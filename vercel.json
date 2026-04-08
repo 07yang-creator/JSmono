@@ -1,15 +1,6 @@
 {
-  "version": 2,
   "framework": null,
   "outputDirectory": "public",
-  "functions": {
-    "api/parse-pdf.py":      { "runtime": "python3.12" },
-    "api/generate-flyer.py": { "runtime": "python3.12" }
-  },
-  "rewrites": [
-    { "source": "/api/parse-pdf",      "destination": "/api/parse-pdf.py"      },
-    { "source": "/api/generate-flyer", "destination": "/api/generate-flyer.py" }
-  ],
   "env": {
     "FONT_PATH": "/var/task/fonts/DroidSansFallbackFull.ttf"
   }
