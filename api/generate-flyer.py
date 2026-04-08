@@ -467,28 +467,65 @@ def generate(data: dict, out_path: str):
     print(f'✅  {out_path}')
 
 
-# ── Vercel handler ────────────────────────────────────────────────────────────
-def handler(request):
-    import tempfile, base64
-    if request.method != 'POST':
-        return {'statusCode': 405, 'body': 'Method Not Allowed'}
-    try:
-        data = json.loads(request.body)
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as t:
-            p = t.name
-        generate(data, p)
-        with open(p, 'rb') as f:
-            b = f.read()
-        os.unlink(p)
-        return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/pdf',
-                        'Content-Disposition': 'attachment; filename="flyer.pdf"'},
-            'body': base64.b64encode(b).decode(),
-            'isBase64Encoded': True,
-        }
-    except Exception as e:
-        return {'statusCode': 500, 'body': str(e)}
+# ── Vercel handler (BaseHTTPRequestHandler) ──────────────────────────────────
+
+import tempfile
+from http.server import BaseHTTPRequestHandler
+
+class handler(BaseHTTPRequestHandler):
+
+    def do_OPTIONS(self):
+        self._cors()
+        self.send_response(200)
+        self.end_headers()
+
+    def do_POST(self):
+        try:
+            content_length = int(self.headers.get('content-length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode('utf-8'))
+
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as t:
+                tmp_path = t.name
+
+            generate(data, tmp_path)
+
+            with open(tmp_path, 'rb') as f:
+                pdf_bytes = f.read()
+            os.unlink(tmp_path)
+
+            # Derive filename from address
+            addr = data.get('address', '物件').replace(' ', '_')[:20]
+            filename = f"{addr}_チラシ.pdf"
+
+            self._cors()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/pdf')
+            self.send_header('Content-Disposition',
+                             f'attachment; filename="{filename}"')
+            self.send_header('Content-Length', str(len(pdf_bytes)))
+            self.end_headers()
+            self.wfile.write(pdf_bytes)
+
+        except Exception as e:
+            msg = str(e).encode('utf-8')
+            self._send(500, msg)
+
+    def _send(self, code, body: bytes):
+        self._cors()
+        self.send_response(code)
+        self.send_header('Content-Type', 'text/plain')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _cors(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+
+    def log_message(self, fmt, *args):
+        pass  # silence default access log
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

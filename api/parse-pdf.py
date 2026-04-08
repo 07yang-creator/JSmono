@@ -327,35 +327,73 @@ def parse_property(pdf_path: str) -> dict:
     return result
 
 
-# ── Vercel / FastAPI handler ──────────────────────────────────────────────────
+# ── Vercel handler (BaseHTTPRequestHandler) ──────────────────────────────────
 
-def handler(request):
-    """Vercel serverless handler (Python runtime)."""
-    import tempfile, os
-    from http import HTTPStatus
+import cgi, io, tempfile, os
+from http.server import BaseHTTPRequestHandler
 
-    if request.method != 'POST':
-        return {'statusCode': 405, 'body': 'Method Not Allowed'}
+class handler(BaseHTTPRequestHandler):
 
-    try:
-        file = request.files.get('file')
-        if not file:
-            return {'statusCode': 400, 'body': 'No file uploaded'}
+    def do_OPTIONS(self):
+        self._cors()
+        self.send_response(200)
+        self.end_headers()
 
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
-            file.save(tmp.name)
-            tmp_path = tmp.name
+    def do_POST(self):
+        try:
+            content_type = self.headers.get('content-type', '')
+            content_length = int(self.headers.get('content-length', 0))
+            body = self.rfile.read(content_length)
 
-        data = parse_property(tmp_path)
-        os.unlink(tmp_path)
+            # Parse multipart/form-data
+            ctype, pdict = cgi.parse_header(content_type)
+            if ctype != 'multipart/form-data':
+                self._send(400, b'Expected multipart/form-data')
+                return
 
-        return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps(data, ensure_ascii=False)
-        }
-    except Exception as e:
-        return {'statusCode': 500, 'body': str(e)}
+            pdict['boundary'] = bytes(pdict['boundary'], 'utf-8')
+            pdict['CONTENT-LENGTH'] = content_length
+            fields = cgi.parse_multipart(io.BytesIO(body), pdict)
+
+            file_data = fields.get('file', [None])[0]
+            if not file_data:
+                self._send(400, b'No file field in form data')
+                return
+
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+                tmp.write(file_data)
+                tmp_path = tmp.name
+
+            result = parse_property(tmp_path)
+            os.unlink(tmp_path)
+
+            body_out = json.dumps(result, ensure_ascii=False).encode('utf-8')
+            self._cors()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Content-Length', str(len(body_out)))
+            self.end_headers()
+            self.wfile.write(body_out)
+
+        except Exception as e:
+            msg = str(e).encode('utf-8')
+            self._send(500, msg)
+
+    def _send(self, code, body: bytes):
+        self._cors()
+        self.send_response(code)
+        self.send_header('Content-Type', 'text/plain')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _cors(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+
+    def log_message(self, fmt, *args):
+        pass  # silence default access log
 
 
 # ── CLI test ──────────────────────────────────────────────────────────────────
