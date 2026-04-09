@@ -3,23 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Justsalemono — 不動産広告自動生成</title>
+  <title>Justsalemono — 不動産チラシ自動生成 by JJconnect</title>
   <style>
     :root {
-      --primary: #1a4fa0;
+      --primary:       #1a4fa0;
+      --primary-dk:    #0e2a5a;
       --primary-light: #2563c4;
-      --accent: #e85d2f;
-      --bg: #f4f6fb;
-      --card: #ffffff;
-      --border: #d0d8e8;
-      --text: #1c2333;
-      --muted: #6b7a99;
-      --success: #16a34a;
-      --radius: 10px;
+      --accent:        #e85d2f;
+      --gold:          #f9b44a;
+      --bg:            #f4f6fb;
+      --card:          #ffffff;
+      --border:        #d0d8e8;
+      --text:          #1c2333;
+      --muted:         #6b7a99;
+      --success:       #16a34a;
+      --radius:        10px;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', 'Yu Gothic', sans-serif;
       background: var(--bg);
@@ -28,7 +28,405 @@
       line-height: 1.6;
     }
 
-    /* ── Header ── */
+    /* ═══════════════════════════════════════════════════════
+       LANDING PAGE
+    ═══════════════════════════════════════════════════════ */
+    #landing-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(160deg, #0e2a5a 0%, #1a4fa0 55%, #2563c4 100%);
+    }
+
+    /* ── LP Header ── */
+    .lp-header {
+      padding: 18px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .lp-logo-circle {
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: var(--gold);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 900; color: #0e2a5a;
+      flex-shrink: 0;
+      letter-spacing: -1px;
+    }
+    .lp-brand { display: flex; flex-direction: column; }
+    .lp-brand-main {
+      font-size: 20px; font-weight: 800; color: #fff;
+      letter-spacing: 0.5px;
+    }
+    .lp-brand-main span { color: var(--gold); }
+    .lp-brand-sub {
+      font-size: 11px; color: rgba(255,255,255,0.55); letter-spacing: 1px;
+    }
+    .lp-header-right {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 20px;
+    }
+    .lp-header-link {
+      color: rgba(255,255,255,0.65);
+      font-size: 12px; text-decoration: none;
+      transition: color 0.2s;
+    }
+    .lp-header-link:hover { color: #fff; }
+
+    /* ── LP Main ── */
+    .lp-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 44px 20px 60px;
+      gap: 32px;
+    }
+
+    /* ── Hero text ── */
+    .lp-hero { text-align: center; max-width: 640px; }
+    .lp-hero h1 {
+      font-size: 32px; font-weight: 900; color: #fff;
+      line-height: 1.25; margin-bottom: 14px;
+    }
+    .lp-hero h1 .highlight { color: var(--gold); }
+    .lp-hero p {
+      font-size: 14px; color: rgba(255,255,255,0.75);
+      line-height: 1.8;
+    }
+
+    /* ── Setup card ── */
+    .lp-card {
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 24px 72px rgba(0,0,0,0.28);
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 740px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .lp-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    /* Building name input */
+    .lp-name-input {
+      width: 100%;
+      font-size: 18px;
+      font-weight: 600;
+      padding: 14px 18px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font-family: inherit;
+      color: var(--text);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      background: #fafbfd;
+    }
+    .lp-name-input:focus {
+      outline: none;
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 4px rgba(37,99,196,0.12);
+      background: #fff;
+    }
+    .lp-name-input::placeholder { color: #bcc6d8; }
+
+    /* Template cards */
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .template-card {
+      position: relative;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .template-card:hover { border-color: var(--primary-light); background: #f5f8ff; }
+    .template-card.selected { border-color: var(--primary); background: #eef3fb; }
+    .template-card.coming-soon { opacity: 0.48; cursor: not-allowed; }
+    .template-card input[type="radio"] { display: none; }
+    .template-badge {
+      position: absolute; top: 10px; right: 10px;
+      font-size: 9px; font-weight: 700;
+      padding: 2px 7px; border-radius: 20px;
+    }
+    .badge-active { background: var(--primary); color: #fff; }
+    .badge-soon { background: #e5e7eb; color: #6b7280; }
+    .template-preview {
+      display: flex;
+      gap: 3px;
+      height: 54px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #f0f3fa;
+      padding: 4px;
+    }
+    .tp-left {
+      width: 38%;
+      background: #c8d4e8;
+      border-radius: 3px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 3px;
+    }
+    .tp-left .bar { height: 4px; border-radius: 2px; background: #9ab0d0; }
+    .tp-left .row { height: 3px; border-radius: 1px; background: #dde8f8; }
+    .tp-mid { width: 12%; background: #e8eef8; border-radius: 3px; }
+    .tp-right { flex: 1; background: #e0e8f4; border-radius: 3px; }
+    .tp-right-4 {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 2px;
+    }
+    .tp-right-4 div { background: #c8d8ec; border-radius: 2px; }
+    .template-name { font-size: 12px; font-weight: 700; color: var(--text); }
+    .template-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+    .template-check {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .template-card.selected .template-check {
+      background: var(--primary);
+      border-color: var(--primary);
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.5 8.5l3 3 6-6' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    .template-card-inner { display: flex; align-items: center; gap: 8px; }
+
+    /* Variant selection */
+    .variant-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .variant-card {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .variant-card:hover { border-color: var(--primary-light); }
+    .variant-card.selected { border-color: var(--primary); background: #eef3fb; }
+    .variant-card input[type="radio"] { display: none; }
+    .variant-radio {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid var(--border);
+      flex-shrink: 0; margin-top: 2px;
+      transition: all 0.15s;
+    }
+    .variant-card.selected .variant-radio {
+      border-color: var(--primary);
+      background: var(--primary);
+      box-shadow: inset 0 0 0 3px #fff;
+    }
+    .variant-body .vname { font-size: 12px; font-weight: 700; }
+    .variant-body .vdesc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* Special sale overlay */
+    .promo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .toggle-switch {
+      position: relative; width: 40px; height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input { display: none; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: #e0e7f3;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-track { background: var(--primary); }
+    .toggle-knob {
+      position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+    }
+    .toggle-switch input:checked ~ .toggle-knob { transform: translateX(18px); }
+    .promo-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .promo-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .promo-input-wrap {
+      display: none;
+      margin-top: 12px;
+    }
+    .promo-input-wrap.visible { display: block; }
+    .promo-input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      font-size: 14px; font-weight: 600;
+      font-family: inherit;
+      color: var(--text);
+      background: #fff9f6;
+    }
+    .promo-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(232,93,47,0.15); }
+    .promo-preview {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px; font-size: 12px; color: var(--muted);
+    }
+    .promo-stamp {
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px; font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 4px;
+      transform: rotate(-8deg);
+      display: inline-block;
+    }
+
+    /* ── Coming soon section ── */
+    .lp-coming-soon {
+      width: 100%; max-width: 740px;
+    }
+    .lp-coming-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.45);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .coming-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .coming-card {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 12px;
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .coming-icon { font-size: 26px; }
+    .coming-name { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.8); }
+    .coming-desc { font-size: 11px; color: rgba(255,255,255,0.45); line-height: 1.5; }
+    .coming-tag {
+      display: inline-block;
+      margin-top: 4px;
+      font-size: 9px; font-weight: 700;
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.5);
+      padding: 2px 8px; border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Start button ── */
+    .lp-start-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 18px 56px;
+      border-radius: 50px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      box-shadow: 0 8px 30px rgba(232,93,47,0.42);
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lp-start-btn:hover {
+      background: #d44e24;
+      transform: translateY(-2px);
+      box-shadow: 0 12px 36px rgba(232,93,47,0.5);
+    }
+    .lp-start-btn:active { transform: scale(0.97); }
+    .lp-start-arrow { font-size: 20px; }
+
+    /* ── LP Footer ── */
+    .lp-footer {
+      text-align: center;
+      padding: 18px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .lp-footer a { color: rgba(255,255,255,0.5); text-decoration: none; }
+    .lp-footer a:hover { color: var(--gold); }
+
+    /* ═══════════════════════════════════════════════════════
+       APP PAGE — back bar
+    ═══════════════════════════════════════════════════════ */
+    .app-back-bar {
+      background: #0e2a5a;
+      color: rgba(255,255,255,0.8);
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 12px;
+    }
+    .app-back-btn {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 11px;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .app-back-btn:hover { background: rgba(255,255,255,0.2); }
+    .app-variant-badge {
+      background: rgba(249,180,74,0.2);
+      color: var(--gold);
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .app-promo-badge {
+      background: rgba(232,93,47,0.2);
+      color: #f87c52;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       APP PAGE — (existing form styles preserved)
+    ═══════════════════════════════════════════════════════ */
     header {
       background: var(--primary);
       color: #fff;
@@ -38,725 +436,835 @@
       gap: 14px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.18);
     }
-    header .logo {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: 1px;
-    }
+    header .logo { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
     header .logo span { color: #f9b44a; }
-    header .tagline {
-      font-size: 12px;
-      opacity: 0.75;
-      margin-top: 2px;
-    }
+    header .tagline { font-size: 12px; opacity: 0.75; margin-top: 2px; }
     header .user-area {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 13px;
+      margin-left: auto; display: flex; align-items: center;
+      gap: 10px; font-size: 13px;
     }
     header .user-area .avatar {
-      width: 34px; height: 34px;
-      border-radius: 50%;
-      background: #f9b44a;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; color: var(--primary); font-size: 15px;
+      width: 34px; height: 34px; border-radius: 50%;
+      background: #f9b44a; display: flex; align-items: center;
+      justify-content: center; font-weight: 700; color: var(--primary); font-size: 15px;
     }
     header .btn-logout {
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.3);
-      color: #fff;
-      padding: 5px 14px;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: background 0.2s;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+      color: #fff; padding: 5px 14px; border-radius: 20px; cursor: pointer;
+      font-size: 12px; transition: background 0.2s;
     }
     header .btn-logout:hover { background: rgba(255,255,255,0.25); }
 
-    /* ── Layout ── */
-    .container {
-      max-width: 1100px;
-      margin: 28px auto;
-      padding: 0 20px;
-    }
+    .container { max-width: 1100px; margin: 28px auto; padding: 0 20px; }
+    .page-title { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+    .page-sub { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
 
-    .page-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--primary);
-      margin-bottom: 4px;
-    }
-    .page-sub {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 24px;
-    }
-
-    /* ── Upload Zone ── */
     .upload-zone {
-      background: var(--card);
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 32px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      margin-bottom: 28px;
+      background: var(--card); border: 2px dashed var(--border); border-radius: var(--radius);
+      padding: 32px; text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s; margin-bottom: 28px;
     }
-    .upload-zone:hover, .upload-zone.dragover {
-      border-color: var(--primary-light);
-      background: #eef3fc;
-    }
+    .upload-zone:hover, .upload-zone.dragover { border-color: var(--primary-light); background: #eef3fc; }
     .upload-zone .upload-icon { font-size: 40px; margin-bottom: 10px; }
     .upload-zone h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
     .upload-zone p { font-size: 12px; color: var(--muted); }
     .upload-zone input[type="file"] { display: none; }
     .btn-upload {
-      display: inline-block;
-      margin-top: 14px;
-      background: var(--primary);
-      color: #fff;
-      padding: 9px 24px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: background 0.2s;
+      display: inline-block; margin-top: 14px; background: var(--primary); color: #fff;
+      padding: 9px 24px; border-radius: 6px; font-size: 13px; cursor: pointer;
+      font-weight: 600; transition: background 0.2s;
     }
     .btn-upload:hover { background: var(--primary-light); }
     .file-selected {
-      display: none;
-      margin-top: 12px;
-      background: #e8f5e9;
-      border: 1px solid #a5d6a7;
-      border-radius: 6px;
-      padding: 8px 14px;
-      font-size: 13px;
-      color: var(--success);
+      display: none; margin-top: 12px; background: #e8f5e9; border: 1px solid #a5d6a7;
+      border-radius: 6px; padding: 8px 14px; font-size: 13px; color: var(--success);
     }
 
-    /* ── Divider ── */
     .divider {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
-      color: var(--muted);
-      font-size: 12px;
+      display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+      color: var(--muted); font-size: 12px;
     }
-    .divider::before, .divider::after {
-      content: ''; flex: 1;
-      height: 1px; background: var(--border);
-    }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-    /* ── Form Sections ── */
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } }
 
-    .section-card {
-      background: var(--card);
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      overflow: hidden;
-    }
-    .section-card.full-width {
-      grid-column: 1 / -1;
-    }
+    .section-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+    .section-card.full-width { grid-column: 1 / -1; }
     .section-header {
-      background: var(--primary);
-      color: #fff;
-      padding: 9px 16px;
-      font-size: 13px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      background: var(--primary); color: #fff; padding: 9px 16px;
+      font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;
     }
-    .section-body {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+    .section-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 
-    /* ── Form Fields ── */
     .field { display: flex; flex-direction: column; gap: 4px; }
-    .field label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-    }
-    .field label .req {
-      color: var(--accent);
-      margin-left: 3px;
-    }
+    .field label { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .field label .req { color: var(--accent); margin-left: 3px; }
     .field input, .field select, .field textarea {
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px 10px;
-      font-size: 13px;
-      font-family: inherit;
-      color: var(--text);
-      transition: border-color 0.2s;
-      background: #fff;
+      border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+      font-size: 13px; font-family: inherit; color: var(--text);
+      transition: border-color 0.2s; background: #fff;
     }
     .field input:focus, .field select:focus, .field textarea:focus {
-      outline: none;
-      border-color: var(--primary-light);
-      box-shadow: 0 0 0 3px rgba(37, 99, 196, 0.12);
+      outline: none; border-color: var(--primary-light);
+      box-shadow: 0 0 0 3px rgba(37,99,196,0.12);
     }
     .field textarea { resize: vertical; min-height: 70px; }
 
-    .field-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .field-row-3 {
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr;
-      gap: 10px;
-    }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field-row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
 
-    /* Station rows */
-    .station-row {
-      display: grid;
-      grid-template-columns: 1fr 2fr 80px;
-      gap: 8px;
-      align-items: end;
-    }
+    .station-row { display: grid; grid-template-columns: 1fr 2fr 80px; gap: 8px; align-items: end; }
     .station-row .field label { font-size: 11px; }
     .remove-btn {
-      background: none;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 8px;
-      cursor: pointer;
-      color: #999;
-      font-size: 16px;
-      transition: color 0.2s;
-      align-self: flex-end;
+      background: none; border: 1px solid #e0e0e0; border-radius: 6px;
+      padding: 8px; cursor: pointer; color: #999; font-size: 16px;
+      transition: color 0.2s; align-self: flex-end;
     }
     .remove-btn:hover { color: var(--accent); border-color: var(--accent); }
-
     .add-btn {
-      background: none;
-      border: 1px dashed var(--border);
-      border-radius: 6px;
-      padding: 7px;
-      cursor: pointer;
-      color: var(--primary);
-      font-size: 12px;
-      font-weight: 600;
-      transition: background 0.2s;
-      width: 100%;
+      background: none; border: 1px dashed var(--border); border-radius: 6px;
+      padding: 7px; cursor: pointer; color: var(--primary); font-size: 12px;
+      font-weight: 600; transition: background 0.2s; width: 100%;
     }
     .add-btn:hover { background: #eef3fc; }
 
-    /* Nearby row */
-    .nearby-row {
-      display: grid;
-      grid-template-columns: 2fr 100px;
-      gap: 8px;
-    }
+    .nearby-row { display: grid; grid-template-columns: 2fr 100px; gap: 8px; }
 
-    /* ── Submit Bar ── */
     .submit-bar {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px 24px;
-      margin-top: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px 24px; margin-top: 24px; display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: 12px;
     }
-    .submit-bar .hints {
-      font-size: 12px;
-      color: var(--muted);
-    }
+    .submit-bar .hints { font-size: 12px; color: var(--muted); }
     .submit-bar .actions { display: flex; gap: 10px; }
     .btn-save {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 10px 22px;
-      border-radius: 7px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
+      background: none; border: 1px solid var(--border); color: var(--text);
+      padding: 10px 22px; border-radius: 7px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: background 0.2s;
     }
     .btn-save:hover { background: var(--bg); }
     .btn-generate {
-      background: var(--accent);
-      border: none;
-      color: #fff;
-      padding: 11px 28px;
-      border-radius: 7px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      background: var(--accent); border: none; color: #fff; padding: 11px 28px;
+      border-radius: 7px; font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: background 0.2s, transform 0.1s; display: flex; align-items: center; gap: 8px;
     }
     .btn-generate:hover { background: #d44e24; }
     .btn-generate:active { transform: scale(0.98); }
 
-    /* ── Progress overlay ── */
     .progress-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      z-index: 100; align-items: center; justify-content: center;
     }
     .progress-overlay.visible { display: flex; }
     .progress-card {
-      background: #fff;
-      border-radius: 14px;
-      padding: 36px 40px;
-      text-align: center;
-      min-width: 300px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      background: #fff; border-radius: 14px; padding: 36px 40px;
+      text-align: center; min-width: 300px; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
     }
     .progress-card .spinner {
-      width: 48px; height: 48px;
-      border: 4px solid #e0e7f3;
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      margin: 0 auto 16px;
-      animation: spin 0.8s linear infinite;
+      width: 48px; height: 48px; border: 4px solid #e0e7f3;
+      border-top-color: var(--primary); border-radius: 50%;
+      margin: 0 auto 16px; animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .progress-card h3 { font-size: 16px; margin-bottom: 6px; }
     .progress-card p { font-size: 12px; color: var(--muted); }
-    .progress-steps {
-      margin-top: 18px;
-      text-align: left;
-      font-size: 12px;
-    }
-    .progress-steps .step {
-      padding: 4px 0;
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .progress-steps { margin-top: 18px; text-align: left; font-size: 12px; }
+    .progress-steps .step { padding: 4px 0; color: var(--muted); display: flex; align-items: center; gap: 8px; }
     .progress-steps .step.done { color: var(--success); }
     .progress-steps .step.active { color: var(--primary); font-weight: 600; }
   </style>
 </head>
 <body>
 
-<!-- Header -->
-<header>
-  <div>
-    <div class="logo">Just<span>Sale</span>mono</div>
-    <div class="tagline">不動産広告チラシ 自動生成システム</div>
-  </div>
-  <div class="user-area">
-    <div class="avatar">田</div>
-    <span>田中エージェント</span>
-    <button class="btn-logout" onclick="handleLogout()">ログアウト</button>
-  </div>
-</header>
+<!-- ═══════════════════════════════════════════════════════════════
+     LANDING PAGE
+═══════════════════════════════════════════════════════════════ -->
+<div id="landing-page">
 
-<div class="container">
-  <div class="page-title">📋 物件情報入力</div>
-  <div class="page-sub">PDFをアップロードして自動入力、または手動でフォームに記入してください</div>
+  <header class="lp-header">
+    <div class="lp-logo-circle">JJ</div>
+    <div class="lp-brand">
+      <div class="lp-brand-main">JJ<span>connect</span>.jp</div>
+      <div class="lp-brand-sub">JUSTSALEMONO — 不動産チラシ自動生成</div>
+    </div>
+    <div class="lp-header-right">
+      <a href="https://jjconnect.jp" class="lp-header-link" target="_blank">🌐 jjconnect.jp</a>
+      <a href="#" class="lp-header-link">ログイン</a>
+    </div>
+  </header>
 
-  <!-- PDF Upload Zone -->
-  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('pdfInput').click()">
-    <div class="upload-icon">📄</div>
-    <h3>物件PDFをここにドラッグ＆ドロップ</h3>
-    <p>または下のボタンからファイルを選択してください</p>
-    <p style="margin-top:4px; font-size:11px;">対応形式：PDF（物件データシート、チラシ、図面等）</p>
-    <label class="btn-upload">📂 PDFを選択してアップロード</label>
-    <input type="file" id="pdfInput" accept=".pdf" onchange="handleFileSelect(event)">
-    <div class="file-selected" id="fileSelected">✅ <span id="fileName"></span> を読み込みました</div>
-  </div>
+  <main class="lp-main">
 
-  <div class="divider">または手動で入力</div>
+    <!-- Hero -->
+    <div class="lp-hero">
+      <h1>物件チラシを<br><span class="highlight">ワンクリック</span>で自動生成</h1>
+      <p>
+        所在地・価格・間取りなどの物件情報を入力するだけで、<br>
+        印刷品質のA4チラシPDFが数秒で完成します。<br>
+        テンプレート・レイアウトを選んで、今すぐ始めましょう。
+      </p>
+    </div>
 
-  <!-- Main Form -->
-  <form id="propertyForm">
-    <div class="form-grid">
+    <!-- Setup Card -->
+    <div class="lp-card">
 
-      <!-- 基本情報 -->
-      <div class="section-card">
-        <div class="section-header">🏠 基本情報</div>
-        <div class="section-body">
-          <div class="field">
-            <label>物件種別<span class="req">*</span></label>
-            <select id="propertyType" name="propertyType">
-              <option value="中古戸建">中古戸建</option>
-              <option value="新築戸建">新築戸建</option>
-              <option value="中古マンション">中古マンション</option>
-              <option value="新築マンション">新築マンション</option>
-              <option value="土地">土地</option>
-              <option value="店舗・事務所">店舗・事務所</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>物件所在地<span class="req">*</span></label>
-            <input type="text" name="address" placeholder="例：東京都新宿区北新宿三丁目12-30" id="address">
-          </div>
-          <div class="field">
-            <label>物件名称（任意）</label>
-            <input type="text" name="propertyName" placeholder="例：北新宿３丁目の家">
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>販売価格<span class="req">*</span></label>
-              <input type="text" name="price" placeholder="例：1,480万円" id="price">
+      <!-- 1. 物件名 -->
+      <div>
+        <div class="lp-section-title">① 物件名（任意）</div>
+        <input
+          type="text"
+          id="lp-building-name"
+          class="lp-name-input"
+          placeholder="例：北新宿３丁目の家　/　パークコート渋谷"
+        >
+      </div>
+
+      <!-- 2. Template selection -->
+      <div>
+        <div class="lp-section-title">② テンプレートを選択</div>
+        <div class="template-grid">
+
+          <!-- Template 1 -->
+          <label class="template-card selected" id="tcard-1" onclick="selectTemplate(1)">
+            <input type="radio" name="template" value="1" checked>
+            <span class="template-badge badge-active">利用可能</span>
+            <div class="template-preview">
+              <div class="tp-left">
+                <div class="bar"></div>
+                <div class="row"></div><div class="row"></div>
+                <div class="bar" style="background:#9ab0d0;margin-top:2px;"></div>
+                <div class="row"></div><div class="row"></div>
+              </div>
+              <div class="tp-mid"></div>
+              <div class="tp-right"></div>
             </div>
-            <div class="field">
-              <label>税込区分</label>
-              <select name="taxIncluded">
-                <option>税込</option>
-                <option>税別</option>
-              </select>
+            <div class="template-card-inner">
+              <span class="template-check"></span>
+              <div>
+                <div class="template-name">テンプレート 1 — スタンダード</div>
+                <div class="template-desc">3カラム構成 / 物件データ + 地図 + 周辺環境</div>
+              </div>
             </div>
+          </label>
+
+          <!-- Template 2 (coming soon) -->
+          <label class="template-card coming-soon" id="tcard-2">
+            <input type="radio" name="template" value="2" disabled>
+            <span class="template-badge badge-soon">準備中</span>
+            <div class="template-preview" style="opacity:0.4;">
+              <div class="tp-left">
+                <div class="bar"></div>
+                <div class="row"></div>
+              </div>
+              <div class="tp-right" style="background:#d8e4f0;"></div>
+            </div>
+            <div class="template-card-inner">
+              <span class="template-check"></span>
+              <div>
+                <div class="template-name">テンプレート 2 — ビジュアル重視</div>
+                <div class="template-desc">大判写真メイン / シンプル2カラム</div>
+              </div>
+            </div>
+          </label>
+
+        </div>
+      </div>
+
+      <!-- 3. Layout variant -->
+      <div>
+        <div class="lp-section-title">③ レイアウトオプション</div>
+        <div class="variant-grid">
+
+          <label class="variant-card selected" id="vcard-A" onclick="selectVariant('A')">
+            <input type="radio" name="variant" value="A" checked>
+            <span class="variant-radio"></span>
+            <div class="variant-body">
+              <div class="vname">🗺 標準（写真2枚 + 地図 + 周辺環境・学区）</div>
+              <div class="vdesc">外観写真・間取り図・地図に加え、周辺施設・学区情報を掲載</div>
+            </div>
+          </label>
+
+          <label class="variant-card" id="vcard-B" onclick="selectVariant('B')">
+            <input type="radio" name="variant" value="B">
+            <span class="variant-radio"></span>
+            <div class="variant-body">
+              <div class="vname">📷 写真重視（写真4枚・周辺環境なし）</div>
+              <div class="vdesc">右エリアを写真4枚で構成。視覚インパクト重視</div>
+            </div>
+          </label>
+
+        </div>
+      </div>
+
+      <!-- 4. Special sale overlay -->
+      <div>
+        <div class="lp-section-title">④ 特売情報オーバーレイ（任意）</div>
+        <div class="promo-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="promo-toggle" onchange="togglePromo(this)">
+            <span class="toggle-track"></span>
+            <span class="toggle-knob"></span>
+          </label>
+          <div>
+            <div class="promo-label">チラシ右上に特別告知バナーを重ねる</div>
+            <div class="promo-sub">価格改定・即時引渡・限定公開など、強調したいキーワードを入力</div>
           </div>
-          <div class="field">
-            <label>現況</label>
-            <select name="currentStatus">
-              <option>空室</option>
-              <option>居住中</option>
-              <option>賃貸中</option>
-              <option>更地</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>引き渡し</label>
-            <input type="text" name="handover" placeholder="例：相談、即渡し、〇年〇月予定">
+        </div>
+        <div class="promo-input-wrap" id="promo-input-wrap">
+          <input
+            type="text"
+            id="promo-text"
+            class="promo-input"
+            placeholder="例：価格改定！　 /　 即時引渡可！　 /　 再建築可に変更！"
+            oninput="updatePromoPreview(this.value)"
+          >
+          <div class="promo-preview">
+            <span style="color:#999;">プレビュー：</span>
+            <span class="promo-stamp" id="promo-stamp-preview">価格改定！</span>
+            <span style="font-size:11px;">→ チラシ右上コーナーに斜めで配置されます</span>
           </div>
         </div>
       </div>
 
-      <!-- 交通アクセス -->
-      <div class="section-card">
-        <div class="section-header">🚉 交通アクセス</div>
-        <div class="section-body">
-          <div id="stationsContainer"></div>
-          <button type="button" class="add-btn" onclick="addStation()">＋ 駅を追加</button>
+    </div><!-- /lp-card -->
+
+    <!-- Coming soon features -->
+    <div class="lp-coming-soon">
+      <div class="lp-coming-title">Coming Soon — 近日公開予定の機能</div>
+      <div class="coming-grid">
+        <div class="coming-card">
+          <div class="coming-icon">📄</div>
+          <div class="coming-name">PDF一括読み込み</div>
+          <div class="coming-desc">既存チラシや物件資料PDFをアップロードして物件情報を自動抽出</div>
+          <span class="coming-tag">AI OCR搭載予定</span>
         </div>
-      </div>
-
-      <!-- 土地情報 -->
-      <div class="section-card">
-        <div class="section-header">🗺 土地情報</div>
-        <div class="section-body">
-          <div class="field-row">
-            <div class="field">
-              <label>面積（㎡）</label>
-              <input type="text" name="landArea" placeholder="例：106.28" id="landArea">
-            </div>
-            <div class="field">
-              <label>面積（坪）</label>
-              <input type="text" name="landAreaTsubo" placeholder="例：32.15" id="landAreaTsubo">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>土地権利</label>
-              <select name="landRight">
-                <option>所有権</option>
-                <option>借地権</option>
-                <option>地上権</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>地目</label>
-              <select name="landCategory">
-                <option>宅地</option>
-                <option>田</option>
-                <option>畑</option>
-                <option>山林</option>
-                <option>雑種地</option>
-              </select>
-            </div>
-          </div>
-          <div class="field">
-            <label>接面道路</label>
-            <input type="text" name="frontRoad" placeholder="例：北側6m公道、建築基準法上の道路に該当しない通路">
-          </div>
-          <div id="leasePeriodSection" style="display:none;">
-            <div class="field">
-              <label>借地期間</label>
-              <input type="text" name="leasePeriod" placeholder="例：令和8年2月1日〜令和38年1月31日（30年）">
-            </div>
-            <div class="field">
-              <label>地代</label>
-              <input type="text" name="groundRent" placeholder="例：30,000円/月　360,000円/年">
-            </div>
-          </div>
-          <div class="field">
-            <label>再建築</label>
-            <select name="rebuild">
-              <option value="">選択してください</option>
-              <option>再建築可</option>
-              <option>再建築不可</option>
-              <option>条件付き再建築可</option>
-            </select>
-          </div>
+        <div class="coming-card">
+          <div class="coming-icon">📊</div>
+          <div class="coming-name">Excelデータ対応</div>
+          <div class="coming-desc">レインズ・社内管理表のExcelを読み込み複数物件を一括生成</div>
+          <span class="coming-tag">バッチ出力対応予定</span>
         </div>
-      </div>
-
-      <!-- 建物情報 -->
-      <div class="section-card">
-        <div class="section-header">🏗 建物情報</div>
-        <div class="section-body">
-          <div class="field-row">
-            <div class="field">
-              <label>築年月</label>
-              <input type="text" name="builtYear" placeholder="例：昭和55年3月、不詳">
-            </div>
-            <div class="field">
-              <label>構造</label>
-              <input type="text" name="structure" placeholder="例：木造瓦葺2階建">
-            </div>
-          </div>
-          <div class="field">
-            <label>床面積（各階）</label>
-            <input type="text" name="floorArea1" placeholder="例：1階 38.01㎡" style="margin-bottom:6px;">
-            <input type="text" name="floorArea2" placeholder="例：2階 12.39㎡" style="margin-bottom:6px;">
-            <input type="text" name="floorArea3" placeholder="例：3階（任意）">
-          </div>
-          <div class="field">
-            <label>合計床面積（㎡）</label>
-            <input type="text" name="totalFloorArea" placeholder="例：50.40" id="totalFloor">
-          </div>
-          <div class="field">
-            <label>間取り</label>
-            <input type="text" name="layout" placeholder="例：3LDK、4K">
-          </div>
+        <div class="coming-card">
+          <div class="coming-icon">🤖</div>
+          <div class="coming-name">AIコピーライティング</div>
+          <div class="coming-desc">物件特徴からキャッチコピーや備考文を自動生成。印象アップに</div>
+          <span class="coming-tag">Claude AI 搭載予定</span>
         </div>
-      </div>
-
-      <!-- 法令制限 -->
-      <div class="section-card">
-        <div class="section-header">⚖️ 法令制限</div>
-        <div class="section-body">
-          <div class="field-row">
-            <div class="field">
-              <label>都市計画</label>
-              <select name="cityPlan">
-                <option>市街化区域</option>
-                <option>市街化調整区域</option>
-                <option>非線引き区域</option>
-                <option>準都市計画区域</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>用途地域</label>
-              <input type="text" name="useZone" placeholder="例：第一種中高層住居専用地域">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>防火指定</label>
-              <select name="fireZone">
-                <option value="">-</option>
-                <option>防火地域</option>
-                <option>準防火地域</option>
-                <option>指定なし</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>高度地区</label>
-              <input type="text" name="heightDistrict" placeholder="例：20m 第二種高度地区">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>建ぺい率</label>
-              <input type="text" name="bcr" placeholder="例：60%">
-            </div>
-            <div class="field">
-              <label>容積率</label>
-              <input type="text" name="far" placeholder="例：300%">
-            </div>
-          </div>
-          <div class="field">
-            <label>その他制限</label>
-            <textarea name="otherLegal" placeholder="例：景観法、宅地造成等工事規制区域、高さ制限あり（10m）"></textarea>
-          </div>
-        </div>
-      </div>
-
-      <!-- 周辺環境 & 学区 -->
-      <div class="section-card">
-        <div class="section-header">🏪 周辺環境・学区</div>
-        <div class="section-body">
-          <label style="font-size:12px; font-weight:600; color:var(--muted);">周辺施設</label>
-          <div id="nearbyContainer"></div>
-          <button type="button" class="add-btn" onclick="addNearby()">＋ 施設を追加</button>
-          <div style="margin-top:8px; border-top:1px solid var(--border); padding-top:10px;">
-            <label style="font-size:12px; font-weight:600; color:var(--muted);">学区</label>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>小学校</label>
-              <input type="text" name="elemSchool" placeholder="例：淀橋第四小学校">
-            </div>
-            <div class="field">
-              <label>距離・徒歩</label>
-              <input type="text" name="elemSchoolDist" placeholder="例：徒歩約3分">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>中学校</label>
-              <input type="text" name="juniorSchool" placeholder="例：新宿西戸山中学校">
-            </div>
-            <div class="field">
-              <label>距離・徒歩</label>
-              <input type="text" name="juniorSchoolDist" placeholder="例：徒歩約16分">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ライフライン・備考 -->
-      <div class="section-card full-width">
-        <div class="section-header">💡 ライフライン・備考</div>
-        <div class="section-body">
-          <div class="field-row">
-            <div class="field">
-              <label>電気</label>
-              <input type="text" name="electric" placeholder="例：東京電力">
-            </div>
-            <div class="field">
-              <label>ガス</label>
-              <input type="text" name="gas" placeholder="例：個別プロパンガス、都市ガス">
-            </div>
-            <div class="field">
-              <label>上下水道</label>
-              <input type="text" name="water" placeholder="例：公営上下水道">
-            </div>
-          </div>
-          <div class="field">
-            <label>備考・特記事項</label>
-            <textarea name="remarks" placeholder="例：再建築不可、現況と図面が相違する場合は現況を優先します。"></textarea>
-          </div>
-        </div>
-      </div>
-
-      <!-- 不動産会社情報 -->
-      <div class="section-card full-width">
-        <div class="section-header">🏢 不動産会社・担当者情報</div>
-        <div class="section-body">
-          <div class="field-row">
-            <div class="field">
-              <label>会社名</label>
-              <input type="text" name="companyName" placeholder="例：株式会社ブリリアント">
-            </div>
-            <div class="field">
-              <label>屋号・ブランド名</label>
-              <input type="text" name="brandName" placeholder="例：リクシル不動産ショップ">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>会社住所</label>
-              <input type="text" name="companyAddress" placeholder="例：東京都台東区台東1-31-7 PMO秋葉原北7F">
-            </div>
-            <div class="field">
-              <label>免許番号</label>
-              <input type="text" name="licenseNo" placeholder="例：東京都知事（3）第92862号">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>担当者名</label>
-              <input type="text" name="agentName" placeholder="例：青木（アオキ）">
-            </div>
-            <div class="field">
-              <label>TEL</label>
-              <input type="text" name="tel" placeholder="例：070-4238-7811">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>FAX</label>
-              <input type="text" name="fax" placeholder="例：03-6803-2967">
-            </div>
-            <div class="field">
-              <label>メール</label>
-              <input type="text" name="email" placeholder="例：s-aoki@brilliant-corp.jp">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label>取引態様</label>
-              <select name="transactionType">
-                <option>売主</option>
-                <option>媒介</option>
-                <option>代理</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>手数料</label>
-              <input type="text" name="fee" placeholder="例：3%(税込)">
-            </div>
-          </div>
-          <div class="field">
-            <label>キャッチコピー・PR文（任意）</label>
-            <textarea name="catchcopy" placeholder="例：実需・投資・借地・再建築不可など積極買取中"></textarea>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /form-grid -->
-
-    <!-- Submit Bar -->
-    <div class="submit-bar">
-      <div class="hints">
-        <span style="color: var(--accent);">*</span> 必須項目を入力してください<br>
-        PDFアップロードで自動入力→確認・修正→生成 の順で進めると効率的です
-      </div>
-      <div class="actions">
-        <button type="button" class="btn-save" onclick="saveDraft()">💾 下書き保存</button>
-        <button type="button" class="btn-generate" onclick="generateFlyer()">
-          <span>🖨</span> チラシPDFを生成
-        </button>
       </div>
     </div>
 
-  </form>
-</div>
+    <!-- Start button -->
+    <button class="lp-start-btn" onclick="startApp()">
+      <span>物件情報を入力してチラシを作る</span>
+      <span class="lp-start-arrow">→</span>
+    </button>
 
-<!-- Progress Overlay -->
-<div class="progress-overlay" id="progressOverlay">
-  <div class="progress-card">
-    <div class="spinner"></div>
-    <h3>チラシを生成中…</h3>
-    <p>しばらくお待ちください</p>
-    <div class="progress-steps" id="progressSteps">
-      <div class="step" id="step1">⬜ PDFデータを解析中</div>
-      <div class="step" id="step2">⬜ レイアウトを構築中</div>
-      <div class="step" id="step3">⬜ 画像を合成中</div>
-      <div class="step" id="step4">⬜ PDFを書き出し中</div>
+  </main>
+
+  <footer class="lp-footer">
+    &copy; 2026 <a href="https://jjconnect.jp" target="_blank">JJconnect.jp</a> — Justsalemono v1.0 &nbsp;|&nbsp;
+    Powered by ReportLab &amp; Claude AI
+  </footer>
+
+</div><!-- /landing-page -->
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     APP PAGE
+═══════════════════════════════════════════════════════════════ -->
+<div id="app-page" style="display:none">
+
+  <!-- Back / status bar -->
+  <div class="app-back-bar">
+    <button class="app-back-btn" onclick="goBack()">← 設定に戻る</button>
+    <span id="app-variant-label" class="app-variant-badge">標準（写真2枚+地図+周辺環境）</span>
+    <span id="app-promo-label" class="app-promo-badge" style="display:none">
+      ✦ 特売バナー: <span id="app-promo-text-label"></span>
+    </span>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div>
+      <div class="logo">Just<span>Sale</span>mono</div>
+      <div class="tagline">不動産広告チラシ 自動生成システム by JJconnect.jp</div>
+    </div>
+    <div class="user-area">
+      <div class="avatar">田</div>
+      <span>田中エージェント</span>
+      <button class="btn-logout" onclick="handleLogout()">ログアウト</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="page-title">📋 物件情報入力</div>
+    <div class="page-sub">テンプレート <strong id="app-template-label">1 — スタンダード</strong>　|　PDFまたは手動入力で物件情報を入力してください</div>
+
+    <!-- PDF Upload Zone -->
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('pdfInput').click()">
+      <div class="upload-icon">📄</div>
+      <h3>物件PDFをここにドラッグ＆ドロップ</h3>
+      <p>または下のボタンからファイルを選択してください</p>
+      <p style="margin-top:4px; font-size:11px;">対応形式：PDF（物件データシート、チラシ、図面等）</p>
+      <label class="btn-upload">📂 PDFを選択してアップロード</label>
+      <input type="file" id="pdfInput" accept=".pdf" onchange="handleFileSelect(event)">
+      <div class="file-selected" id="fileSelected">✅ <span id="fileName"></span> を読み込みました</div>
+    </div>
+
+    <div class="divider">または手動で入力</div>
+
+    <!-- Main Form -->
+    <form id="propertyForm">
+      <!-- Hidden fields from landing page -->
+      <input type="hidden" name="templateId" id="f-templateId" value="1">
+      <input type="hidden" name="templateVariant" id="f-templateVariant" value="A">
+      <input type="hidden" name="specialPromo" id="f-specialPromo" value="">
+
+      <div class="form-grid">
+
+        <!-- 基本情報 -->
+        <div class="section-card">
+          <div class="section-header">🏠 基本情報</div>
+          <div class="section-body">
+            <div class="field">
+              <label>物件種別<span class="req">*</span></label>
+              <select id="propertyType" name="propertyType">
+                <option value="中古戸建">中古戸建</option>
+                <option value="新築戸建">新築戸建</option>
+                <option value="中古マンション">中古マンション</option>
+                <option value="新築マンション">新築マンション</option>
+                <option value="土地">土地</option>
+                <option value="店舗・事務所">店舗・事務所</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>物件所在地<span class="req">*</span></label>
+              <input type="text" name="address" placeholder="例：東京都新宿区北新宿三丁目12-30" id="address">
+            </div>
+            <div class="field">
+              <label>物件名称（任意）</label>
+              <input type="text" name="propertyName" id="f-propertyName" placeholder="例：北新宿３丁目の家">
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>販売価格<span class="req">*</span></label>
+                <input type="text" name="price" placeholder="例：1,480万円" id="price">
+              </div>
+              <div class="field">
+                <label>税込区分</label>
+                <select name="taxIncluded">
+                  <option>税込</option>
+                  <option>税別</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>現況</label>
+              <select name="currentStatus">
+                <option>空室</option>
+                <option>居住中</option>
+                <option>賃貸中</option>
+                <option>更地</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>引き渡し</label>
+              <input type="text" name="handover" placeholder="例：相談、即渡し、〇年〇月予定">
+            </div>
+          </div>
+        </div>
+
+        <!-- 交通アクセス -->
+        <div class="section-card">
+          <div class="section-header">🚉 交通アクセス</div>
+          <div class="section-body">
+            <div id="stationsContainer"></div>
+            <button type="button" class="add-btn" onclick="addStation()">＋ 駅を追加</button>
+          </div>
+        </div>
+
+        <!-- 土地情報 -->
+        <div class="section-card">
+          <div class="section-header">🗺 土地情報</div>
+          <div class="section-body">
+            <div class="field-row">
+              <div class="field">
+                <label>面積（㎡）</label>
+                <input type="text" name="landArea" placeholder="例：106.28" id="landArea">
+              </div>
+              <div class="field">
+                <label>面積（坪）</label>
+                <input type="text" name="landAreaTsubo" placeholder="例：32.15" id="landAreaTsubo">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>土地権利</label>
+                <select name="landRight">
+                  <option>所有権</option>
+                  <option>借地権</option>
+                  <option>地上権</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>地目</label>
+                <select name="landCategory">
+                  <option>宅地</option>
+                  <option>田</option>
+                  <option>畑</option>
+                  <option>山林</option>
+                  <option>雑種地</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>接面道路</label>
+              <input type="text" name="frontRoad" placeholder="例：北側6m公道、建築基準法上の道路に該当しない通路">
+            </div>
+            <div id="leasePeriodSection" style="display:none;">
+              <div class="field">
+                <label>借地期間</label>
+                <input type="text" name="leasePeriod" placeholder="例：令和8年2月1日〜令和38年1月31日（30年）">
+              </div>
+              <div class="field">
+                <label>地代</label>
+                <input type="text" name="groundRent" placeholder="例：30,000円/月　360,000円/年">
+              </div>
+            </div>
+            <div class="field">
+              <label>再建築</label>
+              <select name="rebuild">
+                <option value="">選択してください</option>
+                <option>再建築可</option>
+                <option>再建築不可</option>
+                <option>条件付き再建築可</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- 建物情報 -->
+        <div class="section-card">
+          <div class="section-header">🏗 建物情報</div>
+          <div class="section-body">
+            <div class="field-row">
+              <div class="field">
+                <label>築年月</label>
+                <input type="text" name="builtYear" placeholder="例：昭和55年3月、不詳">
+              </div>
+              <div class="field">
+                <label>構造</label>
+                <input type="text" name="structure" placeholder="例：木造瓦葺2階建">
+              </div>
+            </div>
+            <div class="field">
+              <label>床面積（各階）</label>
+              <input type="text" name="floorArea1" placeholder="例：1階 38.01㎡" style="margin-bottom:6px;">
+              <input type="text" name="floorArea2" placeholder="例：2階 12.39㎡" style="margin-bottom:6px;">
+              <input type="text" name="floorArea3" placeholder="例：3階（任意）">
+            </div>
+            <div class="field">
+              <label>合計床面積（㎡）</label>
+              <input type="text" name="totalFloorArea" placeholder="例：50.40" id="totalFloor">
+            </div>
+            <div class="field">
+              <label>間取り</label>
+              <input type="text" name="layout" placeholder="例：3LDK、4K">
+            </div>
+          </div>
+        </div>
+
+        <!-- 法令制限 -->
+        <div class="section-card">
+          <div class="section-header">⚖️ 法令制限</div>
+          <div class="section-body">
+            <div class="field-row">
+              <div class="field">
+                <label>都市計画</label>
+                <select name="cityPlan">
+                  <option>市街化区域</option>
+                  <option>市街化調整区域</option>
+                  <option>非線引き区域</option>
+                  <option>準都市計画区域</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>用途地域</label>
+                <input type="text" name="useZone" placeholder="例：第一種中高層住居専用地域">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>防火指定</label>
+                <select name="fireZone">
+                  <option value="">-</option>
+                  <option>防火地域</option>
+                  <option>準防火地域</option>
+                  <option>指定なし</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>高度地区</label>
+                <input type="text" name="heightDistrict" placeholder="例：20m 第二種高度地区">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>建ぺい率</label>
+                <input type="text" name="bcr" placeholder="例：60%">
+              </div>
+              <div class="field">
+                <label>容積率</label>
+                <input type="text" name="far" placeholder="例：300%">
+              </div>
+            </div>
+            <div class="field">
+              <label>その他制限</label>
+              <textarea name="otherLegal" placeholder="例：景観法、宅地造成等工事規制区域、高さ制限あり（10m）"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- 周辺環境 & 学区 (hidden for variant B) -->
+        <div class="section-card" id="nearby-section">
+          <div class="section-header">🏪 周辺環境・学区</div>
+          <div class="section-body">
+            <label style="font-size:12px; font-weight:600; color:var(--muted);">周辺施設</label>
+            <div id="nearbyContainer"></div>
+            <button type="button" class="add-btn" onclick="addNearby()">＋ 施設を追加</button>
+            <div style="margin-top:8px; border-top:1px solid var(--border); padding-top:10px;">
+              <label style="font-size:12px; font-weight:600; color:var(--muted);">学区</label>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>小学校</label>
+                <input type="text" name="elemSchool" placeholder="例：淀橋第四小学校">
+              </div>
+              <div class="field">
+                <label>距離・徒歩</label>
+                <input type="text" name="elemSchoolDist" placeholder="例：徒歩約3分">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>中学校</label>
+                <input type="text" name="juniorSchool" placeholder="例：新宿西戸山中学校">
+              </div>
+              <div class="field">
+                <label>距離・徒歩</label>
+                <input type="text" name="juniorSchoolDist" placeholder="例：徒歩約16分">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ライフライン・備考 -->
+        <div class="section-card full-width">
+          <div class="section-header">💡 ライフライン・備考</div>
+          <div class="section-body">
+            <div class="field-row">
+              <div class="field">
+                <label>電気</label>
+                <input type="text" name="electric" placeholder="例：東京電力">
+              </div>
+              <div class="field">
+                <label>ガス</label>
+                <input type="text" name="gas" placeholder="例：個別プロパンガス、都市ガス">
+              </div>
+              <div class="field">
+                <label>上下水道</label>
+                <input type="text" name="water" placeholder="例：公営上下水道">
+              </div>
+            </div>
+            <div class="field">
+              <label>備考・特記事項</label>
+              <textarea name="remarks" placeholder="例：再建築不可、現況と図面が相違する場合は現況を優先します。"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- 不動産会社情報 -->
+        <div class="section-card full-width">
+          <div class="section-header">🏢 不動産会社・担当者情報</div>
+          <div class="section-body">
+            <div class="field-row">
+              <div class="field">
+                <label>会社名</label>
+                <input type="text" name="companyName" placeholder="例：株式会社ブリリアント">
+              </div>
+              <div class="field">
+                <label>屋号・ブランド名</label>
+                <input type="text" name="brandName" placeholder="例：リクシル不動産ショップ">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>会社住所</label>
+                <input type="text" name="companyAddress" placeholder="例：東京都新宿区西新宿1-2-3">
+              </div>
+              <div class="field">
+                <label>免許番号</label>
+                <input type="text" name="licenseNo" placeholder="例：東京都知事（3）第92862号">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>担当者名</label>
+                <input type="text" name="agentName" placeholder="例：青木（アオキ）">
+              </div>
+              <div class="field">
+                <label>TEL</label>
+                <input type="text" name="tel" placeholder="例：070-4238-7811">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>FAX</label>
+                <input type="text" name="fax" placeholder="例：03-6803-2967">
+              </div>
+              <div class="field">
+                <label>メール</label>
+                <input type="text" name="email" placeholder="例：s-aoki@brilliant-corp.jp">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>取引態様</label>
+                <select name="transactionType">
+                  <option>売主</option>
+                  <option>媒介</option>
+                  <option>代理</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>所属団体</label>
+                <input type="text" name="association" placeholder="例：（公社）東京都宅地建物取引業協会会員">
+              </div>
+            </div>
+            <div class="field">
+              <label>キャッチコピー・PR文（任意）</label>
+              <textarea name="catchcopy" placeholder="例：実需・投資・借地・再建築不可など積極買取中"></textarea>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <!-- Submit Bar -->
+      <div class="submit-bar">
+        <div class="hints">
+          <span style="color: var(--accent);">*</span> 必須項目を入力してください<br>
+          所在地と販売価格は必須です。その他は任意項目です。
+        </div>
+        <div class="actions">
+          <button type="button" class="btn-save" onclick="saveDraft()">💾 下書き保存</button>
+          <button type="button" class="btn-generate" onclick="generateFlyer()">
+            <span>🖨</span> チラシPDFを生成
+          </button>
+        </div>
+      </div>
+
+    </form>
+  </div><!-- /container -->
+
+  <!-- Progress Overlay -->
+  <div class="progress-overlay" id="progressOverlay">
+    <div class="progress-card">
+      <div class="spinner"></div>
+      <h3>チラシを生成中…</h3>
+      <p>しばらくお待ちください</p>
+      <div class="progress-steps" id="progressSteps">
+        <div class="step" id="step1">⬜ PDFデータを解析中</div>
+        <div class="step" id="step2">⬜ レイアウトを構築中</div>
+        <div class="step" id="step3">⬜ 画像を合成中</div>
+        <div class="step" id="step4">⬜ PDFを書き出し中</div>
+      </div>
     </div>
   </div>
-</div>
+
+</div><!-- /app-page -->
+
 
 <script>
-// ── Station management ──
+// ═══════════════════════════════════════════════════════════════
+// LANDING PAGE LOGIC
+// ═══════════════════════════════════════════════════════════════
+
+let _selectedTemplate = 1;
+let _selectedVariant  = 'A';
+
+function selectTemplate(n) {
+  _selectedTemplate = n;
+  document.querySelectorAll('.template-card').forEach(el => el.classList.remove('selected'));
+  document.getElementById('tcard-' + n).classList.add('selected');
+}
+
+function selectVariant(v) {
+  _selectedVariant = v;
+  document.querySelectorAll('.variant-card').forEach(el => el.classList.remove('selected'));
+  document.getElementById('vcard-' + v).classList.add('selected');
+  document.querySelector('#vcard-' + v + ' input[type="radio"]').checked = true;
+}
+
+function togglePromo(checkbox) {
+  const wrap = document.getElementById('promo-input-wrap');
+  wrap.classList.toggle('visible', checkbox.checked);
+}
+
+function updatePromoPreview(text) {
+  document.getElementById('promo-stamp-preview').textContent = text || '価格改定！';
+}
+
+function startApp() {
+  const buildingName  = document.getElementById('lp-building-name').value.trim();
+  const promoEnabled  = document.getElementById('promo-toggle').checked;
+  const promoText     = document.getElementById('promo-text').value.trim();
+
+  // Set hidden form fields
+  document.getElementById('f-templateId').value      = _selectedTemplate;
+  document.getElementById('f-templateVariant').value = _selectedVariant;
+  document.getElementById('f-specialPromo').value    = promoEnabled ? promoText : '';
+
+  // Pre-fill building name
+  if (buildingName) document.getElementById('f-propertyName').value = buildingName;
+
+  // Update status bar labels
+  const variantLabels = {
+    A: '標準（写真2枚+地図+周辺環境）',
+    B: '写真重視（写真4枚・周辺環境なし）',
+  };
+  document.getElementById('app-variant-label').textContent =
+    'Template ' + _selectedTemplate + ' — ' + variantLabels[_selectedVariant];
+
+  if (promoEnabled && promoText) {
+    document.getElementById('app-promo-label').style.display = '';
+    document.getElementById('app-promo-text-label').textContent = promoText;
+  } else {
+    document.getElementById('app-promo-label').style.display = 'none';
+  }
+
+  // Show/hide nearby section for variant B
+  document.getElementById('nearby-section').style.display =
+    _selectedVariant === 'B' ? 'none' : '';
+
+  // Page transition
+  document.getElementById('landing-page').style.display = 'none';
+  document.getElementById('app-page').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+function goBack() {
+  document.getElementById('app-page').style.display = 'none';
+  document.getElementById('landing-page').style.display = 'flex';
+  document.getElementById('landing-page').style.flexDirection = 'column';
+  window.scrollTo(0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APP FORM LOGIC (unchanged from original)
+// ═══════════════════════════════════════════════════════════════
+
 let stationCount = 0;
 function addStation(line='', station='', walk='') {
   stationCount++;
@@ -786,7 +1294,6 @@ function removeStation(id) {
   if (el) el.remove();
 }
 
-// ── Nearby management ──
 let nearbyCount = 0;
 function addNearby(name='', walk='') {
   nearbyCount++;
@@ -802,13 +1309,11 @@ function addNearby(name='', walk='') {
   c.appendChild(div);
 }
 
-// ── Lease period toggle ──
 document.querySelector('[name="landRight"]').addEventListener('change', function() {
   document.getElementById('leasePeriodSection').style.display =
     this.value === '借地権' ? 'block' : 'none';
 });
 
-// ── File upload ──
 function handleFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -817,7 +1322,6 @@ function handleFileSelect(e) {
   parsePDF(file);
 }
 
-// Drag & drop
 const zone = document.getElementById('uploadZone');
 zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
 zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
@@ -832,7 +1336,6 @@ zone.addEventListener('drop', e => {
   }
 });
 
-// ── PDF parse (calls backend) ──
 function parsePDF(file) {
   const fd = new FormData();
   fd.append('file', file);
@@ -842,38 +1345,61 @@ function parsePDF(file) {
     .catch(err => console.warn('PDF parse error (demo mode):', err));
 }
 
-// Auto-fill form from parsed data
 function autofillForm(data) {
   for (const [key, val] of Object.entries(data)) {
     const el = document.querySelector(`[name="${key}"]`);
     if (el) el.value = val;
   }
-  if (data.stations) {
-    data.stations.forEach(s => addStation(s.line, s.station, s.walk));
-  }
-  if (data.nearby) {
-    data.nearby.forEach(n => addNearby(n.name, n.walk));
-  }
+  if (data.stations) data.stations.forEach(s => addStation(s.line, s.station, s.walk));
+  if (data.nearby)   data.nearby.forEach(n => addNearby(n.name, n.walk));
 }
 
-// ── sqm <-> tsubo auto-convert ──
 document.getElementById('landArea')?.addEventListener('input', function() {
   const v = parseFloat(this.value);
   if (!isNaN(v)) document.getElementById('landAreaTsubo').value = (v / 3.3058).toFixed(2);
 });
 
-// ── Generate flyer ──
+// Build stations data from form fields
+function collectStations() {
+  const stations = [];
+  document.querySelectorAll('.station-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 3) {
+      const line    = inputs[0].value.trim();
+      const station = inputs[1].value.trim();
+      const walk    = inputs[2].value.trim();
+      if (line || station) stations.push({ line, station, walk });
+    }
+  });
+  return stations;
+}
+
+function collectNearby() {
+  const nearby = [];
+  document.querySelectorAll('.nearby-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 2) {
+      const name = inputs[0].value.trim();
+      const walk = inputs[1].value.trim();
+      if (name) nearby.push({ name, walk });
+    }
+  });
+  return nearby;
+}
+
 function generateFlyer() {
   const form = document.getElementById('propertyForm');
-  const data = Object.fromEntries(new FormData(form));
+  const raw  = Object.fromEntries(new FormData(form));
 
-  // Validate required fields
-  if (!data.address || !data.price) {
+  if (!raw.address || !raw.price) {
     alert('所在地と販売価格は必須です。');
     return;
   }
 
-  // Show progress
+  // Attach structured arrays
+  raw.stations = collectStations();
+  raw.nearby   = collectNearby();
+
   const overlay = document.getElementById('progressOverlay');
   overlay.classList.add('visible');
 
@@ -881,20 +1407,19 @@ function generateFlyer() {
   let i = 0;
   const interval = setInterval(() => {
     if (i > 0) {
-      document.getElementById(steps[i-1]).textContent =
-        '✅ ' + document.getElementById(steps[i-1]).textContent.slice(3);
-      document.getElementById(steps[i-1]).className = 'step done';
+      const prev = document.getElementById(steps[i-1]);
+      prev.textContent = '✅ ' + prev.textContent.slice(3);
+      prev.className = 'step done';
     }
     if (i < steps.length) {
       document.getElementById(steps[i]).className = 'step active';
       i++;
     } else {
       clearInterval(interval);
-      // Send to backend
       fetch('/api/generate-flyer', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(data)
+        body: JSON.stringify(raw)
       })
       .then(r => r.blob())
       .then(blob => {
@@ -902,7 +1427,7 @@ function generateFlyer() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = (data.address || '物件').replace(/\s/g,'_') + '_チラシ.pdf';
+        a.download = (raw.address || '物件').replace(/\s/g,'_') + '_チラシ.pdf';
         a.click();
         resetSteps();
       })
@@ -916,14 +1441,13 @@ function generateFlyer() {
 }
 
 function resetSteps() {
+  const labels = ['PDFデータを解析中','レイアウトを構築中','画像を合成中','PDFを書き出し中'];
   ['step1','step2','step3','step4'].forEach((id, i) => {
-    const labels = ['PDFデータを解析中','レイアウトを構築中','画像を合成中','PDFを書き出し中'];
     document.getElementById(id).textContent = '⬜ ' + labels[i];
     document.getElementById(id).className = 'step';
   });
 }
 
-// ── Draft save ──
 function saveDraft() {
   const form = document.getElementById('propertyForm');
   const data = Object.fromEntries(new FormData(form));
@@ -937,7 +1461,7 @@ function handleLogout() {
   if (confirm('ログアウトしますか？')) window.location.href = '/logout';
 }
 
-// Initialize with default stations & nearby
+// Initialize default form rows
 addStation();
 addStation();
 addNearby();
