@@ -1,149 +1,108 @@
 """
-generate_flyer.py  —  Justsalemono
-───────────────────────────────────
-Generates an A4 Japanese real estate advertisement flyer (PDF).
-Uses a dual-font engine: Helvetica (embedded) for ASCII/Latin,
-DroidSansFallbackFull (embedded TTF) for Japanese/CJK/fullwidth.
+generate_flyer.py  —  Justsalemono  (Template 1)
+─────────────────────────────────────────────────────────────
+A4 portrait.  Three columns, four cells in the right area:
 
-Deploy as:  POST /api/generate-flyer
-Input:      application/json  (property data dict)
-Output:     application/pdf
-CLI:        python generate_flyer.py data.json output.pdf
+  LEFT (38%)  │  Q1 (31%)        │  Q2 (31%)
+  ────────────┼──────────────────┼──────────────────
+  TOP BAND    │  K1 外観写真      │  H/I 周辺環境    ← Variant A
+  (title/     │                  │  or K2 photo     ← Variant B
+   price)     │                  │  [promo flag ▶]
+  ────────────┼──────────────────┼──────────────────
+  data rows   │  K5 地図         │  K2/K4 間取り図   ← Variant A
+              │                  │  K3/K4 photo     ← Variant B
+  ────────────┴──────────────────┴──────────────────
+  FOOTER  (full width — company info)
+
+Column boundaries are IDENTICAL for top and bottom sections
+→ clean visual grid, no mid-page column shift.
+
+ly convention: ly = current TOP-EDGE; helpers decrement BEFORE drawing.
 """
 
-import json, sys, os
+import json, sys, os, io, math
 from reportlab.lib.pagesizes import A4
-
-# ── Font path: env var (Vercel) → bundled relative → system fallback ─────────
-def _resolve_font():
-    candidates = [
-        os.environ.get('FONT_PATH', ''),
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'fonts', 'DroidSansFallbackFull.ttf'),
-        '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
-    ]
-    for p in candidates:
-        if p and os.path.exists(p):
-            return p
-    raise FileNotFoundError('DroidSansFallbackFull.ttf not found. Add it to /fonts/ or set FONT_PATH.')
 from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from http.server import BaseHTTPRequestHandler
 
-# ── Fonts ────────────────────────────────────────────────────────────────────
-JP_TTF  = _resolve_font()
+# ── Font ──────────────────────────────────────────────────────────────────────
+def _resolve_font():
+    for p in [
+        os.environ.get('FONT_PATH', ''),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     'fonts', 'DroidSansFallbackFull.ttf'),
+        '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
+    ]:
+        if p and os.path.exists(p):
+            return p
+    raise FileNotFoundError('DroidSansFallbackFull.ttf not found.')
+
 JP_FONT = 'JP'
-LA_FONT = 'Helvetica'          # built-in, no registration needed
+LA_FONT = 'Helvetica'
 LA_BOLD = 'Helvetica-Bold'
-pdfmetrics.registerFont(TTFont(JP_FONT, JP_TTF))
+pdfmetrics.registerFont(TTFont(JP_FONT, _resolve_font()))
 
-def is_latin(ch):
-    """True for basic ASCII + Latin-1 (U+0000–U+00FF)."""
-    return ord(ch) <= 0x00FF
+# ── Text engine ───────────────────────────────────────────────────────────────
+def is_latin(ch): return ord(ch) <= 0x00FF
 
-def txt_width(s, size):
-    """Width of mixed string at given size."""
-    w = 0
-    for ch in s:
-        f = LA_FONT if is_latin(ch) else JP_FONT
-        w += pdfmetrics.stringWidth(ch, f, size)
-    return w
+def txt_width(s, size, bold=False):
+    return sum(pdfmetrics.stringWidth(ch, (LA_BOLD if bold else LA_FONT)
+               if is_latin(ch) else JP_FONT, size) for ch in s)
 
-def draw_text(c, s, x, y, size, color=None, align='left'):
-    """Draw mixed Japanese/Latin string with per-character font switching."""
-    if not s:
-        return
-    if color:
-        c.setFillColor(color)
-
-    # Measure for alignment
+def draw_text(c, s, x, y, size, color=None, align='left', bold=False):
+    if not s: return
+    if color: c.setFillColor(color)
     if align in ('center', 'right'):
-        w = txt_width(s, size)
-        if align == 'center':
-            x = x - w / 2
-        else:
-            x = x - w
-
-    cur_x = x
-    run = ''
-    run_lat = None
-
-    def flush(seg, use_lat, cx):
-        if not seg:
-            return cx
-        font = LA_FONT if use_lat else JP_FONT
-        c.setFont(font, size)
-        c.drawString(cx, y, seg)
-        return cx + pdfmetrics.stringWidth(seg, font, size)
-
-    for ch in s:
-        lat = is_latin(ch)
-        if run_lat is None:
-            run_lat = lat
-        if lat != run_lat:
-            cur_x = flush(run, run_lat, cur_x)
-            run, run_lat = ch, lat
-        else:
-            run += ch
-    flush(run, run_lat, cur_x)
-
-def draw_text_bold(c, s, x, y, size, color=None, align='left'):
-    """Draw with bold Latin font (JP font has no bold variant)."""
-    if not s:
-        return
-    if color:
-        c.setFillColor(color)
-    if align in ('center', 'right'):
-        w = txt_width(s, size)
-        x = x - w / 2 if align == 'center' else x - w
-    cur_x = x
-    run = ''
-    run_lat = None
-    def flush(seg, use_lat, cx):
+        w = txt_width(s, size, bold)
+        x = (x - w/2) if align == 'center' else (x - w)
+    cur_x, run, run_lat = x, '', None
+    def flush(seg, lat, cx):
         if not seg: return cx
-        font = LA_BOLD if use_lat else JP_FONT
-        c.setFont(font, size)
-        c.drawString(cx, y, seg)
-        return cx + pdfmetrics.stringWidth(seg, font, size)
+        f = (LA_BOLD if lat else JP_FONT) if bold else (LA_FONT if lat else JP_FONT)
+        c.setFont(f, size); c.drawString(cx, y, seg)
+        return cx + pdfmetrics.stringWidth(seg, f, size)
     for ch in s:
         lat = is_latin(ch)
         if run_lat is None: run_lat = lat
-        if lat != run_lat:
-            cur_x = flush(run, run_lat, cur_x)
-            run, run_lat = ch, lat
-        else:
-            run += ch
+        if lat != run_lat: cur_x = flush(run, run_lat, cur_x); run, run_lat = ch, lat
+        else: run += ch
     flush(run, run_lat, cur_x)
 
-# ── Colour palette ────────────────────────────────────────────────────────────
-C_NAVY    = colors.HexColor('#1a4fa0')
-C_NAVYDK  = colors.HexColor('#12357a')
-C_ACCENT  = colors.HexColor('#e85d2f')
-C_GOLD    = colors.HexColor('#c8971a')
-C_LBLUE   = colors.HexColor('#eef3fb')
-C_MBLUE   = colors.HexColor('#d8e4f5')
-C_SECBG   = colors.HexColor('#dde8f8')
-C_WHITE   = colors.white
-C_BLACK   = colors.HexColor('#1c2333')
-C_MUTED   = colors.HexColor('#5a6480')
-C_DIV     = colors.HexColor('#c0cfe8')
-C_GREEN   = colors.HexColor('#16a34a')
-C_RED     = colors.HexColor('#dc2626')
-C_REDBG   = colors.HexColor('#fef2f2')
-C_REDBDR  = colors.HexColor('#f87171')
-C_AMBER   = colors.HexColor('#f9d87a')
-C_STEELBL = colors.HexColor('#adc4e8')
-C_DARKBL  = colors.HexColor('#c8d8f0')
+def draw_bold(c, s, x, y, size, color=None, align='left'):
+    draw_text(c, s, x, y, size, color, align, bold=True)
 
-W, H      = A4
-MX        = 14 * mm    # horizontal margin
-MY        = 9  * mm    # bottom margin
-IW        = W - 2 * MX  # inner width
+def truncate_text(s, max_w, size, bold=False, ellipsis='…'):
+    if not s or txt_width(s, size, bold) <= max_w:
+        return s
+    for i in range(len(s), 0, -1):
+        cand = s[:i] + ellipsis
+        if txt_width(cand, size, bold) <= max_w:
+            return cand
+    return ellipsis
 
+# ── Colours ───────────────────────────────────────────────────────────────────
+C_NAVY   = colors.HexColor('#1a4fa0')
+C_NAVYDK = colors.HexColor('#12357a')
+C_ACCENT = colors.HexColor('#e85d2f')
+C_WHITE  = colors.white
+C_BLACK  = colors.HexColor('#1c2333')
+C_MUTED  = colors.HexColor('#5a6480')
+C_LBLUE  = colors.HexColor('#eef3fb')
+C_MBLUE  = colors.HexColor('#d8e4f5')
+C_SECBG  = colors.HexColor('#dde8f8')
+C_DIV    = colors.HexColor('#c0cfe8')
+C_STEELBL= colors.HexColor('#adc4e8')
+C_DARKBL = colors.HexColor('#c8d8f0')
+C_RED    = colors.HexColor('#dc2626')
+C_AMBER  = colors.HexColor('#f9d87a')
+C_REDBG  = colors.HexColor('#fef2f2')
+C_REDBDR = colors.HexColor('#f87171')
 
-# ── Drawing primitives ────────────────────────────────────────────────────────
-
+# ── Primitives ────────────────────────────────────────────────────────────────
 def rect(c, x, y, w, h, fill=None, stroke=None, lw=0.5):
     c.saveState()
     if fill:   c.setFillColor(fill)
@@ -151,387 +110,475 @@ def rect(c, x, y, w, h, fill=None, stroke=None, lw=0.5):
     c.rect(x, y, w, h, fill=1 if fill else 0, stroke=1 if stroke else 0)
     c.restoreState()
 
-def hline(c, x, y, w, color=C_DIV, lw=0.4):
-    c.saveState()
-    c.setStrokeColor(color)
-    c.setLineWidth(lw)
-    c.line(x, y, x + w, y)
-    c.restoreState()
+def vline(c, x, y1, y2, color=C_DIV, lw=0.4):
+    c.saveState(); c.setStrokeColor(color); c.setLineWidth(lw)
+    c.line(x, y1, x, y2); c.restoreState()
 
-def section_bar(c, label, x, y, w, h=13):
-    """Draws a dark-navy section header bar. Returns top-of-bar y."""
-    rect(c, x, y, w, h, fill=C_NAVY)
-    draw_text(c, label, x + 6, y + 3.5, 8.5, color=C_WHITE)
-    return y + h
+def hline(c, x1, x2, y, color=C_DIV, lw=0.4):
+    c.saveState(); c.setStrokeColor(color); c.setLineWidth(lw)
+    c.line(x1, y, x2, y); c.restoreState()
 
-def table_row(c, label, value, x, y, lw, vw, rh=12, alt=False):
-    """Draws a label | value row. Returns y BELOW the row."""
-    bg = C_LBLUE if alt else C_WHITE
-    rect(c, x,      y, lw, rh, fill=C_SECBG, stroke=C_DIV, lw=0.3)
-    rect(c, x + lw, y, vw, rh, fill=bg,      stroke=C_DIV, lw=0.3)
-    draw_text(c, label, x + 3,      y + 3, 7.5, color=C_NAVY)
-    draw_text(c, value, x + lw + 4, y + 3, 7.5, color=C_BLACK)
-    return y - rh
+def photo_placeholder(c, x, y, w, h, label, sublabel='', bg='#c8d4e8', tc='#7a8faa'):
+    """Draw a shaded photo slot with centred labels."""
+    rect(c, x, y, w, h, fill=colors.HexColor(bg), stroke=C_DIV, lw=0.5)
+    cx = x + w / 2
+    draw_text(c, label,    cx, y + h/2 + 6,  12, color=colors.HexColor(tc), align='center')
+    if sublabel:
+        draw_text(c, sublabel, cx, y + h/2 - 9, 7.5, color=colors.HexColor(tc), align='center')
 
 
-# ── Main generator ─────────────────────────────────────────────────────────────
+# ── Generator ─────────────────────────────────────────────────────────────────
+def generate(data: dict, out):
+    c = canvas.Canvas(out, pagesize=A4)
+    W, H = A4
+    MX = 11 * mm
+    MY = 8  * mm
+    IW = W - 2 * MX          # ≈ 551 pts
 
-def generate(data: dict, out_path: str):
-    c = canvas.Canvas(out_path, pagesize=A4)
+    variant = data.get('templateVariant', 'A').upper()
 
-    # ── 1. HEADER BANNER ────────────────────────────────────────────────────
-    BH = 26 * mm
-    rect(c, 0, H - BH, W, BH, fill=C_NAVY)
+    # ── Column geometry  (consistent top-to-bottom) ───────────────────────────
+    LCW  = IW * 0.38              # left column  (38%)
+    HALF = (IW - LCW) / 2        # each right cell (≈31%)
+    LX   = MX                     # left column left edge
+    RX1  = LX + LCW               # Q1 left edge  (photos/map)
+    RX2  = RX1 + HALF             # Q2 left edge  (H/I or photo)
 
-    # Property-type badge
+    # ── Vertical anchors ──────────────────────────────────────────────────────
+    STRIP_H   = 7  * mm
+    FOOTER_H  = 22 * mm
+    FOOTER_Y  = MY + STRIP_H
+    STRIP_Y   = MY
+
+    CTOP      = H - 4 * mm
+    CBOT      = MY + STRIP_H + FOOTER_H + 2 * mm
+
+    TOP_H     = 68 * mm
+    BAND_TOP  = CTOP
+    BAND_BOT  = CTOP - TOP_H
+
+    MID_TOP   = BAND_BOT
+    MID_BOT   = CBOT
+    MID_H     = MID_TOP - MID_BOT
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TOP BAND — LEFT column  (navy header + price strip)
+    # ─────────────────────────────────────────────────────────────────────────
+    PRICE_H = 17 * mm
+    NAV_H   = TOP_H - PRICE_H
+
+    rect(c, LX, BAND_BOT + PRICE_H, LCW, NAV_H, fill=C_NAVY)
+
     prop_type = data.get('propertyType', '中古戸建')
-    bw = txt_width(prop_type, 9) + 14
-    rect(c, MX, H - BH + 10, bw, 13, fill=C_ACCENT)
-    draw_text(c, prop_type, MX + 7, H - BH + 14, 9, color=C_WHITE)
+    bw = txt_width(prop_type, 8) + 12
+    by = BAND_BOT + PRICE_H + NAV_H - 16
+    rect(c, LX + 4, by, bw, 12, fill=C_ACCENT)
+    draw_text(c, prop_type, LX + 4 + 6, by + 4, 8, color=C_WHITE)
 
-    # Short address
     addr_raw = data.get('address', '')
-    short = addr_raw.replace('東京都','').replace('大阪府','').replace('神奈川県','')[:22]
-    draw_text(c, short, MX + bw + 8, H - BH + 14, 11, color=C_WHITE)
+    short = addr_raw.replace('東京都','').replace('大阪府','').replace('神奈川県','')
+    draw_bold(c, short[:22], LX + 4 + bw + 6, by + 4, 9.5, color=C_WHITE)
 
-    # Brand top-right
-    brand = data.get('brandName', data.get('companyName', ''))
-    draw_text(c, brand, W - MX, H - BH + 14, 8, color=C_STEELBL, align='right')
-
-    # Station strip
-    sx = MX
+    st_y = by - 12
     for st in data.get('stations', [])[:3]:
-        entry = f"{st.get('line','')} 『{st.get('station','').replace('駅','')}』駅 徒歩{st.get('walk','')}分"
-        draw_text(c, entry, sx, H - BH + 3, 7.5, color=C_DARKBL)
-        sx += txt_width(entry, 7.5) + 14
-        if sx > W - MX - 40: break
+        ln  = st.get('line', '')
+        stn = st.get('station', '').replace('駅', '')
+        wk  = st.get('walk', '')
+        draw_text(c, f"{ln}  『{stn}』駅 徒歩{wk}分",
+                  LX + 4, st_y, 6.5, color=C_DARKBL)
+        st_y -= 9
+        if st_y < BAND_BOT + PRICE_H + 3: break
 
-    cur_y = H - BH - 4 * mm
+    # Price strip
+    rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=C_LBLUE)
+    lbl_y = BAND_BOT + PRICE_H - 10
+    draw_text(c, '販売価格', LX + 4, lbl_y, 6, color=C_MUTED)
 
-    # ── 2. PRICE STRIP ──────────────────────────────────────────────────────
-    PH = 16 * mm
-    rect(c, 0, cur_y - PH, W, PH, fill=C_LBLUE)
-
-    # "販売価格" label — small tag at TOP of strip
-    draw_text(c, '販売価格', MX, cur_y - 8, 7, color=C_MUTED)
-
-    # Large price number — sits in lower 2/3 of strip
     price_raw = data.get('price', '')
-    num_part  = price_raw.replace('万円','').strip()   # keep commas e.g. "1,480"
-    tax_label = '万円（税込）' if '税込' in data.get('taxIncluded', '税込') else '万円（税別）'
-    price_y   = cur_y - PH + 10            # baseline sits near the bottom of strip
-    draw_text_bold(c, num_part, MX, price_y, 24, color=C_ACCENT)
-    px = MX + txt_width(num_part, 24)
-    draw_text(c, tax_label, px + 3, price_y + 2, 10, color=C_ACCENT)
+    num_part  = price_raw.replace('万円', '').strip()
+    tax_lbl   = '万円（税込）' if '税込' in data.get('taxIncluded', '税込') else '万円（税別）'
+    py = BAND_BOT + 5
+    draw_bold(c, num_part, LX + 4, py, 18, color=C_ACCENT)
+    draw_text(c, tax_lbl,
+              LX + 4 + txt_width(num_part, 18, bold=True) + 3,
+              py + 2, 8, color=C_ACCENT)
 
-    # Rebuild badge — vertically centred on price row
     rebuild = data.get('rebuild', '')
     if rebuild:
-        rbw = txt_width(rebuild, 8) + 12
-        bh  = 13
-        by  = price_y - 2
-        rect(c, W - MX - rbw, by, rbw, bh, fill=C_REDBG, stroke=C_REDBDR, lw=0.8)
-        draw_text(c, rebuild, W - MX - rbw + 6, by + 3, 8, color=C_RED)
+        rbw = txt_width(rebuild, 7) + 10
+        rect(c, LX + LCW - rbw - 4, py + 1, rbw, 11,
+             fill=C_REDBG, stroke=C_REDBDR, lw=0.6)
+        draw_text(c, rebuild, LX + LCW - rbw/2 - 4, py + 4, 7,
+                  color=C_RED, align='center')
 
-    cur_y -= PH + 3 * mm
+    # ─────────────────────────────────────────────────────────────────────────
+    # TOP BAND — Q1  (K1 外観写真 main photo)
+    # ─────────────────────────────────────────────────────────────────────────
+    photo_placeholder(c, RX1, BAND_BOT, HALF, TOP_H,
+                      '外　観', '（写真をここに挿入）', bg='#c8d4e8', tc='#7a8faa')
 
-    # ── 3. PHOTO + SIDE INFO ────────────────────────────────────────────────
-    PW    = IW * 0.56
-    PH2   = 62 * mm
-    px_   = MX
-    py_   = cur_y - PH2
-
-    rect(c, px_, py_, PW, PH2, fill=colors.HexColor('#c8d4e8'), stroke=C_DIV, lw=0.5)
-    draw_text(c, '外　観', px_ + PW/2, py_ + PH2/2 + 3, 18,
-              color=colors.HexColor('#7a8faa'), align='center')
-    draw_text(c, '（写真をここに挿入）', px_ + PW/2, py_ + PH2/2 - 12, 8,
-              color=colors.HexColor('#8899bb'), align='center')
-
-    # Right side info panel
-    sx2  = px_ + PW + 4 * mm
-    sw2  = IW - PW - 4 * mm
-    sy2  = cur_y
-
-    # Lease period box — tight fit, only as tall as the content needs
-    lease = data.get('leasePeriod', '')
-    grent = data.get('groundRent', '')
-    if lease:
-        lbh = 24 if grent else 17        # height in POINTS
-        rect(c, sx2, sy2 - lbh, sw2, lbh,
-             fill=colors.HexColor('#fff7ed'), stroke=colors.HexColor('#fed7aa'), lw=0.7)
-        draw_text(c, '◆ 借地期間', sx2 + 4, sy2 - 8,  7.5, color=C_ACCENT)
-        draw_text(c, lease,        sx2 + 4, sy2 - lbh + 4, 7, color=C_BLACK)
-        if grent:
-            draw_text(c, '地代　' + grent, sx2 + txt_width('◆ 借地期間', 7.5) + 8,
-                      sy2 - 8, 7, color=C_BLACK)
-        sy2 -= lbh + 3
-
-    # Status bar
-    status   = data.get('currentStatus', '')
+    # ─────────────────────────────────────────────────────────────────────────
+    # TOP BAND — Q2  (Variant A: H/I info  /  Variant B: K2 photo)
+    # ─────────────────────────────────────────────────────────────────────────
+    lease   = data.get('leasePeriod', '')
+    grent   = data.get('groundRent', '')
+    status  = data.get('currentStatus', '')
     handover = data.get('handover', '')
-    if status:
-        rect(c, sx2, sy2 - 9, sw2, 9, fill=C_MBLUE)
-        draw_text(c, f'現況：{status}　引渡：{handover}', sx2 + 4, sy2 - 7, 7.5, color=C_NAVY)
-        sy2 -= 11
 
-    # Nearby list
-    nearby = data.get('nearby', [])
-    if nearby:
-        draw_text(c, '◆ 周辺環境', sx2 + 2, sy2 - 6, 7.5, color=C_NAVY)
-        ny_y = sy2 - 15
-        for nb in nearby[:6]:
-            nm = nb.get('name','')
-            wk = nb.get('walk','')
-            draw_text(c, f'・{nm}', sx2 + 3, ny_y, 7, color=C_BLACK)
-            draw_text(c, wk, sx2 + sw2 - 2, ny_y, 7, color=C_MUTED, align='right')
-            ny_y -= 8.5
-            if ny_y < py_: break
+    if variant == 'B':
+        # Q2-top = second exterior photo
+        photo_placeholder(c, RX2, BAND_BOT, HALF, TOP_H,
+                          '外観写真２', '（K2）', bg='#d4cce8', tc='#7a78aa')
+    else:
+        # Q2-top = H/I 周辺環境・学区 info box
+        rect(c, RX2, BAND_BOT, HALF, TOP_H,
+             fill=colors.HexColor('#f0f5ff'), stroke=C_DIV, lw=0.5)
 
-    cur_y = py_ - 3 * mm
+        q2y = BAND_BOT + TOP_H - 4    # current y (top-of-content, decrements downward)
+        q2_pad = 4                     # horizontal padding inside Q2
+        q2_inner_w = HALF - q2_pad * 2
 
-    # ── 4. PROPERTY OVERVIEW TABLE ──────────────────────────────────────────
-    section_bar(c, '■ 物件概要', MX, cur_y, IW)
-    cur_y -= 1
+        # G box content (借地条件) if applicable
+        if lease or grent:
+            g_bar_h = 11
+            if q2y - g_bar_h >= BAND_BOT:
+                q2y -= g_bar_h
+                rect(c, RX2, q2y, HALF, g_bar_h, fill=C_NAVY)
+                draw_bold(c, '借地条件', RX2 + q2_pad, q2y + 3, 6.5, color=C_WHITE)
+            if grent and q2y - 10 >= BAND_BOT:
+                q2y -= 10
+                draw_text(c, f'地代　{grent}', RX2 + q2_pad, q2y + 2, 6.5, color=C_BLACK)
+            if lease and q2y - 9 >= BAND_BOT:
+                q2y -= 9
+                lt = truncate_text(lease, q2_inner_w, 6.5)
+                draw_text(c, lt, RX2 + q2_pad, q2y + 2, 6.5, color=C_BLACK)
+            if (status or handover) and q2y - 10 >= BAND_BOT:
+                q2y -= 2
+                rect(c, RX2, q2y - 10, HALF, 10, fill=C_MBLUE)
+                draw_text(c, f'現況:{status}　引渡:{handover}',
+                          RX2 + q2_pad, q2y - 7, 6, color=C_NAVY)
+                q2y -= 12
+            q2y -= 4   # gap before H/I
 
-    cw   = IW / 2
-    lw_  = cw * 0.32
-    vw_  = cw * 0.68
-    rh_  = 13
+        # H 周辺環境 section
+        nearby = data.get('nearby', [])
+        if nearby and q2y - 11 >= BAND_BOT:
+            q2y -= 11
+            rect(c, RX2, q2y, HALF, 11, fill=C_NAVY)
+            draw_bold(c, '■ 周辺環境', RX2 + q2_pad, q2y + 3, 6.5, color=C_WHITE)
+        for i, nb in enumerate(nearby[:6]):
+            if q2y - 10 < BAND_BOT: break
+            q2y -= 10
+            bg = C_LBLUE if i % 2 == 1 else C_WHITE
+            rect(c, RX2, q2y, HALF, 10, fill=bg, stroke=C_DIV, lw=0.2)
+            name_t = truncate_text('・' + nb.get('name',''), q2_inner_w * 0.62, 6.5)
+            dist_t = truncate_text(nb.get('walk',''), q2_inner_w * 0.38, 6)
+            draw_text(c, name_t, RX2 + q2_pad, q2y + 2, 6.5, color=C_BLACK)
+            draw_text(c, dist_t, RX2 + HALF - q2_pad, q2y + 2, 6, color=C_MUTED, align='right')
 
-    ly_ = cur_y
-    ry_ = cur_y
-    rx_ = MX + cw
+        # I 学区 section
+        school_lines = []
+        if data.get('elemSchool'):
+            school_lines.append(('小', data['elemSchool'], data.get('elemSchoolDist','')))
+        if data.get('juniorSchool'):
+            school_lines.append(('中', data['juniorSchool'], data.get('juniorSchoolDist','')))
+        if school_lines and q2y - 11 >= BAND_BOT:
+            q2y -= 4
+            q2y -= 11
+            rect(c, RX2, q2y, HALF, 11, fill=C_NAVY)
+            draw_bold(c, '■ 学区', RX2 + q2_pad, q2y + 3, 6.5, color=C_WHITE)
+        for i, (tag, nm, dist) in enumerate(school_lines):
+            if q2y - 10 < BAND_BOT: break
+            q2y -= 10
+            bg = C_LBLUE if i % 2 == 1 else C_WHITE
+            rect(c, RX2, q2y, HALF, 10, fill=bg, stroke=C_DIV, lw=0.2)
+            nm_t = truncate_text(f'{tag}:  {nm}', q2_inner_w * 0.62, 6.5)
+            draw_text(c, nm_t, RX2 + q2_pad, q2y + 2, 6.5, color=C_BLACK)
+            draw_text(c, dist, RX2 + HALF - q2_pad, q2y + 2, 6, color=C_MUTED, align='right')
 
-    def tl(lbl, val, alt=False):
-        nonlocal ly_
-        ly_ = table_row(c, lbl, val, MX, ly_, lw_, vw_, rh_, alt)
+    # ─────────────────────────────────────────────────────────────────────────
+    # SPECIAL PROMO FLAG  (pennant-style, top-right corner of Q2-top)
+    # "a stick holding just a few words"
+    # ─────────────────────────────────────────────────────────────────────────
+    promo = data.get('specialPromo', '').strip()
+    if promo:
+        # Flag geometry
+        flag_txt = truncate_text(promo, HALF * 0.80, 7.5, bold=True)
+        fw = txt_width(flag_txt, 7.5, bold=True) + 14   # flag width
+        fh = 16                                           # flag height
+        stick_h = 26                                      # stick length below flag
+        # Anchor: near the top-right corner of Q2-top
+        flag_right = RX2 + HALF - 5             # right edge of flag
+        flag_top   = BAND_BOT + TOP_H - 5       # top of flag (just inside cell)
+        flag_x     = flag_right - fw
+        flag_y     = flag_top - fh
 
-    def tr(lbl, val, alt=False):
-        nonlocal ry_
-        ry_ = table_row(c, lbl, val, rx_, ry_, lw_, vw_, rh_, alt)
+        # Stick (vertical line under the flag's right edge)
+        stick_x = flag_right - 2
+        c.saveState()
+        c.setStrokeColor(C_RED)
+        c.setLineWidth(1.8)
+        c.line(stick_x, flag_y, stick_x, flag_y - stick_h)
+        c.restoreState()
 
-    tl('■ 所在地',   addr_raw)
-    tl('■ 土地面積', f"{data.get('landArea','')}㎡ ({data.get('landAreaTsubo','')}坪)")
-    tl('■ 土地権利', data.get('landRight',''),  alt=True)
-    tl('■ 地目',     data.get('landCategory',''))
-    tl('■ 接面道路', data.get('frontRoad',''),   alt=True)
-    tl('■ 再建築',   data.get('rebuild',''))
+        # Pennant body (red rectangle with a small right-pointing notch removed)
+        # Draw as a polygon to get the flag look
+        notch = fh / 3
+        c.saveState()
+        c.setFillColor(C_RED)
+        p = c.beginPath()
+        p.moveTo(flag_x, flag_top)           # top-left
+        p.lineTo(flag_right, flag_top)        # top-right
+        p.lineTo(flag_right, flag_y)          # bottom-right
+        p.lineTo(flag_x + fw * 0.85, flag_y + notch)  # notch point (→ right = pennant tip)
+        p.lineTo(flag_x, flag_y)             # bottom-left
+        p.close()
+        c.drawPath(p, fill=1, stroke=0)
+        c.restoreState()
 
-    tr('■ 築年月',   data.get('builtYear',''))
-    tr('■ 構造',     data.get('structure',''))
-    floors = '  '.join([data.get(f'floorArea{i}','') for i in range(1,4) if data.get(f'floorArea{i}')])
-    tr('■ 床面積',   floors,                    alt=True)
-    tr('■ 合計',     f"{data.get('totalFloorArea','')}㎡")
-    tr('■ 間取り',   data.get('layout','－'),    alt=True)
-    tr('■ 現況',     data.get('currentStatus',''))
+        # Text on the flag
+        txt_cx = flag_x + (fw * 0.85) / 2
+        txt_y  = flag_y + (fh - 7.5) / 2
+        draw_bold(c, flag_txt, txt_cx, txt_y, 7.5, color=C_WHITE, align='center')
 
-    cur_y = min(ly_, ry_) - 3
+    # ─────────────────────────────────────────────────────────────────────────
+    # GRID DIVIDERS
+    # Vertical lines at RX1 and RX2 run full content height (consistent grid)
+    # ─────────────────────────────────────────────────────────────────────────
+    vline(c, RX1, CBOT, CTOP, color=C_DIV, lw=0.6)
+    vline(c, RX2, CBOT, CTOP, color=C_DIV, lw=0.6)
+    # Horizontal divider between Q-top and Q-bottom (right area only)
+    hline(c, RX1, W - MX, BAND_BOT, color=C_DIV, lw=0.7)
 
-    # ── 5. LEGAL RESTRICTIONS ────────────────────────────────────────────────
-    section_bar(c, '■ 法令制限', MX, cur_y, IW)
-    cur_y -= 1
+    # ─────────────────────────────────────────────────────────────────────────
+    # MIDDLE SECTION — LEFT column  (property data rows)
+    # ─────────────────────────────────────────────────────────────────────────
+    rect(c, LX, MID_BOT, LCW, MID_H, fill=C_WHITE)
 
-    half  = IW / 2
-    llw   = half * 0.32
-    lvw   = half * 0.68
-    rh2   = 13
-    ll_y  = cur_y
-    rl_y  = cur_y
-    rl_x  = MX + half
+    LLBW = LCW * 0.34
+    LVBW = LCW - LLBW
+    LRH  = 13
+    LBAR = 12
 
-    def ll(lbl, val, alt=False):
-        nonlocal ll_y
-        ll_y = table_row(c, lbl, val, MX,   ll_y, llw, lvw, rh2, alt)
+    ly = MID_TOP
 
-    def rl(lbl, val, alt=False):
-        nonlocal rl_y
-        rl_y = table_row(c, lbl, val, rl_x, rl_y, llw, lvw, rh2, alt)
+    def lsec(title):
+        nonlocal ly
+        if ly - LBAR < MID_BOT: return
+        ly -= LBAR
+        rect(c, LX, ly, LCW, LBAR, fill=C_NAVY)
+        draw_bold(c, title, LX + 4, ly + 3, 7, color=C_WHITE)
 
-    ll('都市計画', data.get('cityPlan',''))
-    ll('用途地域', data.get('useZone',''))
-    ll('防火指定', data.get('fireZone',''), alt=True)
+    def lrow(lbl, val, alt=False):
+        nonlocal ly
+        if not val: return
+        if ly - LRH < MID_BOT: return
+        ly -= LRH
+        bg = C_LBLUE if alt else C_WHITE
+        rect(c, LX,         ly, LLBW, LRH, fill=C_SECBG, stroke=C_DIV, lw=0.3)
+        draw_text(c, lbl,   LX + 2,         ly + 3, 6.5, color=C_NAVY)
+        rect(c, LX + LLBW,  ly, LVBW, LRH, fill=bg,     stroke=C_DIV, lw=0.3)
+        val_fit = truncate_text(val, LVBW - 5, 6.5)
+        draw_text(c, val_fit, LX + LLBW + 3, ly + 3, 6.5, color=C_BLACK)
 
-    rl('建ぺい率', data.get('bcr',''))
-    rl('容積率',   data.get('far',''))
-    rl('高度地区', data.get('heightDistrict',''), alt=True)
+    # 所在地
+    lsec('■ 所在地')
+    lrow('所在地', addr_raw)
 
-    cur_y = min(ll_y, rl_y)
-    other = data.get('otherLegal','')
-    if other:
-        cur_y = table_row(c, 'その他', other, MX, cur_y, IW*0.16, IW*0.84, rh2)
+    # 物件概要
+    lsec('■ 物件概要')
 
-    cur_y -= 3
+    la = f"{data.get('landArea','')}㎡"
+    if data.get('landAreaTsubo'):
+        la += f"  ({data['landAreaTsubo']}坪)"
 
-    # ── 6. UTILITIES & REMARKS ───────────────────────────────────────────────
-    section_bar(c, '■ ライフライン・備考', MX, cur_y, IW)
-    cur_y -= 1
+    fa_parts = [data.get(f'floorArea{i}','') for i in range(1,5)]
+    fa = '  '.join(x for x in fa_parts if x)
+    tf = f"{data.get('totalFloorArea','')}㎡" if data.get('totalFloorArea') else ''
 
-    utils = '　'.join(filter(None, [
-        f"電気：{data.get('electric','')}" if data.get('electric') else '',
-        f"ガス：{data.get('gas','')}"      if data.get('gas')      else '',
-        f"水道：{data.get('water','')}"    if data.get('water')    else '',
-    ]))
-    cur_y = table_row(c, 'ライフライン', utils, MX, cur_y, IW*0.16, IW*0.84, rh2)
+    lrow('土地面積', la)
+    lrow('土地権利', data.get('landRight',''),      alt=True)
+    lrow('地目',     data.get('landCategory',''))
+    lrow('接面道路', data.get('frontRoad',''),       alt=True)
+    lrow('再建築',   rebuild)
+    lrow('築年月',   data.get('builtYear',''),       alt=True)
+    lrow('構造',     data.get('structure',''))
+    lrow('床面積',   fa if fa else '',               alt=True)
+    if tf: lrow('合計', tf)
+    lrow('間取り',   data.get('layout',''),          alt=True)
+    lrow('現況',     status)
+    lrow('引渡し',   handover,                       alt=True)
 
-    for i, rem in enumerate(data.get('remarks','').split('\n')):
-        if rem.strip():
-            cur_y = table_row(c, '備考', rem.strip(), MX, cur_y, IW*0.16, IW*0.84, rh2, alt=(i%2==0))
+    # マンション専用 (E)
+    if data.get('propertyType','') == 'マンション':
+        lsec('■ マンション情報')
+        lrow('建物名',   data.get('buildingName',''))
+        lrow('所在階',   data.get('floorInfo',''),     alt=True)
+        lrow('専有面積', f"{data.get('exclusiveArea','')}㎡" if data.get('exclusiveArea') else '')
+        lrow('バルコニー', f"{data.get('balconyArea','')}㎡" if data.get('balconyArea') else '', alt=True)
+        lrow('管理費',   f"{data.get('managementFee','')}円/月" if data.get('managementFee') else '')
+        lrow('修繕積立', f"{data.get('repairFund','')}円/月"    if data.get('repairFund') else '',  alt=True)
+        lrow('管理会社', data.get('managementCo',''))
+        lrow('管理形態', data.get('managementType',''), alt=True)
 
-    school = ''
-    if data.get('elemSchool'):
-        school += f"小：{data['elemSchool']} {data.get('elemSchoolDist','')}　"
-    if data.get('juniorSchool'):
-        school += f"中：{data['juniorSchool']} {data.get('juniorSchoolDist','')}"
-    if school:
-        cur_y = table_row(c, '学区', school.strip(), MX, cur_y, IW*0.16, IW*0.84, rh2)
+    # 法令制限 (F) — skip for マンション
+    if data.get('propertyType','') != 'マンション':
+        lsec('■ 法令制限')
+        lrow('都市計画', data.get('cityPlan',''))
+        lrow('用途地域', data.get('useZone',''),         alt=True)
+        lrow('防火指定', data.get('fireZone',''))
+        lrow('建ぺい率', data.get('bcr',''),             alt=True)
+        lrow('容積率',   data.get('far',''))
+        lrow('高度地区', data.get('heightDistrict',''),  alt=True)
+        if data.get('otherLegal'):
+            lrow('その他', data['otherLegal'])
 
-    cur_y -= 4
-    draw_text(c, '※現況と図面が相違する場合は現況を優先します。', MX, cur_y, 6.5, color=C_MUTED)
-    cur_y -= 9
+    # ライフライン (J1)
+    up_parts = []
+    if data.get('electric'): up_parts.append(f"電気：{data['electric']}")
+    if data.get('gas'):      up_parts.append(f"ガス：{data['gas']}")
+    if data.get('water'):    up_parts.append(f"水道：{data['water']}")
+    if up_parts:
+        lsec('■ ライフライン')
+        if ly - LRH >= MID_BOT:
+            ly -= LRH
+            rect(c, LX, ly, LCW, LRH, fill=C_WHITE, stroke=C_DIV, lw=0.3)
+            up_fit = truncate_text('　'.join(up_parts), LCW - 6, 6.5)
+            draw_text(c, up_fit, LX + 3, ly + 3, 6.5, color=C_BLACK)
 
-    # ── 7. MAP PLACEHOLDER (fills remaining space above footer) ─────────────
-    FH     = 25 * mm
-    FY     = MY
-    map_y  = FY + FH + 6 * mm          # top of map = bottom of available space
-    map_h  = cur_y - map_y - 2 * mm    # height = whatever is left
-    if map_h > 20:                      # only draw if there's meaningful space
-        map_half = (IW - 3 * mm) / 2
-        # Left: map placeholder
-        rect(c, MX, map_y, map_half, map_h,
-             fill=colors.HexColor('#e8eef6'), stroke=C_DIV, lw=0.5)
-        draw_text(c, '周辺地図', MX + map_half/2, map_y + map_h/2 + 4, 13,
-                  color=colors.HexColor('#8899bb'), align='center')
-        draw_text(c, '（地図を挿入）', MX + map_half/2, map_y + map_h/2 - 10, 8,
-                  color=colors.HexColor('#8899bb'), align='center')
-        # Right: map placeholder 2 (interior/floor plan)
-        rx = MX + map_half + 3 * mm
-        rect(c, rx, map_y, map_half, map_h,
-             fill=colors.HexColor('#eef3e8'), stroke=C_DIV, lw=0.5)
-        draw_text(c, '間取り図', rx + map_half/2, map_y + map_h/2 + 4, 13,
-                  color=colors.HexColor('#88aa88'), align='center')
-        draw_text(c, '（間取り図を挿入）', rx + map_half/2, map_y + map_h/2 - 10, 8,
-                  color=colors.HexColor('#88aa88'), align='center')
+    # 備考 (J5)
+    DISCLAIMER = '現況と図面が相違する場合は現況を優先します'
+    remarks = [r.strip() for r in data.get('remarks','').split('\n')
+               if r.strip() and DISCLAIMER not in r]
+    if remarks:
+        lsec('■ 備考')
+        for i, r in enumerate(remarks):
+            lrow('', r, alt=(i % 2 == 1))
 
-    # ── 8. FOOTER BAR ────────────────────────────────────────────────────────
-    rect(c, 0, FY, W, FH, fill=C_NAVYDK)
+    # Disclaimer text at bottom
+    if MID_BOT + 8 < ly:
+        draw_text(c, '※現況と図面が相違する場合は現況を優先します。',
+                  LX + 2, MID_BOT + 4, 5.5, color=C_MUTED)
 
-    fy = FY + FH - 5
+    # ─────────────────────────────────────────────────────────────────────────
+    # MIDDLE SECTION — Q1 bottom  (K5 地図)
+    # ─────────────────────────────────────────────────────────────────────────
+    if variant == 'B':
+        photo_placeholder(c, RX1, MID_BOT, HALF, MID_H,
+                          '外観写真３', '（K3）', bg='#d0e0d0', tc='#5a7a5a')
+    else:
+        photo_placeholder(c, RX1, MID_BOT, HALF, MID_H,
+                          '地　図', '（地図を挿入）', bg='#e8eef6', tc='#8899bb')
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # MIDDLE SECTION — Q2 bottom  (K2 間取り図  /  Variant B: K4 photo)
+    # ─────────────────────────────────────────────────────────────────────────
+    if variant == 'B':
+        photo_placeholder(c, RX2, MID_BOT, HALF, MID_H,
+                          '間取り図 / 地図', '（K4 / K5）', bg='#e0eed0', tc='#5a7a5a')
+    else:
+        photo_placeholder(c, RX2, MID_BOT, HALF, MID_H,
+                          '間取り図', '（間取り図を挿入）', bg='#eef3e8', tc='#88aa88')
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # FOOTER
+    # Left: brand/company/address  |  Centre: TEL/FAX  |  Right: agent
+    # Strip: licence + association + transaction type
+    # ─────────────────────────────────────────────────────────────────────────
+    # Licence strip
+    rect(c, 0, STRIP_Y, W, STRIP_H, fill=colors.HexColor('#0e2660'))
+    lic    = data.get('licenseNo', '')
+    assoc  = data.get('association', '')
+    ttype  = data.get('transactionType', '')
+    strip_t = '　'.join(filter(None, [lic, assoc,
+                                       f'取引態様：{ttype}' if ttype else '']))
+    if strip_t:
+        draw_text(c, strip_t, MX, STRIP_Y + 2, 5.5, color=C_STEELBL)
+
+    # Footer band
+    rect(c, 0, FOOTER_Y, W, FOOTER_H, fill=C_NAVYDK)
+
+    # Left: brand + company + address
+    brand = data.get('brandName', data.get('companyName', ''))
+    fy = FOOTER_Y + FOOTER_H - 6
     if brand:
-        draw_text_bold(c, brand, MX, fy, 10, color=C_WHITE)
-        fy -= 12
-    co = data.get('companyName','')
+        draw_bold(c, brand, MX, fy, 10, color=C_WHITE)
+        uw = txt_width(brand, 10, bold=True)
+        c.saveState(); c.setStrokeColor(C_ACCENT); c.setLineWidth(0.8)
+        c.line(MX, fy - 1, MX + uw, fy - 1); c.restoreState()
+        fy -= 13
+    co = data.get('companyName', '')
     if co and co != brand:
-        draw_text(c, co, MX, fy, 8, color=C_STEELBL)
-        fy -= 10
-    ca = data.get('companyAddress','')
-    if ca:
-        draw_text(c, ca, MX, fy, 6.5, color=C_STEELBL)
+        draw_text(c, co, MX, fy, 8, color=C_STEELBL); fy -= 10
+    addr_co = data.get('companyAddress', '')
+    if addr_co:
+        draw_text(c, addr_co, MX, fy, 6.5, color=C_STEELBL)
 
-    # Right side: catchcopy + agent + contact
-    ry2 = FY + FH - 5
-    cp  = data.get('catchcopy','')
-    if cp:
-        draw_text(c, cp, W - MX, ry2, 7, color=C_AMBER, align='right')
-        ry2 -= 10
-    ag = data.get('agentName','')
-    if ag:
-        draw_text(c, f'【担当】{ag}', W - MX, ry2, 8, color=C_WHITE, align='right')
-        ry2 -= 10
-    tel = data.get('tel','')
+    # Centre: contact
+    cx2 = W * 0.50
+    cy2 = FOOTER_Y + FOOTER_H - 7
+    draw_bold(c, 'お問い合わせ先', cx2, cy2, 7, color=C_AMBER, align='center'); cy2 -= 12
+    tel = data.get('tel', '')
     if tel:
-        draw_text_bold(c, f'TEL：{tel}', W - MX, ry2, 9, color=C_WHITE, align='right')
-        ry2 -= 10
-    fax = data.get('fax','')
+        draw_bold(c, f'TEL  {tel}', cx2, cy2, 10, color=C_WHITE, align='center'); cy2 -= 14
+    fax = data.get('fax', '')
     if fax:
-        draw_text(c, f'FAX：{fax}', W - MX, ry2, 7.5, color=C_STEELBL, align='right')
-        ry2 -= 9
-    em = data.get('email','')
+        draw_text(c, f'FAX  {fax}', cx2, cy2, 8, color=C_STEELBL, align='center')
+
+    # Right: agent
+    ry2 = FOOTER_Y + FOOTER_H - 7
+    ag  = data.get('agentName', '')
+    if ag:
+        draw_bold(c, f'【担当】 {ag}', W - MX, ry2, 8, color=C_WHITE, align='right'); ry2 -= 12
+    ag_tel = data.get('agentTel', data.get('tel', ''))
+    if ag_tel and ag_tel != tel:
+        draw_text(c, f'直通  {ag_tel}', W - MX, ry2, 7.5, color=C_STEELBL, align='right'); ry2 -= 10
+    em = data.get('email', '')
     if em:
         draw_text(c, em, W - MX, ry2, 7, color=C_STEELBL, align='right')
 
-    # Centre: transaction / fee
-    cx2 = W / 2
-    tt  = data.get('transactionType','')
-    fee = data.get('fee','')
-    if tt:
-        draw_text(c, f'取引態様：{tt}', cx2, FY + FH - 7,  7.5, color=C_WHITE, align='center')
-    if fee:
-        draw_text(c, f'手数料：{fee}',  cx2, FY + FH - 18, 7.5, color=C_WHITE, align='center')
-
-    # ── 8. LICENSE LINE ──────────────────────────────────────────────────────
-    lic = data.get('licenseNo','')
-    if lic:
-        draw_text(c, lic, MX, FY - 6, 6, color=C_MUTED)
-
     c.save()
-    print(f'✅  {out_path}')
 
 
-# ── Vercel handler (BaseHTTPRequestHandler) ──────────────────────────────────
-
-import tempfile
-from http.server import BaseHTTPRequestHandler
-
+# ── Vercel handler ────────────────────────────────────────────────────────────
 class handler(BaseHTTPRequestHandler):
-
     def do_OPTIONS(self):
-        self._cors()
         self.send_response(200)
+        for k, v in [('Access-Control-Allow-Origin','*'),
+                     ('Access-Control-Allow-Methods','POST, OPTIONS'),
+                     ('Access-Control-Allow-Headers','Content-Type')]:
+            self.send_header(k, v)
         self.end_headers()
 
     def do_POST(self):
         try:
-            content_length = int(self.headers.get('content-length', 0))
-            body = self.rfile.read(content_length)
-            data = json.loads(body.decode('utf-8'))
-
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as t:
-                tmp_path = t.name
-
-            generate(data, tmp_path)
-
-            with open(tmp_path, 'rb') as f:
-                pdf_bytes = f.read()
-            os.unlink(tmp_path)
-
-            # Derive filename from address
-            addr = data.get('address', '物件').replace(' ', '_')[:20]
-            filename = f"{addr}_チラシ.pdf"
-
-            self._cors()
+            n   = int(self.headers.get('Content-Length', 0))
+            dat = json.loads(self.rfile.read(n))
+            buf = io.BytesIO()
+            generate(dat, buf)
+            pdf = buf.getvalue()
             self.send_response(200)
-            self.send_header('Content-Type', 'application/pdf')
-            self.send_header('Content-Disposition',
-                             f'attachment; filename="{filename}"')
-            self.send_header('Content-Length', str(len(pdf_bytes)))
+            for k, v in [('Content-Type','application/pdf'),
+                         ('Content-Disposition','attachment; filename="flyer.pdf"'),
+                         ('Content-Length', str(len(pdf))),
+                         ('Access-Control-Allow-Origin','*')]:
+                self.send_header(k, v)
             self.end_headers()
-            self.wfile.write(pdf_bytes)
-
+            self.wfile.write(pdf)
         except Exception as e:
-            msg = str(e).encode('utf-8')
-            self._send(500, msg)
+            msg = str(e).encode()
+            self.send_response(500)
+            self.send_header('Content-Type','text/plain')
+            self.send_header('Content-Length', str(len(msg)))
+            self.end_headers()
+            self.wfile.write(msg)
 
-    def _send(self, code, body: bytes):
-        self._cors()
-        self.send_response(code)
-        self.send_header('Content-Type', 'text/plain')
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def _cors(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-
-    def log_message(self, fmt, *args):
-        pass  # silence default access log
+    def log_message(self, *a): pass
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print('Usage: python generate_flyer.py data.json output.pdf')
-        sys.exit(1)
+        print('Usage: python generate_flyer.py data.json output.pdf'); sys.exit(1)
     with open(sys.argv[1], encoding='utf-8') as f:
         generate(json.load(f), sys.argv[2])
