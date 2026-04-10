@@ -270,19 +270,31 @@ def generate(data: dict, out):
     n_st = max(len(stations_raw), 1)
     ST_H = n_st * (ST_FONT + 3) + 4   # dynamic station strip height
 
-    # ── Change 2: Nav box height = just enough for pill + address ────────────
+    # ── Change 2: Nav box height = just enough for propertyName + pill + address ─
     pill_pad_x, pill_pad_y = 8, 4
     pill_bh = PILL_SZ + pill_pad_y * 2   # = 18 pts
 
-    prop_type_early = data.get('propertyType', '中古戸建')
-    addr_raw_early  = data.get('address', '')
-    short_early     = addr_raw_early.replace('東京都','').replace('大阪府','').replace('神奈川県','')[:20]
-    addr_sz_early   = 8
+    prop_type_early  = data.get('propertyType', '中古戸建')
+    prop_name_early  = data.get('propertyName', '')
+    addr_raw_early   = data.get('address', '')
+    short_early      = addr_raw_early.replace('東京都','').replace('大阪府','').replace('神奈川県','')[:20]
+
+    # Auto-size property name font
+    prop_name_sz = 0
+    if prop_name_early:
+        for sz in range(20, 7, -1):
+            if txt_width(prop_name_early, sz, bold=True) <= LCW - 10:
+                prop_name_sz = sz; break
+
+    addr_sz_early = 8
     for sz in range(22, 7, -1):
         if txt_width(short_early, sz, bold=True) <= LCW - 10:
             addr_sz_early = sz; break
 
-    NAV_H   = pill_bh + addr_sz_early + 14   # pill + address + padding
+    # NAV_H: propertyName (if any) + pill + address + internal padding
+    NAV_H_base = pill_bh + addr_sz_early + 14
+    NAV_H = NAV_H_base + (prop_name_sz + 8 if prop_name_sz else 0)
+
     PRICE_H = 20 * mm
 
     # Right area vertical split
@@ -299,22 +311,36 @@ def generate(data: dict, out):
     # TOP BAND — LEFT column:  NAVY (type+address)  /  STATION STRIP  /  PRICE
     # ─────────────────────────────────────────────────────────────────────────
 
-    # ── Navy header box — exactly fits pill + address, both center-aligned ────
+    # ── Navy header box — propertyName (headline) + pill + address, centered ──
     nav_y = BAND_BOT + PRICE_H + ST_H      # bottom of navy box (in PDF y-space)
     rect(c, LX, nav_y, LCW, NAV_H, fill=C_NAVY)
 
     prop_type = data.get('propertyType', '中古戸建')
+    prop_name = prop_name_early
     bw = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
     bh = pill_bh
+    nav_top = nav_y + NAV_H   # visual top of navy box
 
-    # Pill: centered horizontally, near top of navy box
-    pill_margin_top = 5
-    by = nav_y + NAV_H - bh - pill_margin_top
+    # ── Property name headline at the very top ────────────────────────────────
+    if prop_name and prop_name_sz:
+        pname_y = nav_top - prop_name_sz - 5   # text baseline
+        draw_bold(c, prop_name, LX + LCW / 2, pname_y, prop_name_sz,
+                  color=C_WHITE, align='center')
+        # Gold accent line below name
+        hline(c, LX + 4, LX + LCW - 4, pname_y - 3,
+              color=colors.HexColor('#f9d87a'), lw=0.7)
+        # Pill positioned just below the accent line
+        by = pname_y - 3 - 5 - bh
+    else:
+        # No property name: pill near top as before
+        by = nav_top - bh - 5
+
+    # ── Type pill — centered horizontally ────────────────────────────────────
     pill_x = LX + (LCW - bw) / 2
     rect(c, pill_x, by, bw, bh, fill=C_ACCENT)
     draw_text(c, prop_type, pill_x + pill_pad_x, by + pill_pad_y, PILL_SZ, color=C_WHITE)
 
-    # Address: centered horizontally in space below pill
+    # ── Address: centered in space below pill ─────────────────────────────────
     addr_raw = addr_raw_early
     short    = short_early
     addr_sz  = addr_sz_early
@@ -707,23 +733,30 @@ def generate(data: dict, out):
     vline(c, F_INFO_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
 
     # ── c) COMPANY INFO ────────────────────────────────────────────────────────
-    INFO_SZ  = 6.5
-    addr_co  = data.get('companyAddress', '')
-    tel      = data.get('tel', '')
-    fax      = data.get('fax', '')
-    em       = data.get('email', '')
-    dept     = data.get('department', '')
+    INFO_SZ   = 6.5
+    addr_co   = data.get('companyAddress', '')
+    tel       = data.get('tel', '')
+    fax       = data.get('fax', '')
+    em        = data.get('email', '')
+    dept      = data.get('department', '')
+    licenseNo = data.get('licenseNo', '')
+    assoc     = data.get('association', '')
     ify = FY_TOP - F_PAD
     if dept:
-        draw_text(c, dept,          F_INFO_X + F_PAD, ify, INFO_SZ, color=colors.HexColor('#aabbd4')); ify -= INFO_SZ + 3
+        draw_text(c, dept,              F_INFO_X + F_PAD, ify, INFO_SZ, color=colors.HexColor('#aabbd4')); ify -= INFO_SZ + 3
     if addr_co:
-        draw_text(c, addr_co,       F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
+        draw_text(c, addr_co,           F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
     if tel:
-        draw_text(c, f'TEL：{tel}', F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
+        draw_text(c, f'TEL：{tel}',     F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
     if fax:
-        draw_text(c, f'FAX：{fax}', F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
+        draw_text(c, f'FAX：{fax}',     F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
     if em:
-        draw_text(c, f'✉ {em}',    F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL)
+        draw_text(c, f'✉ {em}',        F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
+    if licenseNo:
+        draw_text(c, licenseNo,         F_INFO_X + F_PAD, ify, INFO_SZ - 0.5, color=colors.HexColor('#8aa8cc')); ify -= INFO_SZ + 2
+    if assoc:
+        lic_fit = truncate_text(assoc, F_INFO_W - F_PAD * 2, INFO_SZ - 1)
+        draw_text(c, lic_fit,           F_INFO_X + F_PAD, ify, INFO_SZ - 1, color=colors.HexColor('#8aa8cc'))
 
     vline(c, F_CONT_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
 
@@ -760,7 +793,8 @@ def generate(data: dict, out):
     rect(c, F_YELL_X, FOOTER_Y, F_YELL_W, FOOTER_H,
          fill=colors.HexColor('#f5c800'), stroke=None)
 
-    slogan = data.get('companySlogan', '')
+    # 'catchcopy' is the form field name; 'companySlogan' kept as fallback
+    slogan = data.get('catchcopy', data.get('companySlogan', ''))
     ttype  = data.get('transactionType', '')
     fee    = data.get('fee', '')
     YPW    = F_YELL_W - F_PAD * 2
