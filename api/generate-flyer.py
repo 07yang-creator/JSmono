@@ -20,13 +20,14 @@ Column boundaries are IDENTICAL for top and bottom sections
 ly convention: ly = current TOP-EDGE; helpers decrement BEFORE drawing.
 """
 
-import json, sys, os, io, math
-from reportlab.lib.pagesizes import A4
+import json, sys, os, io, math, base64
+from reportlab.lib.pagesizes import A4, portrait
 from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.utils import ImageReader
 from http.server import BaseHTTPRequestHandler
 
 # ── Font ──────────────────────────────────────────────────────────────────────
@@ -74,6 +75,23 @@ def draw_text(c, s, x, y, size, color=None, align='left', bold=False):
 
 def draw_bold(c, s, x, y, size, color=None, align='left'):
     draw_text(c, s, x, y, size, color, align, bold=True)
+
+def _draw_rotated_text(c, s, x, y, size):
+    """Draw mixed JP/Latin text at position (x,y) in the CURRENT (rotated) coordinate space."""
+    if not s: return
+    cur_x = x
+    run, run_lat = '', None
+    def flush(seg, lat, cx):
+        if not seg: return cx
+        f = LA_BOLD if lat else JP_FONT
+        c.setFont(f, size); c.drawString(cx, y, seg)
+        return cx + pdfmetrics.stringWidth(seg, f, size)
+    for ch in s:
+        lat = is_latin(ch)
+        if run_lat is None: run_lat = lat
+        if lat != run_lat: cur_x = flush(run, run_lat, cur_x); run, run_lat = ch, lat
+        else: run += ch
+    flush(run, run_lat, cur_x)
 
 def truncate_text(s, max_w, size, bold=False, ellipsis='…'):
     if not s or txt_width(s, size, bold) <= max_w:
@@ -126,11 +144,34 @@ def photo_placeholder(c, x, y, w, h, label, sublabel='', bg='#c8d4e8', tc='#7a8f
     if sublabel:
         draw_text(c, sublabel, cx, y + h/2 - 9, 7.5, color=colors.HexColor(tc), align='center')
 
+def draw_photo(c, x, y, w, h, b64_data, label, sublabel=''):
+    """Draw a real photo (JPEG/PNG base64) or fall back to placeholder."""
+    if b64_data:
+        try:
+            raw = b64_data.split(',', 1)[-1] if ',' in b64_data else b64_data
+            img_bytes = base64.b64decode(raw)
+            img = ImageReader(io.BytesIO(img_bytes))
+            iw, ih = img.getSize()
+            scale = min(w / iw, h / ih)
+            dw, dh = iw * scale, ih * scale
+            ox = x + (w - dw) / 2
+            oy = y + (h - dh) / 2
+            # Clip to cell before drawing
+            c.saveState()
+            cp = c.beginPath(); cp.rect(x, y, w, h); c.clipPath(cp, stroke=0)
+            c.drawImage(img, ox, oy, dw, dh, preserveAspectRatio=True, mask='auto')
+            c.restoreState()
+            return
+        except Exception:
+            pass
+    photo_placeholder(c, x, y, w, h, label, sublabel)
+
 
 # ── Generator ─────────────────────────────────────────────────────────────────
 def generate(data: dict, out):
-    c = canvas.Canvas(out, pagesize=A4)
-    W, H = A4
+    PAGE = portrait(A4)          # always A4 portrait (595 × 842 pts)
+    c = canvas.Canvas(out, pagesize=PAGE)
+    W, H = PAGE
     MX = 11 * mm
     MY = 8  * mm
     IW = W - 2 * MX          # ≈ 551 pts
@@ -214,8 +255,8 @@ def generate(data: dict, out):
     # ─────────────────────────────────────────────────────────────────────────
     # TOP BAND — Q1  (K1 外観写真 main photo)
     # ─────────────────────────────────────────────────────────────────────────
-    photo_placeholder(c, RX1, BAND_BOT, HALF, TOP_H,
-                      '外　観', '（写真をここに挿入）', bg='#c8d4e8', tc='#7a8faa')
+    draw_photo(c, RX1, BAND_BOT, HALF, TOP_H,
+               data.get('k1Image', ''), '外　観', '（写真をここに挿入）')
 
     # ─────────────────────────────────────────────────────────────────────────
     # TOP BAND — Q2  (Variant A: H/I info  /  Variant B: K2 photo)
@@ -227,8 +268,8 @@ def generate(data: dict, out):
 
     if variant == 'B':
         # Q2-top = second exterior photo
-        photo_placeholder(c, RX2, BAND_BOT, HALF, TOP_H,
-                          '外観写真２', '（K2）', bg='#d4cce8', tc='#7a78aa')
+        draw_photo(c, RX2, BAND_BOT, HALF, TOP_H,
+                   data.get('k2Image', ''), '外観写真２', '（K2）')
     else:
         # Q2-top = H/I 周辺環境・学区 info box
         rect(c, RX2, BAND_BOT, HALF, TOP_H,
@@ -297,49 +338,61 @@ def generate(data: dict, out):
             draw_text(c, dist, RX2 + HALF - q2_pad, q2y + 2, 6, color=C_MUTED, align='right')
 
     # ─────────────────────────────────────────────────────────────────────────
-    # SPECIAL PROMO FLAG  (pennant-style, top-right corner of Q2-top)
-    # "a stick holding just a few words"
+    # SPECIAL PROMO — 绶带 (diagonal corner ribbon) top-right of Q2-top
     # ─────────────────────────────────────────────────────────────────────────
     promo = data.get('specialPromo', '').strip()
     if promo:
-        # Flag geometry
-        flag_txt = truncate_text(promo, HALF * 0.80, 7.5, bold=True)
-        fw = txt_width(flag_txt, 7.5, bold=True) + 14   # flag width
-        fh = 16                                           # flag height
-        stick_h = 26                                      # stick length below flag
-        # Anchor: near the top-right corner of Q2-top
-        flag_right = RX2 + HALF - 5             # right edge of flag
-        flag_top   = BAND_BOT + TOP_H - 5       # top of flag (just inside cell)
-        flag_x     = flag_right - fw
-        flag_y     = flag_top - fh
+        # Corner anchor = top-right corner of Q2-top cell
+        cx_r = RX2 + HALF       # right edge of cell
+        cy_t = BAND_BOT + TOP_H # top edge of cell
 
-        # Stick (vertical line under the flag's right edge)
-        stick_x = flag_right - 2
-        c.saveState()
-        c.setStrokeColor(C_RED)
-        c.setLineWidth(1.8)
-        c.line(stick_x, flag_y, stick_x, flag_y - stick_h)
-        c.restoreState()
+        a  = 58   # ribbon reach along each edge from corner
+        bw = 32   # band width along each edge (controls ribbon thickness)
 
-        # Pennant body (red rectangle with a small right-pointing notch removed)
-        # Draw as a polygon to get the flag look
-        notch = fh / 3
+        # Four corners of the diagonal ribbon parallelogram:
+        # P1, P2 on the top edge; P3, P4 on the right edge
+        P1 = (cx_r - a,      cy_t)
+        P2 = (cx_r - a + bw, cy_t)
+        P3 = (cx_r,          cy_t - a + bw)
+        P4 = (cx_r,          cy_t - a)
+
         c.saveState()
+        # Clip to cell so ribbon doesn't bleed outside
+        clip = c.beginPath()
+        clip.rect(RX2, BAND_BOT, HALF, TOP_H)
+        c.clipPath(clip, stroke=0)
+
+        # Shadow layer (slightly offset, semi-transparent dark)
+        c.setFillColor(colors.HexColor('#99000088') if False else colors.HexColor('#c0000066'))
+        ps = c.beginPath()
+        ps.moveTo(P1[0]+2, P1[1]-2); ps.lineTo(P2[0]+2, P2[1]-2)
+        ps.lineTo(P3[0]+2, P3[1]-2); ps.lineTo(P4[0]+2, P4[1]-2)
+        ps.close(); c.drawPath(ps, fill=1, stroke=0)
+
+        # Main ribbon body
         c.setFillColor(C_RED)
-        p = c.beginPath()
-        p.moveTo(flag_x, flag_top)           # top-left
-        p.lineTo(flag_right, flag_top)        # top-right
-        p.lineTo(flag_right, flag_y)          # bottom-right
-        p.lineTo(flag_x + fw * 0.85, flag_y + notch)  # notch point (→ right = pennant tip)
-        p.lineTo(flag_x, flag_y)             # bottom-left
-        p.close()
-        c.drawPath(p, fill=1, stroke=0)
-        c.restoreState()
+        pr = c.beginPath()
+        pr.moveTo(*P1); pr.lineTo(*P2); pr.lineTo(*P3); pr.lineTo(*P4)
+        pr.close(); c.drawPath(pr, fill=1, stroke=0)
 
-        # Text on the flag
-        txt_cx = flag_x + (fw * 0.85) / 2
-        txt_y  = flag_y + (fh - 7.5) / 2
-        draw_bold(c, flag_txt, txt_cx, txt_y, 7.5, color=C_WHITE, align='center')
+        # Thin gold border lines along both edges
+        c.setStrokeColor(C_AMBER); c.setLineWidth(0.8)
+        c.line(*P1, *P4)
+        c.line(*P2, *P3)
+
+        # Text: centred in ribbon, rotated -45°
+        mid_x = (P1[0] + P3[0]) / 2
+        mid_y = (P1[1] + P3[1]) / 2
+        promo_txt = truncate_text(promo, bw * 1.2, 7, bold=True)
+        c.translate(mid_x, mid_y)
+        c.rotate(-45)
+        tw = txt_width(promo_txt, 7, bold=True)
+        # Use setFont directly since we're in transformed space
+        c.setFillColor(C_WHITE)
+        # Draw each character segment (latin/JP)
+        _draw_rotated_text(c, promo_txt, -tw/2, -3.5, 7)
+
+        c.restoreState()
 
     # ─────────────────────────────────────────────────────────────────────────
     # GRID DIVIDERS
@@ -464,21 +517,21 @@ def generate(data: dict, out):
     # MIDDLE SECTION — Q1 bottom  (K5 地図)
     # ─────────────────────────────────────────────────────────────────────────
     if variant == 'B':
-        photo_placeholder(c, RX1, MID_BOT, HALF, MID_H,
-                          '外観写真３', '（K3）', bg='#d0e0d0', tc='#5a7a5a')
+        draw_photo(c, RX1, MID_BOT, HALF, MID_H,
+                   data.get('k3Image', ''), '外観写真３', '（K3）')
     else:
-        photo_placeholder(c, RX1, MID_BOT, HALF, MID_H,
-                          '地　図', '（地図を挿入）', bg='#e8eef6', tc='#8899bb')
+        draw_photo(c, RX1, MID_BOT, HALF, MID_H,
+                   data.get('k5Image', ''), '地　図', '（地図を挿入）')
 
     # ─────────────────────────────────────────────────────────────────────────
     # MIDDLE SECTION — Q2 bottom  (K2 間取り図  /  Variant B: K4 photo)
     # ─────────────────────────────────────────────────────────────────────────
     if variant == 'B':
-        photo_placeholder(c, RX2, MID_BOT, HALF, MID_H,
-                          '間取り図 / 地図', '（K4 / K5）', bg='#e0eed0', tc='#5a7a5a')
+        draw_photo(c, RX2, MID_BOT, HALF, MID_H,
+                   data.get('k4Image', ''), '間取り図 / 地図', '（K4 / K5）')
     else:
-        photo_placeholder(c, RX2, MID_BOT, HALF, MID_H,
-                          '間取り図', '（間取り図を挿入）', bg='#eef3e8', tc='#88aa88')
+        draw_photo(c, RX2, MID_BOT, HALF, MID_H,
+                   data.get('k2Image', ''), '間取り図', '（間取り図を挿入）')
 
     # ─────────────────────────────────────────────────────────────────────────
     # FOOTER
