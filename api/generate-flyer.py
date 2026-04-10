@@ -1,27 +1,24 @@
 """
 generate_flyer.py  —  Justsalemono  (Template 1)
 ─────────────────────────────────────────────────────────────
-A4 portrait.  Three columns, four cells in the right area:
+A4 landscape.  Three columns, four cells in the right area:
 
-  LEFT (38%)  │  Q1 (31%)        │  Q2 (31%)
-  ────────────┼──────────────────┼──────────────────
-  TOP BAND    │  K1 外観写真      │  H/I 周辺環境    ← Variant A
-  (title/     │                  │  or K2 photo     ← Variant B
-   price)     │                  │  [promo flag ▶]
-  ────────────┼──────────────────┼──────────────────
-  data rows   │  K5 地図         │  K2/K4 間取り図   ← Variant A
-              │                  │  K3/K4 photo     ← Variant B
-  ────────────┴──────────────────┴──────────────────
-  FOOTER  (full width — company info)
-
-Column boundaries are IDENTICAL for top and bottom sections
-→ clean visual grid, no mid-page column shift.
+  LEFT (≈24%)  │  Q1 (38%)        │  Q2 (38%)
+  ─────────────┼──────────────────┼──────────────────
+  TOP BAND     │  K1 外観写真      │  K5 地図          ← Variant A
+  (title/      │                  │  or K2 photo      ← Variant B
+   price)      │                  │  [promo ribbon ▶]
+  ─────────────┼──────────────────┼──────────────────
+  data rows    │  H/I 周辺環境     │  K2 間取り図       ← Variant A
+               │  (flowing text)  │  K3/K4 photo      ← Variant B
+  ─────────────┴──────────────────┴──────────────────
+  FOOTER  (IW width — Logo | Name | Info | Contact | Yellow)
 
 ly convention: ly = current TOP-EDGE; helpers decrement BEFORE drawing.
 """
 
 import json, sys, os, io, math, base64
-from reportlab.lib.pagesizes import A4, portrait, landscape
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
@@ -180,59 +177,57 @@ def _img_ar(b64_data, default=4/3):
 def draw_flex_grid(c, images, x, y, w, h):
     """
     Flexible photo grid — aspect-ratio-aware layout for 1–4 images.
+    White gaps between cells create a shadow/mat effect.
     images: list of (b64, label, sublabel) tuples.
-    Images are distributed into rows; within each row widths scale
-    proportionally to each image's aspect ratio.
     """
+    GAP = 3   # white gap between photos (shadow/mat effect)
     n = len(images)
     if n == 0:
         return
     ars = [_img_ar(b) for b, _, _ in images]
 
     def row(imgs, ars_r, rx, ry, rw, rh):
-        """Draw one row of images side-by-side."""
+        """Draw one row of images side-by-side with white gaps."""
+        n_imgs = len(imgs)
+        usable_w = rw - GAP * (n_imgs - 1)
         total = sum(ars_r) or 1
         cur_x = rx
         for i, (img_tuple, ar) in enumerate(zip(imgs, ars_r)):
-            cell_w = rw * ar / total
-            if i == len(imgs) - 1:          # last cell takes remaining width
-                cell_w = rx + rw - cur_x
+            cell_w = usable_w * ar / total
+            if i == n_imgs - 1:
+                cell_w = rx + rw - cur_x   # last cell absorbs rounding
             draw_photo(c, cur_x, ry, cell_w, rh, *img_tuple)
-            # thin divider line between cells
-            if i < len(imgs) - 1:
-                vline(c, cur_x + cell_w, ry, ry + rh, color=C_DIV, lw=0.5)
             cur_x += cell_w
+            if i < n_imgs - 1:
+                rect(c, cur_x, ry, GAP, rh, fill=C_WHITE)
+                cur_x += GAP
 
     if n == 1:
         draw_photo(c, x, y, w, h, *images[0])
 
     elif n == 2:
-        # Two images side by side, single row
         row(images, ars, x, y, w, h)
 
     elif n == 3:
-        # Top row: image 0 full-width; bottom row: images 1 & 2 side-by-side
-        # Row heights weighted by effective height at full width
         rh0_nat = w / ars[0]
         rh1_nat = w / ((ars[1] + ars[2]) / 2)
         tot = rh0_nat + rh1_nat or 1
         rh0 = max(h * 0.35, min(h * 0.65, h * rh0_nat / tot))
-        rh1 = h - rh0
-        draw_photo(c, x, y + rh1, w, rh0, *images[0])
-        hline(c, x, x + w, y + rh1, color=C_DIV, lw=0.5)
+        rh1 = h - rh0 - GAP
+        draw_photo(c, x, y + rh1 + GAP, w, rh0, *images[0])
+        rect(c, x, y + rh1, w, GAP, fill=C_WHITE)
         row(images[1:], ars[1:], x, y, w, rh1)
 
     else:  # n == 4
-        # Two rows of two images each; row height weighted by avg aspect ratio
         avg_top = (ars[0] + ars[1]) / 2
         avg_bot = (ars[2] + ars[3]) / 2
         rh_top_nat = w / avg_top
         rh_bot_nat = w / avg_bot
         tot = rh_top_nat + rh_bot_nat or 1
         rh_top = max(h * 0.35, min(h * 0.65, h * rh_top_nat / tot))
-        rh_bot = h - rh_top
-        row(images[:2], ars[:2], x, y + rh_bot, w, rh_top)
-        hline(c, x, x + w, y + rh_bot, color=C_DIV, lw=0.5)
+        rh_bot = h - rh_top - GAP
+        row(images[:2], ars[:2], x, y + rh_bot + GAP, w, rh_top)
+        rect(c, x, y + rh_bot, w, GAP, fill=C_WHITE)
         row(images[2:], ars[2:], x, y, w, rh_bot)
 
 
@@ -247,28 +242,50 @@ def generate(data: dict, out):
 
     variant = data.get('templateVariant', 'A').upper()
 
-    # ── Column geometry  (consistent top-to-bottom) ───────────────────────────
-    LCW  = IW * 0.34 * 0.85     # left data column  (≈29%, reduced 15%)
-    RW   = IW - LCW              # right photo area
-    LX   = MX                    # left column left edge
-    RX   = LX + LCW              # right area left edge
+    # ── Font/size constants ───────────────────────────────────────────────────
+    PILL_SZ = 10          # property type pill font size
+    ST_FONT = PILL_SZ     # Change 3: station info same size as pill
 
-    # Within the right area: two equal columns
+    # ── Column geometry ───────────────────────────────────────────────────────
+    # Change 1: reduce left column by another 15% (on top of previous 15%)
+    LCW  = IW * 0.34 * 0.85 * 0.85   # ≈ IW * 0.245
+    RW   = IW - LCW
+    LX   = MX
+    RX   = LX + LCW
+
     HALF = RW / 2
-    RX1  = RX                    # Q1 left edge
-    RX2  = RX + HALF             # Q2 left edge
+    RX1  = RX
+    RX2  = RX + HALF
 
     # ── Vertical anchors ──────────────────────────────────────────────────────
-    FOOTER_H  = 18 * mm          # footer band (no separate strip below)
-    FOOTER_Y  = MY               # footer sits at bottom margin
+    # Change 4: footer height ×1.5 (18mm → 27mm); constrained to IW
+    FOOTER_H  = 27 * mm
+    FOOTER_Y  = MY
 
-    CTOP      = H - MY           # content top
-    CBOT      = MY + FOOTER_H + 2 * mm  # content bottom (just above footer)
+    CTOP      = H - MY
+    CBOT      = MY + FOOTER_H + 2 * mm
 
-    # Station strip font — used in both station strip + price tax label
-    ST_FONT = 5.5
+    # ── Read station data early (needed for ST_H geometry) ───────────────────
+    stations_raw = data.get('stations', [])[:3]
+    n_st = max(len(stations_raw), 1)
+    ST_H = n_st * (ST_FONT + 3) + 4   # dynamic station strip height
 
-    # Right area vertical split: top band (~47%) / middle (~53%)
+    # ── Change 2: Nav box height = just enough for pill + address ────────────
+    pill_pad_x, pill_pad_y = 8, 4
+    pill_bh = PILL_SZ + pill_pad_y * 2   # = 18 pts
+
+    prop_type_early = data.get('propertyType', '中古戸建')
+    addr_raw_early  = data.get('address', '')
+    short_early     = addr_raw_early.replace('東京都','').replace('大阪府','').replace('神奈川県','')[:20]
+    addr_sz_early   = 8
+    for sz in range(22, 7, -1):
+        if txt_width(short_early, sz, bold=True) <= LCW - 10:
+            addr_sz_early = sz; break
+
+    NAV_H   = pill_bh + addr_sz_early + 14   # pill + address + padding
+    PRICE_H = 20 * mm
+
+    # Right area vertical split
     CONTENT_H = CTOP - CBOT
     TOP_H     = CONTENT_H * 0.48
     BAND_TOP  = CTOP
@@ -281,54 +298,50 @@ def generate(data: dict, out):
     # ─────────────────────────────────────────────────────────────────────────
     # TOP BAND — LEFT column:  NAVY (type+address)  /  STATION STRIP  /  PRICE
     # ─────────────────────────────────────────────────────────────────────────
-    PRICE_H = 20 * mm
-    ST_H    = 7  * mm            # thin strip for station lines, outside navy
-    NAV_H   = TOP_H - PRICE_H - ST_H
 
-    # ── Navy header box (property type + address only) ────────────────────────
-    rect(c, LX, BAND_BOT + PRICE_H + ST_H, LCW, NAV_H, fill=C_NAVY)
+    # ── Navy header box — exactly fits pill + address, both center-aligned ────
+    nav_y = BAND_BOT + PRICE_H + ST_H      # bottom of navy box (in PDF y-space)
+    rect(c, LX, nav_y, LCW, NAV_H, fill=C_NAVY)
 
     prop_type = data.get('propertyType', '中古戸建')
-    PILL_SZ = 10
-    pill_pad_x, pill_pad_y = 8, 4
     bw = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
-    bh = PILL_SZ + pill_pad_y * 2
-    by = BAND_BOT + PRICE_H + ST_H + NAV_H - bh - 5
-    rect(c, LX + 5, by, bw, bh, fill=C_ACCENT)
-    draw_text(c, prop_type, LX + 5 + pill_pad_x, by + pill_pad_y, PILL_SZ, color=C_WHITE)
+    bh = pill_bh
 
-    addr_raw = data.get('address', '')
-    short = addr_raw.replace('東京都','').replace('大阪府','').replace('神奈川県','')[:20]
-    addr_avail = LCW - 10
-    addr_sz = 8
-    for sz in range(22, 7, -1):
-        if txt_width(short, sz, bold=True) <= addr_avail:
-            addr_sz = sz; break
-    # Centre address vertically in remaining navy space
-    nav_remain = by - (BAND_BOT + PRICE_H + ST_H)
-    addr_y = BAND_BOT + PRICE_H + ST_H + (nav_remain + addr_sz) / 2
-    draw_bold(c, short, LX + 5, addr_y, addr_sz, color=C_WHITE)
+    # Pill: centered horizontally, near top of navy box
+    pill_margin_top = 5
+    by = nav_y + NAV_H - bh - pill_margin_top
+    pill_x = LX + (LCW - bw) / 2
+    rect(c, pill_x, by, bw, bh, fill=C_ACCENT)
+    draw_text(c, prop_type, pill_x + pill_pad_x, by + pill_pad_y, PILL_SZ, color=C_WHITE)
 
-    # ── Station strip (outside navy, between price and nav) ───────────────────
+    # Address: centered horizontally in space below pill
+    addr_raw = addr_raw_early
+    short    = short_early
+    addr_sz  = addr_sz_early
+    space_below_pill = by - nav_y
+    addr_y   = nav_y + (space_below_pill - addr_sz) / 2
+    draw_bold(c, short, LX + LCW / 2, addr_y, addr_sz, color=C_WHITE, align='center')
+
+    # ── Station strip — Change 3: ST_FONT=PILL_SZ=10, center-aligned ─────────
     rect(c, LX, BAND_BOT + PRICE_H, LCW, ST_H, fill=colors.HexColor('#dce8f8'))
-    stations = data.get('stations', [])[:3]
-    st_y = BAND_BOT + PRICE_H + ST_H - ST_FONT - 1.5
-    for st in stations:
-        if st_y < BAND_BOT + PRICE_H + 1: break
+    addr_avail = LCW - 10
+    st_y = BAND_BOT + PRICE_H + ST_H - ST_FONT - 2
+    for st in stations_raw:
+        if st_y < BAND_BOT + PRICE_H + 2: break
         ln  = st.get('line', '')
         stn = st.get('station', '').replace('駅', '')
         wk  = st.get('walk', '')
         line_t = truncate_text(f"{ln}　{stn}駅 徒歩{wk}分", addr_avail, ST_FONT)
-        draw_text(c, line_t, LX + 5, st_y, ST_FONT, color=C_NAVY)
-        st_y -= ST_FONT + 2.5
+        draw_text(c, line_t, LX + LCW / 2, st_y, ST_FONT, color=C_NAVY, align='center')
+        st_y -= ST_FONT + 3
 
-    # ── Price strip — price auto-sized and centred ────────────────────────────
+    # ── Price strip ───────────────────────────────────────────────────────────
     rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=C_LBLUE)
 
     price_raw = data.get('price', '')
     num_part  = price_raw.replace('万円', '').strip()
     tax_lbl   = '万円（税込）' if '税込' in data.get('taxIncluded', '税込') else '万円（税別）'
-    tax_sz    = ST_FONT          # same size as station info (change #2)
+    tax_sz    = ST_FONT
 
     price_avail_w = LCW - 10
     price_sz = 10
@@ -356,43 +369,38 @@ def generate(data: dict, out):
 
     # ─────────────────────────────────────────────────────────────────────────
     # RIGHT PHOTO AREA
-    # Variant B: 4-photo flexible grid fills the entire right area
-    # Variant A: Q1-top = K1 photo; Q2-top = H/I info box; bottom = K5 + K2
     # ─────────────────────────────────────────────────────────────────────────
     if variant == 'B':
         b_images = [
-            (data.get('k1Image',''), '外　観',    '（K1）'),
-            (data.get('k2Image',''), '外観写真２', '（K2）'),
-            (data.get('k3Image',''), '外観写真３', '（K3）'),
+            (data.get('k1Image',''), '外　観',      '（K1）'),
+            (data.get('k2Image',''), '外観写真２',  '（K2）'),
+            (data.get('k3Image',''), '外観写真３',  '（K3）'),
             (data.get('k4Image',''), '間取り / 地図', '（K4）'),
         ]
         draw_flex_grid(c, b_images, RX, MID_BOT, RW, CONTENT_H)
 
-    # Draw outer border for right area
     rect(c, RX, MID_BOT, RW, CONTENT_H, fill=None, stroke=C_DIV, lw=0.5)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # VARIANT A — TOP BAND — Q1  (K1 外観写真)
+    # VARIANT A — TOP BAND PHOTOS
     # ─────────────────────────────────────────────────────────────────────────
-    lease   = data.get('leasePeriod', '')
-    grent   = data.get('groundRent', '')
-    status  = data.get('currentStatus', '')
+    lease    = data.get('leasePeriod', '')
+    grent    = data.get('groundRent', '')
+    status   = data.get('currentStatus', '')
     handover = data.get('handover', '')
 
     if variant != 'B':
-        # Q1-top: K1 main exterior photo
         draw_photo(c, RX1, BAND_BOT, HALF, TOP_H,
                    data.get('k1Image', ''), '外　観', '（写真をここに挿入）')
-        # Q2-top: K5 地図 (map) — moved from Q1-bottom
         draw_photo(c, RX2, BAND_BOT, HALF, TOP_H,
                    data.get('k5Image', ''), '地　図', '（地図を挿入）')
 
     if variant != 'B':
-        # Q1-bottom: H/I 周辺環境・学区 info box — moved from Q2-top (down-left of 2×2)
+        # Q1-bottom: H/I 周辺環境・学区 info box
         rect(c, RX1, MID_BOT, HALF, MID_H,
              fill=colors.HexColor('#f0f5ff'), stroke=C_DIV, lw=0.5)
 
-        q2y    = MID_BOT + MID_H - 4   # start near top, decrement downward
+        q2y    = MID_BOT + MID_H - 4
         q2_pad = 4
         q2_inner_w = HALF - q2_pad * 2
 
@@ -416,21 +424,38 @@ def generate(data: dict, out):
                 q2y -= 12
             q2y -= 4
 
-        # H — 周辺環境
+        # H — 周辺環境 (Change 7: flowing word text, not table)
         nearby = data.get('nearby', [])
         if nearby and q2y - 11 >= MID_BOT:
             q2y -= 11
             rect(c, RX1, q2y, HALF, 11, fill=C_NAVY)
             draw_bold(c, '■ 周辺環境', RX1 + q2_pad, q2y + 3, 6.5, color=C_WHITE)
-        for i, nb in enumerate(nearby[:7]):
-            if q2y - 10 < MID_BOT: break
-            q2y -= 10
-            bg = C_LBLUE if i % 2 == 1 else C_WHITE
-            rect(c, RX1, q2y, HALF, 10, fill=bg, stroke=C_DIV, lw=0.2)
-            name_t = truncate_text('・' + nb.get('name',''), q2_inner_w * 0.62, 6.5)
-            dist_t = truncate_text(nb.get('walk',''), q2_inner_w * 0.38, 6)
-            draw_text(c, name_t, RX1 + q2_pad, q2y + 2, 6.5, color=C_BLACK)
-            draw_text(c, dist_t, RX1 + HALF - q2_pad, q2y + 2, 6, color=C_MUTED, align='right')
+
+        if nearby:
+            nearby_sz  = 7
+            line_h     = nearby_sz + 3
+            SEP        = '　・　'
+            avail_w    = HALF - q2_pad * 2
+
+            # Wrap items into lines at separator boundaries
+            parts = [f"{nb.get('name','')}({nb.get('walk','')})"
+                     for nb in nearby if nb.get('name')]
+            lines_nb = []
+            cur_line  = ''
+            for i, part in enumerate(parts):
+                chunk = (SEP if cur_line else '') + part
+                if cur_line and txt_width(cur_line + chunk, nearby_sz) > avail_w:
+                    lines_nb.append(cur_line)
+                    cur_line = part
+                else:
+                    cur_line += chunk
+            if cur_line:
+                lines_nb.append(cur_line)
+
+            for line in lines_nb[:5]:
+                if q2y - line_h < MID_BOT: break
+                q2y -= line_h
+                draw_text(c, line, RX1 + q2_pad, q2y + 2, nearby_sz, color=C_BLACK)
 
         # I — 学区
         school_lines = []
@@ -452,15 +477,20 @@ def generate(data: dict, out):
             draw_text(c, dist, RX1 + HALF - q2_pad, q2y + 2, 6, color=C_MUTED, align='right')
 
     # ─────────────────────────────────────────────────────────────────────────
-    # SPECIAL PROMO — 绶带 (diagonal corner ribbon) top-right of right area
+    # SPECIAL PROMO — 绶带 (diagonal corner ribbon) top-right
+    # Change 6: auto-scale 'a' to hold up to 20 characters; center-aligned
     # ─────────────────────────────────────────────────────────────────────────
     promo = data.get('specialPromo', '').strip()
     if promo:
-        cx_r = W - MX       # right edge of content
-        cy_t = CTOP         # top edge of content
+        cx_r = W - MX
+        cy_t = CTOP
 
-        a  = 62   # ribbon reach along each edge from corner
-        bw = 36   # band width
+        ribbon_sz  = 7.5
+        promo_tw   = txt_width(promo, ribbon_sz, bold=True)
+        # The ribbon text runs at -45°; available diagonal length ≈ a*√2
+        # Solve for a: a*√2 ≥ promo_tw + margin → a = promo_tw/√2 + margin
+        a  = max(55, int(promo_tw / math.sqrt(2)) + 20)
+        bw = max(28, int(a * 0.55))
 
         P1 = (cx_r - a,      cy_t)
         P2 = (cx_r - a + bw, cy_t)
@@ -489,20 +519,18 @@ def generate(data: dict, out):
         c.setStrokeColor(C_AMBER); c.setLineWidth(0.8)
         c.line(*P1, *P4); c.line(*P2, *P3)
 
-        # Rotated text centred in ribbon
+        # Rotated text — center-aligned in ribbon midpoint
         mid_x = (P1[0] + P3[0]) / 2
         mid_y = (P1[1] + P3[1]) / 2
-        promo_txt = truncate_text(promo, bw * 1.3, 7.5, bold=True)
         c.translate(mid_x, mid_y); c.rotate(-45)
-        tw = txt_width(promo_txt, 7.5, bold=True)
         c.setFillColor(C_WHITE)
-        _draw_rotated_text(c, promo_txt, -tw/2, -3.75, 7.5)
+        _draw_rotated_text(c, promo, -promo_tw / 2, -ribbon_sz / 2, ribbon_sz)
         c.restoreState()
 
     # ─────────────────────────────────────────────────────────────────────────
-    # GRID DIVIDERS (Variant A only — Variant B dividers drawn by flex grid)
+    # GRID DIVIDERS (Variant A only)
     # ─────────────────────────────────────────────────────────────────────────
-    vline(c, RX, CBOT, CTOP, color=C_DIV, lw=0.8)   # left|right column divider
+    vline(c, RX, CBOT, CTOP, color=C_DIV, lw=0.8)
     if variant != 'B':
         vline(c, RX2, CBOT, CTOP, color=C_DIV, lw=0.5)
         hline(c, RX, W - MX, BAND_BOT, color=C_DIV, lw=0.6)
@@ -538,11 +566,9 @@ def generate(data: dict, out):
         val_fit = truncate_text(val, LVBW - 5, 6.5)
         draw_text(c, val_fit, LX + LLBW + 3, ly + 3, 6.5, color=C_BLACK)
 
-    # 所在地
     lsec('■ 所在地')
     lrow('所在地', addr_raw)
 
-    # 物件概要
     lsec('■ 物件概要')
 
     la = f"{data.get('landArea','')}㎡"
@@ -566,7 +592,6 @@ def generate(data: dict, out):
     lrow('現況',     status)
     lrow('引渡し',   handover,                       alt=True)
 
-    # マンション専用 (E)
     if data.get('propertyType','') == 'マンション':
         lsec('■ マンション情報')
         lrow('建物名',   data.get('buildingName',''))
@@ -578,7 +603,6 @@ def generate(data: dict, out):
         lrow('管理会社', data.get('managementCo',''))
         lrow('管理形態', data.get('managementType',''), alt=True)
 
-    # 法令制限 (F) — skip for マンション
     if data.get('propertyType','') != 'マンション':
         lsec('■ 法令制限')
         lrow('都市計画', data.get('cityPlan',''))
@@ -590,7 +614,6 @@ def generate(data: dict, out):
         if data.get('otherLegal'):
             lrow('その他', data['otherLegal'])
 
-    # ライフライン (J1)
     up_parts = []
     if data.get('electric'): up_parts.append(f"電気：{data['electric']}")
     if data.get('gas'):      up_parts.append(f"ガス：{data['gas']}")
@@ -603,7 +626,6 @@ def generate(data: dict, out):
             up_fit = truncate_text('　'.join(up_parts), LCW - 6, 6.5)
             draw_text(c, up_fit, LX + 3, ly + 3, 6.5, color=C_BLACK)
 
-    # 備考 (J5)
     DISCLAIMER = '現況と図面が相違する場合は現況を優先します'
     remarks = [r.strip() for r in data.get('remarks','').split('\n')
                if r.strip() and DISCLAIMER not in r]
@@ -612,56 +634,44 @@ def generate(data: dict, out):
         for i, r in enumerate(remarks):
             lrow('', r, alt=(i % 2 == 1))
 
-    # Disclaimer text at bottom
     if MID_BOT + 8 < ly:
         draw_text(c, '※現況と図面が相違する場合は現況を優先します。',
                   LX + 2, MID_BOT + 4, 5.5, color=C_MUTED)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # MIDDLE SECTION — Q1 bottom  (K5 地図)
+    # Q2-bottom (Variant A): K2 間取り図
     # ─────────────────────────────────────────────────────────────────────────
-    # Variant A: Q1-bottom = H/I (drawn above), Q2-bottom = K2 floor plan
-    # Variant B: all photos drawn via draw_flex_grid above
     if variant != 'B':
         draw_photo(c, RX2, MID_BOT, HALF, MID_H,
                    data.get('k2Image', ''), '間取り図', '（間取り図を挿入）')
 
     # ─────────────────────────────────────────────────────────────────────────
-    # FOOTER  — replicates sample layout:
-    #   [LOGO | Brand/Company/Address] | [Dept + お問い合わせ先 + TEL/FAX/Mail] | [YELLOW: Slogan + 担当/取引態様/手数料]
-    #   ───────────────────── bottom strip: licence numbers ─────────────────────
-    # ─────────────────────────────────────────────────────────────────────────
-    # ─────────────────────────────────────────────────────────────────────────
-    # FOOTER — 5 sections, described right→left:
-    #   a) Logo (rightmost, square)
-    #   b) Company name (large, same height as logo)
-    #   c) Company info (address / tel / fax / email, uniform small font)
-    #   d) Contact (horizontal orange strip at top + agent name + TEL below)
-    #   e) Yellow slogan area (leftmost) — slogan + 取引態様/手数料 on one line
-    # No bottom licence strip.
+    # FOOTER — Changes 4 & 5:
+    #   Width constrained to IW (MX … W-MX); height = 27mm
+    #   Order left→right: Logo | Name | Info | Contact | Yellow
     # ─────────────────────────────────────────────────────────────────────────
     F_PAD    = 5
     FY_TOP   = FOOTER_Y + FOOTER_H
     DIV_COL  = colors.HexColor('#2a4a8a')
 
-    # Section widths (right→left)
-    F_LOGO_W = FOOTER_H              # a: square
-    F_NAME_W = W * 0.17              # b: company name
-    F_INFO_W = W * 0.22              # c: company info
-    F_CONT_W = W * 0.24              # d: contact
-    F_YELL_W = W - F_LOGO_W - F_NAME_W - F_INFO_W - F_CONT_W  # e: yellow
+    # Section widths — proportional to IW
+    F_LOGO_W = FOOTER_H              # a: square logo (27mm × 27mm)
+    F_NAME_W = IW * 0.17             # b: company name
+    F_INFO_W = IW * 0.22             # c: company info
+    F_CONT_W = IW * 0.24             # d: contact
+    F_YELL_W = IW - F_LOGO_W - F_NAME_W - F_INFO_W - F_CONT_W  # e: yellow
 
-    # x positions (left→right: yellow | contact | info | name | logo)
-    F_YELL_X = 0
-    F_CONT_X = F_YELL_W
-    F_INFO_X = F_YELL_W + F_CONT_W
-    F_NAME_X = F_YELL_W + F_CONT_W + F_INFO_W
-    F_LOGO_X = W - F_LOGO_W
+    # x positions: left→right = Logo | Name | Info | Contact | Yellow
+    F_LOGO_X = MX
+    F_NAME_X = MX + F_LOGO_W
+    F_INFO_X = MX + F_LOGO_W + F_NAME_W
+    F_CONT_X = MX + F_LOGO_W + F_NAME_W + F_INFO_W
+    F_YELL_X = MX + F_LOGO_W + F_NAME_W + F_INFO_W + F_CONT_W
 
-    # Full navy background
-    rect(c, 0, FOOTER_Y, W, FOOTER_H, fill=C_NAVYDK)
+    # Navy background (IW width only)
+    rect(c, MX, FOOTER_Y, IW, FOOTER_H, fill=C_NAVYDK)
 
-    # ── a) LOGO — rightmost square ────────────────────────────────────────────
+    # ── a) LOGO — leftmost square ─────────────────────────────────────────────
     logo_b64 = data.get('logoImage', '')
     if logo_b64:
         try:
@@ -677,9 +687,9 @@ def generate(data: dict, out):
         except Exception:
             pass
 
-    vline(c, F_LOGO_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
+    vline(c, F_NAME_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
 
-    # ── b) COMPANY NAME — auto-sized, same visual weight as logo ─────────────
+    # ── b) COMPANY NAME ────────────────────────────────────────────────────────
     brand = data.get('brandName', '')
     co    = data.get('companyName', '')
     longest_co = max((brand, co), key=len) if (brand or co) else ''
@@ -694,9 +704,9 @@ def generate(data: dict, out):
     if co and co != brand:
         draw_bold(c, co, F_NAME_X + F_PAD, nfy, max(name_sz - 3, 7), color=C_WHITE)
 
-    vline(c, F_NAME_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
+    vline(c, F_INFO_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
 
-    # ── c) COMPANY INFO — all same font size ──────────────────────────────────
+    # ── c) COMPANY INFO ────────────────────────────────────────────────────────
     INFO_SZ  = 6.5
     addr_co  = data.get('companyAddress', '')
     tel      = data.get('tel', '')
@@ -705,30 +715,29 @@ def generate(data: dict, out):
     dept     = data.get('department', '')
     ify = FY_TOP - F_PAD
     if dept:
-        draw_text(c, dept,             F_INFO_X + F_PAD, ify, INFO_SZ, color=colors.HexColor('#aabbd4')); ify -= INFO_SZ + 3
+        draw_text(c, dept,          F_INFO_X + F_PAD, ify, INFO_SZ, color=colors.HexColor('#aabbd4')); ify -= INFO_SZ + 3
     if addr_co:
-        draw_text(c, addr_co,          F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
+        draw_text(c, addr_co,       F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
     if tel:
-        draw_text(c, f'TEL：{tel}',    F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
+        draw_text(c, f'TEL：{tel}', F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
     if fax:
-        draw_text(c, f'FAX：{fax}',    F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
+        draw_text(c, f'FAX：{fax}', F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL); ify -= INFO_SZ + 3
     if em:
-        draw_text(c, f'✉ {em}',       F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL)
+        draw_text(c, f'✉ {em}',    F_INFO_X + F_PAD, ify, INFO_SZ, color=C_STEELBL)
 
-    vline(c, F_INFO_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
+    vline(c, F_CONT_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
 
-    # ── d) CONTACT — horizontal orange strip at top + name/TEL below ─────────
-    OBC_H = 11           # orange strip height at top
+    # ── d) CONTACT — orange overhead + agent name + TEL ───────────────────────
+    OBC_H = 13
     rect(c, F_CONT_X, FY_TOP - OBC_H, F_CONT_W, OBC_H, fill=C_ACCENT, stroke=None)
     draw_bold(c, 'お問い合わせ先',
-              F_CONT_X + F_CONT_W / 2, FY_TOP - OBC_H + 2.5, 8, color=C_WHITE, align='center')
+              F_CONT_X + F_CONT_W / 2, FY_TOP - OBC_H + 2.5, 9, color=C_WHITE, align='center')
 
     ag     = data.get('agentName', '')
     ag_tel = data.get('agentTel', '')
     CW     = F_CONT_W - F_PAD * 2
     cy     = FY_TOP - OBC_H - 3
 
-    # Agent name — auto-sized, ≤ name_sz
     ag_sz = 8
     if ag:
         for sz in range(min(name_sz, 15), 7, -1):
@@ -737,7 +746,6 @@ def generate(data: dict, out):
         draw_bold(c, f'【担当】{ag}', F_CONT_X + F_PAD, cy, ag_sz, color=C_WHITE)
         cy -= ag_sz + 3
 
-    # TEL — auto-sized, ≤ name_sz
     tel_str = ag_tel or tel
     tel_sz  = 8
     if tel_str:
@@ -746,26 +754,24 @@ def generate(data: dict, out):
                 tel_sz = sz; break
         draw_bold(c, f'TEL：{tel_str}', F_CONT_X + F_PAD, cy, tel_sz, color=C_WHITE)
 
-    vline(c, F_CONT_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
+    vline(c, F_YELL_X, FOOTER_Y, FY_TOP, color=DIV_COL, lw=0.6)
 
-    # ── e) YELLOW SLOGAN AREA — leftmost ─────────────────────────────────────
+    # ── e) YELLOW SLOGAN AREA — rightmost ─────────────────────────────────────
     rect(c, F_YELL_X, FOOTER_Y, F_YELL_W, FOOTER_H,
          fill=colors.HexColor('#f5c800'), stroke=None)
 
     slogan = data.get('companySlogan', '')
     ttype  = data.get('transactionType', '')
     fee    = data.get('fee', '')
-    YPW    = F_YELL_W - F_PAD * 2   # usable yellow width
+    YPW    = F_YELL_W - F_PAD * 2
 
-    # Slogan: auto-sized to fill yellow width, in top portion
     slogan_sz = 8
     if slogan:
         for sz in range(28, 6, -1):
             if txt_width(slogan, sz, bold=True) <= YPW and sz <= FOOTER_H * 0.72:
                 slogan_sz = sz; break
-        draw_bold(c, slogan, F_PAD, FY_TOP - slogan_sz - F_PAD, slogan_sz, color=C_NAVYDK)
+        draw_bold(c, slogan, F_YELL_X + F_PAD, FY_TOP - slogan_sz - F_PAD, slogan_sz, color=C_NAVYDK)
 
-    # 取引態様/手数料 — on ONE line, auto-sized, in bottom portion
     bot_parts = list(filter(None, [
         f'【取引態様】{ttype}' if ttype else '',
         f'【手数料】{fee}'     if fee   else '',
@@ -776,7 +782,7 @@ def generate(data: dict, out):
         for sz in range(16, 6, -1):
             if txt_width(bot_line, sz, bold=True) <= YPW:
                 bot_sz = sz; break
-        draw_bold(c, bot_line, F_PAD, FOOTER_Y + F_PAD, bot_sz, color=C_NAVYDK)
+        draw_bold(c, bot_line, F_YELL_X + F_PAD, FOOTER_Y + F_PAD, bot_sz, color=C_NAVYDK)
 
     c.save()
 
