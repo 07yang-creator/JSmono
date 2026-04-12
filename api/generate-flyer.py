@@ -648,22 +648,31 @@ def generate(data: dict, out):
 
     vline(c, F_NAME_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
-    # ── b) Company name ───────────────────────────────────────────────────────
+    # ── b) Company name — vertically centred in footer ───────────────────────
     brand = data.get('brandName', '')
     co    = data.get('companyName', '')
-    longest = max((brand, co), key=len) if (brand or co) else ''
-    name_sz = autosize(longest, F_NAME_W - F_PAD*2, 20, min_sz=7, bold=True)
-    ny = FY_TOP - F_PAD
-    if brand:
-        draw_bold(c, brand, F_NAME_X+F_PAD, ny, name_sz, color=C_WHITE)
-        ny -= name_sz + 3
-    if co and co != brand:
-        draw_bold(c, co, F_NAME_X+F_PAD, ny, max(name_sz-3, 7), color=C_WHITE)
+    av_nw    = F_NAME_W - F_PAD * 2
+    brand_sz = autosize(brand, av_nw, 22, min_sz=7, bold=True) if brand else 0
+    co_sz    = autosize(co,    av_nw, 18, min_sz=7, bold=True) if (co and co != brand) else 0
+    N_GAP = 4
+    have_b = bool(brand); have_c = bool(co and co != brand)
+    # Centre the text block vertically — baseline of top line
+    if have_b and have_c:
+        ny = FOOTER_Y + FOOTER_H / 2 + (brand_sz + N_GAP) / 2
+    elif have_b or have_c:
+        ny = FOOTER_Y + FOOTER_H / 2
+    else:
+        ny = FOOTER_Y + FOOTER_H / 2
+    if have_b:
+        draw_bold(c, brand, F_NAME_X+F_PAD, ny, brand_sz, color=C_WHITE)
+        ny -= brand_sz + N_GAP
+    if have_c:
+        draw_bold(c, co, F_NAME_X+F_PAD, ny, co_sz, color=C_WHITE)
 
     vline(c, F_INFO_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
     # ── c) Company info ───────────────────────────────────────────────────────
-    ISZ       = 6.5
+    ISZ       = 7.0
     addr_co   = data.get('companyAddress', '')
     tel       = data.get('tel', '')
     fax       = data.get('fax', '')
@@ -671,20 +680,25 @@ def generate(data: dict, out):
     dept      = data.get('department', '')
     licenseNo = data.get('licenseNo', '')
     assoc     = data.get('association', '')
-    iy = FY_TOP - F_PAD
+    iy = FY_TOP - F_PAD - int(ISZ)    # start baseline so cap stays within footer top
     def irow(txt, col, sz=ISZ):
         nonlocal iy
         if not txt or iy - sz < FOOTER_Y: return
         draw_text(c, truncate_text(txt, F_INFO_W-F_PAD*2, sz),
                   F_INFO_X+F_PAD, iy, sz, color=col)
         iy -= sz + 2.5
-    irow(dept,      colors.HexColor('#aabbd4'))
-    irow(addr_co,   C_STEELBL)
-    irow(f'TEL：{tel}' if tel else '', C_STEELBL)
-    irow(f'FAX：{fax}' if fax else '', C_STEELBL)
-    irow(f'✉ {em}'    if em  else '', C_STEELBL)
-    irow(licenseNo, colors.HexColor('#8aa8cc'), sz=ISZ-0.5)
-    irow(assoc,     colors.HexColor('#8aa8cc'), sz=ISZ-1)
+    irow(dept,    colors.HexColor('#aabbd4'))
+    irow(addr_co, C_STEELBL)
+    # TEL + FAX on one line to save vertical space
+    if tel and fax:
+        irow(f'TEL：{tel}  FAX：{fax}', C_STEELBL)
+    elif tel:
+        irow(f'TEL：{tel}', C_STEELBL)
+    elif fax:
+        irow(f'FAX：{fax}', C_STEELBL)
+    irow(f'✉ {em}' if em else '', C_STEELBL)
+    irow(licenseNo, colors.HexColor('#8aa8cc'), sz=ISZ-1)
+    irow(assoc,     colors.HexColor('#8aa8cc'), sz=ISZ-1.5)
 
     vline(c, F_CONT_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
@@ -699,12 +713,12 @@ def generate(data: dict, out):
     CW     = F_CONT_W - F_PAD*2
     cy2    = FY_TOP - OBC_H - 4
     if ag:
-        asz = autosize(f'【担当】{ag}', CW, min(name_sz, 15), min_sz=7, bold=True)
+        asz = autosize(f'【担当】{ag}', CW, 14, min_sz=7, bold=True)
         draw_bold(c, f'【担当】{ag}', F_CONT_X+F_PAD, cy2, asz, color=C_WHITE)
         cy2 -= asz + 3
     tel_str = ag_tel or tel
     if tel_str:
-        tsz = autosize(f'TEL：{tel_str}', CW, min(name_sz, 16), min_sz=7, bold=True)
+        tsz = autosize(f'TEL：{tel_str}', CW, 15, min_sz=7, bold=True)
         draw_bold(c, f'TEL：{tel_str}', F_CONT_X+F_PAD, cy2, tsz, color=C_WHITE)
 
     vline(c, F_YELL_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
