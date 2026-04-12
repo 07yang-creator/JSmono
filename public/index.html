@@ -582,6 +582,87 @@
     .btn-generate:hover { background: #d44e24; }
     .btn-generate:active { transform: scale(0.98); }
 
+    /* ── Profile section (landing page) ──────────────────────────── */
+    .lp-profile-card {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 24px 28px; margin-top: 20px;
+    }
+    .lp-profile-card h3 { font-size: 14px; font-weight: 700; color: var(--primary); margin: 0 0 16px; }
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+    @media (max-width: 600px) { .profile-grid { grid-template-columns: 1fr; } }
+    .profile-field { display: flex; flex-direction: column; gap: 4px; }
+    .profile-field label { font-size: 11px; font-weight: 600; color: var(--muted); }
+    .profile-field input, .profile-field textarea, .profile-field select {
+      padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 13px; background: var(--bg); color: var(--text); width: 100%; box-sizing: border-box;
+    }
+    .profile-field.full { grid-column: 1 / -1; }
+    .profile-logo-slot {
+      width: 80px; height: 80px; border: 2px dashed var(--border); border-radius: 8px;
+      cursor: pointer; overflow: hidden; display: flex; align-items: center;
+      justify-content: center; background: var(--bg); position: relative; flex-shrink: 0;
+    }
+    .profile-logo-slot:hover { border-color: var(--primary-light); }
+    .profile-logo-slot.has-image { border-style: solid; border-color: var(--primary); }
+    .profile-logo-slot img { width: 100%; height: 100%; object-fit: contain; display: none; }
+    .profile-logo-slot .logo-clear {
+      position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5); color: #fff;
+      border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px;
+      cursor: pointer; display: none; align-items: center; justify-content: center;
+    }
+    .profile-logo-slot.has-image .logo-clear { display: flex; }
+    .profile-logo-row { display: flex; align-items: flex-start; gap: 14px; margin-top: 12px; }
+    .profile-logo-meta { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
+    .btn-profile-save {
+      margin-top: 16px; padding: 9px 22px; background: var(--primary); color: #fff;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .btn-profile-save:hover { background: var(--primary-light); }
+    .profile-saved-badge {
+      display: none; background: #e8f5e9; color: #2e7d32;
+      border: 1px solid #a5d6a7; border-radius: 6px; padding: 4px 12px;
+      font-size: 12px; margin-left: 10px;
+    }
+
+    /* ── Photo requirement notice ──────────────────────────────────── */
+    .photo-req {
+      border-radius: 7px; padding: 11px 14px; font-size: 12px;
+      margin-bottom: 14px; line-height: 1.6;
+      background: #fff8e1; border: 1px solid #ffd54f; color: #5d4037;
+    }
+    .photo-req.ok { background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32; }
+    .photo-req strong { font-size: 13px; display: block; margin-bottom: 3px; }
+
+    /* ── Section header checkbox (use-profile) ─────────────────────── */
+    .section-header { position: relative; }
+    .use-profile-cb {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.92); cursor: pointer;
+    }
+    .use-profile-cb input[type="checkbox"] { cursor: pointer; accent-color: #f9b44a; }
+
+    /* ── Company logo slot inside form ─────────────────────────────── */
+    .logo-upload-row { display: flex; align-items: flex-start; gap: 14px; margin-top: 10px; }
+    .form-logo-slot {
+      width: 90px; height: 90px; border: 2px dashed var(--border); border-radius: 8px;
+      cursor: pointer; overflow: hidden; display: flex; align-items: center;
+      justify-content: center; background: var(--bg); position: relative; flex-shrink: 0;
+    }
+    .form-logo-slot:hover { border-color: var(--primary-light); }
+    .form-logo-slot.has-image { border-style: solid; border-color: var(--primary); }
+    .form-logo-slot .preview { width: 100%; height: 100%; object-fit: contain; display: none; }
+    .form-logo-slot .slot-label { font-size: 10px; color: var(--muted); text-align: center; padding: 4px; }
+    .form-logo-slot .clear-btn {
+      position: absolute; top: 3px; right: 3px; background: rgba(0,0,0,0.5);
+      color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px;
+      font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 3;
+    }
+    .form-logo-slot.has-image .clear-btn { display: flex; }
+    .form-logo-slot.has-image .slot-label { display: none; }
+    .form-logo-meta { font-size: 11px; color: var(--muted); line-height: 1.7; padding-top: 4px; }
+
     .progress-overlay {
       display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
       z-index: 100; align-items: center; justify-content: center;
@@ -758,6 +839,82 @@
       </div>
 
     </div><!-- /lp-card -->
+
+    <!-- Company Profile Card -->
+    <div id="lp-profile-section" class="lp-card" style="padding:28px 40px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div class="lp-section-title" style="margin-bottom:4px;">⑤ 会社プロフィールを登録（任意・保存可能）</div>
+          <div style="font-size:12px;color:var(--muted);">保存しておくと、チラシ作成時にワンクリックで会社情報を自動入力できます</div>
+        </div>
+        <span id="profile-saved-badge" class="profile-saved-badge">✅ 保存しました</span>
+      </div>
+      <div class="profile-grid">
+        <div class="profile-field">
+          <label>会社名</label>
+          <input type="text" name="companyName" placeholder="例：株式会社ブリリアント">
+        </div>
+        <div class="profile-field">
+          <label>屋号・ブランド名</label>
+          <input type="text" name="brandName" placeholder="例：リクシル不動産ショップ">
+        </div>
+        <div class="profile-field">
+          <label>会社住所</label>
+          <input type="text" name="companyAddress" placeholder="例：東京都新宿区西新宿1-2-3">
+        </div>
+        <div class="profile-field">
+          <label>免許番号</label>
+          <input type="text" name="licenseNo" placeholder="例：東京都知事（3）第92862号">
+        </div>
+        <div class="profile-field">
+          <label>担当者名</label>
+          <input type="text" name="agentName" placeholder="例：青木（アオキ）">
+        </div>
+        <div class="profile-field">
+          <label>TEL</label>
+          <input type="text" name="tel" placeholder="例：070-4238-7811">
+        </div>
+        <div class="profile-field">
+          <label>FAX</label>
+          <input type="text" name="fax" placeholder="例：03-6803-2967">
+        </div>
+        <div class="profile-field">
+          <label>メール</label>
+          <input type="text" name="email" placeholder="例：s-aoki@brilliant-corp.jp">
+        </div>
+        <div class="profile-field">
+          <label>取引態様</label>
+          <select name="transactionType">
+            <option>売主</option>
+            <option>媒介</option>
+            <option>代理</option>
+          </select>
+        </div>
+        <div class="profile-field">
+          <label>所属団体</label>
+          <input type="text" name="association" placeholder="例：（公社）東京都宅地建物取引業協会会員">
+        </div>
+        <div class="profile-field full">
+          <label>キャッチコピー・PR文</label>
+          <input type="text" name="catchcopy" placeholder="例：実需・投資・借地・再建築不可など積極買取中">
+        </div>
+      </div>
+      <div class="profile-logo-row">
+        <div class="profile-logo-slot" id="lp-profile-logo-slot">
+          <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+          <img alt="" style="display:none;width:100%;height:100%;object-fit:contain;">
+          <button type="button" class="logo-clear">✕</button>
+          <span style="font-size:10px;color:var(--muted);text-align:center;padding:4px;pointer-events:none;">🏢<br>ロゴ</span>
+        </div>
+        <div class="profile-logo-meta">
+          <strong style="font-size:12px;">会社ロゴ</strong><br>
+          JPEG / PNG・3MB以下<br>
+          チラシのフッターに表示されます
+        </div>
+      </div>
+      <input type="hidden" id="lp-profile-logo-hidden" value="">
+      <button type="button" class="btn-profile-save" onclick="saveProfile()">💾 プロフィールを保存</button>
+    </div><!-- /lp-profile-section -->
 
     <!-- Coming soon features -->
     <div class="lp-coming-soon">
@@ -1116,7 +1273,11 @@
 
         <!-- 不動産会社情報 -->
         <div class="section-card full-width">
-          <div class="section-header">🏢 不動産会社・担当者情報</div>
+          <div class="section-header">🏢 不動産会社・担当者情報
+            <label class="use-profile-cb">
+              <input type="checkbox" id="useProfileCb" onchange="applyProfile(this.checked)"> プロフィールから読み込む
+            </label>
+          </div>
           <div class="section-body">
             <div class="field-row">
               <div class="field">
@@ -1176,14 +1337,39 @@
               <label>キャッチコピー・PR文（任意）</label>
               <textarea name="catchcopy" placeholder="例：実需・投資・借地・再建築不可など積極買取中"></textarea>
             </div>
+            <div class="logo-upload-row">
+              <div class="form-logo-slot" id="form-logo-slot">
+                <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+                <img class="preview" alt="">
+                <button class="clear-btn" type="button">✕</button>
+                <div class="slot-label">🏢<br>会社ロゴ</div>
+              </div>
+              <div class="form-logo-meta">
+                <strong>会社ロゴ</strong>（任意）<br>
+                JPEG / PNG・3MB以下<br>
+                フッターの左端に表示されます
+              </div>
+            </div>
+            <input type="hidden" name="logoImage" id="img-logoImage" value="">
           </div>
         </div>
 
         <!-- 📷 写真アップロード -->
         <div class="section-card full-width">
-          <div class="section-header">📷 写真・ロゴのアップロード（JPEG / PNG）</div>
+          <div class="section-header">📷 写真のアップロード（JPEG / PNG）</div>
           <div class="section-body">
             <p class="photo-note">各スロットをクリックして画像を選択してください。✕ で削除できます。</p>
+
+            <!-- Photo requirement notice (Variant A only) -->
+            <div id="photo-req-notice" class="photo-req">
+              <strong>📷 写真の要件（標準レイアウト）</strong>
+              外観写真（K1）・間取り図（K2）・地図（K5）の3枚が必須です。さらに <strong>内観写真（K3）を追加</strong>するか、<strong>周辺環境・学区情報を入力</strong>してください。<br>
+              ※ 内観写真をアップロードすると、周辺環境欄の代わりにチラシに掲載されます。<br>
+              <span style="font-size:11px;color:#7d6330;">必要写真・情報が揃うと緑色に変わります</span>
+              <br>
+              <span style="font-size:11px;color:#7d6330;">（写真要件：3枚＋周辺環境情報、または4枚）/ 照片要求：3张＋周边信息，或4张）</span>
+            </div>
+
             <div class="photo-grid">
 
               <!-- K1: 外観写真（常に表示） -->
@@ -1216,13 +1402,15 @@
                 </div>
               </div>
 
-              <!-- K3: 外観写真３（写真重視 Variant B のみ） -->
-              <div class="photo-slot hidden-slot" id="slot-k3Image">
+              <!-- K3: 内観写真（Variant A）/ 外観写真３（Variant B） -->
+              <div class="photo-slot" id="slot-k3Image">
                 <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
                 <img class="preview" alt="">
                 <button class="clear-btn" type="button">✕</button>
                 <div class="slot-label">
-                  <span class="slot-icon">📷</span>外観写真３<br><small>K3（写真重視）</small>
+                  <span class="slot-icon">📷</span>
+                  <span id="k3-label-text">内観写真</span><br>
+                  <small id="k3-label-sub">K3（任意）</small>
                 </div>
               </div>
 
@@ -1236,15 +1424,6 @@
                 </div>
               </div>
 
-              <!-- Logo: 会社ロゴ（常に表示） -->
-              <div class="photo-slot" id="slot-logoImage">
-                <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
-                <img class="preview" alt="">
-                <button class="clear-btn" type="button">✕</button>
-                <div class="slot-label">
-                  <span class="slot-icon">🏢</span>会社ロゴ<br><small>Logo</small>
-                </div>
-              </div>
 
             </div><!-- /photo-grid -->
 
@@ -1254,7 +1433,6 @@
             <input type="hidden" name="k5Image"    id="img-k5Image"    value="">
             <input type="hidden" name="k3Image"    id="img-k3Image"    value="">
             <input type="hidden" name="k4Image"    id="img-k4Image"    value="">
-            <input type="hidden" name="logoImage"  id="img-logoImage"  value="">
           </div>
         </div>
 
@@ -1297,9 +1475,15 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// LANDING PAGE LOGIC
+// CONSTANTS & PROFILE
 // ═══════════════════════════════════════════════════════════════
+const PROFILE_KEY = 'jjc_company_profile';
+const PROFILE_FIELDS = ['companyName','brandName','companyAddress','licenseNo',
+                        'agentName','tel','fax','email','transactionType','association','catchcopy'];
 
+// ═══════════════════════════════════════════════════════════════
+// LANDING PAGE
+// ═══════════════════════════════════════════════════════════════
 let _selectedTemplate = 1;
 let _selectedVariant  = 'A';
 
@@ -1314,16 +1498,24 @@ function selectVariant(v) {
   document.querySelectorAll('.variant-card').forEach(el => el.classList.remove('selected'));
   document.getElementById('vcard-' + v).classList.add('selected');
   document.querySelector('#vcard-' + v + ' input[type="radio"]').checked = true;
-  // Show/hide variant-specific photo slots
   const isA = v === 'A';
+  // K5 only for A; K4 only for B
   document.getElementById('slot-k5Image').classList.toggle('hidden-slot', !isA);
-  document.getElementById('slot-k3Image').classList.toggle('hidden-slot',  isA);
   document.getElementById('slot-k4Image').classList.toggle('hidden-slot',  isA);
+  // K3 visible for both variants with different labels
+  document.getElementById('slot-k3Image').classList.remove('hidden-slot');
+  const labelText = document.getElementById('k3-label-text');
+  const labelSub  = document.getElementById('k3-label-sub');
+  if (labelText) labelText.textContent = isA ? '内観写真' : '外観写真３';
+  if (labelSub)  labelSub.textContent  = isA ? 'K3（任意）' : 'K3（写真重視）';
+  // Photo requirement notice only for variant A
+  const reqNotice = document.getElementById('photo-req-notice');
+  if (reqNotice) reqNotice.style.display = isA ? '' : 'none';
+  updatePhotoReq();
 }
 
 function togglePromo(checkbox) {
-  const wrap = document.getElementById('promo-input-wrap');
-  wrap.classList.toggle('visible', checkbox.checked);
+  document.getElementById('promo-input-wrap').classList.toggle('visible', checkbox.checked);
 }
 
 function updatePromoPreview(text) {
@@ -1331,23 +1523,16 @@ function updatePromoPreview(text) {
 }
 
 function startApp() {
-  const buildingName  = document.getElementById('lp-building-name').value.trim();
-  const promoEnabled  = document.getElementById('promo-toggle').checked;
-  const promoText     = document.getElementById('promo-text').value.trim();
+  const buildingName = document.getElementById('lp-building-name').value.trim();
+  const promoEnabled = document.getElementById('promo-toggle').checked;
+  const promoText    = document.getElementById('promo-text').value.trim();
 
-  // Set hidden form fields
   document.getElementById('f-templateId').value      = _selectedTemplate;
   document.getElementById('f-templateVariant').value = _selectedVariant;
   document.getElementById('f-specialPromo').value    = promoEnabled ? promoText : '';
-
-  // Pre-fill building name
   if (buildingName) document.getElementById('f-propertyName').value = buildingName;
 
-  // Update status bar labels
-  const variantLabels = {
-    A: '標準（写真2枚+地図+周辺環境）',
-    B: '写真重視（写真4枚・周辺環境なし）',
-  };
+  const variantLabels = { A: '標準（写真2枚+地図+周辺環境）', B: '写真重視（写真4枚・周辺環境なし）' };
   document.getElementById('app-variant-label').textContent =
     'Template ' + _selectedTemplate + ' — ' + variantLabels[_selectedVariant];
 
@@ -1357,15 +1542,12 @@ function startApp() {
   } else {
     document.getElementById('app-promo-label').style.display = 'none';
   }
+  document.getElementById('nearby-section').style.display = _selectedVariant === 'B' ? 'none' : '';
 
-  // Show/hide nearby section for variant B
-  document.getElementById('nearby-section').style.display =
-    _selectedVariant === 'B' ? 'none' : '';
-
-  // Page transition
   document.getElementById('landing-page').style.display = 'none';
   document.getElementById('app-page').style.display = 'block';
   window.scrollTo(0, 0);
+  updatePhotoReq();
 }
 
 function goBack() {
@@ -1376,9 +1558,51 @@ function goBack() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// APP FORM LOGIC (unchanged from original)
+// PROFILE SYSTEM
 // ═══════════════════════════════════════════════════════════════
+function loadProfile() {
+  try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}'); }
+  catch { return {}; }
+}
 
+function saveProfile() {
+  const profile = {};
+  PROFILE_FIELDS.forEach(f => {
+    const el = document.querySelector('#lp-profile-section [name="' + f + '"]');
+    if (el) profile[f] = el.value;
+  });
+  profile.logoImage = document.getElementById('lp-profile-logo-hidden')?.value || '';
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  const badge = document.getElementById('profile-saved-badge');
+  if (badge) { badge.style.display = 'inline-block'; setTimeout(() => badge.style.display = 'none', 2500); }
+}
+
+function applyProfile(apply) {
+  if (!apply) return;
+  const profile = loadProfile();
+  if (!Object.keys(profile).filter(k => profile[k]).length) {
+    alert('プロフィールが保存されていません。\nトップページで会社情報を登録してください。');
+    const cb = document.getElementById('useProfileCb');
+    if (cb) cb.checked = false;
+    return;
+  }
+  PROFILE_FIELDS.forEach(f => {
+    const el = document.querySelector('#propertyForm [name="' + f + '"]');
+    if (el && profile[f] !== undefined) el.value = profile[f];
+  });
+  if (profile.logoImage) {
+    const hidden  = document.getElementById('img-logoImage');
+    const slot    = document.getElementById('form-logo-slot');
+    const preview = slot ? slot.querySelector('.preview') : null;
+    if (hidden)  hidden.value = profile.logoImage;
+    if (preview) { preview.src = profile.logoImage; preview.style.display = 'block'; }
+    if (slot)    slot.classList.add('has-image');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APP FORM LOGIC
+// ═══════════════════════════════════════════════════════════════
 let stationCount = 0;
 function addStation(line='', station='', walk='') {
   stationCount++;
@@ -1387,18 +1611,12 @@ function addStation(line='', station='', walk='') {
   div.className = 'station-row';
   div.id = 'station-' + stationCount;
   div.innerHTML = `
-    <div class="field">
-      <label>路線名</label>
-      <input type="text" name="line_${stationCount}" value="${line}" placeholder="例：JR総武線">
-    </div>
-    <div class="field">
-      <label>駅名</label>
-      <input type="text" name="station_${stationCount}" value="${station}" placeholder="例：大久保駅">
-    </div>
-    <div class="field">
-      <label>徒歩（分）</label>
-      <input type="number" name="walk_${stationCount}" value="${walk}" placeholder="7" min="1">
-    </div>
+    <div class="field"><label>路線名</label>
+      <input type="text" name="line_${stationCount}" value="${line}" placeholder="例：JR総武線"></div>
+    <div class="field"><label>駅名</label>
+      <input type="text" name="station_${stationCount}" value="${station}" placeholder="例：大久保駅"></div>
+    <div class="field"><label>徒歩（分）</label>
+      <input type="number" name="walk_${stationCount}" value="${walk}" placeholder="7" min="1"></div>
     <button type="button" class="remove-btn" onclick="removeStation(${stationCount})" title="削除">✕</button>
   `;
   c.appendChild(div);
@@ -1440,8 +1658,7 @@ const zone = document.getElementById('uploadZone');
 zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
 zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
 zone.addEventListener('drop', e => {
-  e.preventDefault();
-  zone.classList.remove('dragover');
+  e.preventDefault(); zone.classList.remove('dragover');
   const file = e.dataTransfer.files[0];
   if (file && file.type === 'application/pdf') {
     document.getElementById('fileName').textContent = file.name;
@@ -1454,8 +1671,7 @@ function parsePDF(file) {
   const fd = new FormData();
   fd.append('file', file);
   fetch('/api/parse-pdf', { method: 'POST', body: fd })
-    .then(r => r.json())
-    .then(data => autofillForm(data))
+    .then(r => r.json()).then(data => autofillForm(data))
     .catch(err => console.warn('PDF parse error (demo mode):', err));
 }
 
@@ -1473,15 +1689,12 @@ document.getElementById('landArea')?.addEventListener('input', function() {
   if (!isNaN(v)) document.getElementById('landAreaTsubo').value = (v / 3.3058).toFixed(2);
 });
 
-// Build stations data from form fields
 function collectStations() {
   const stations = [];
   document.querySelectorAll('.station-row').forEach(row => {
     const inputs = row.querySelectorAll('input');
     if (inputs.length >= 3) {
-      const line    = inputs[0].value.trim();
-      const station = inputs[1].value.trim();
-      const walk    = inputs[2].value.trim();
+      const line = inputs[0].value.trim(), station = inputs[1].value.trim(), walk = inputs[2].value.trim();
       if (line || station) stations.push({ line, station, walk });
     }
   });
@@ -1493,14 +1706,52 @@ function collectNearby() {
   document.querySelectorAll('.nearby-row').forEach(row => {
     const inputs = row.querySelectorAll('input');
     if (inputs.length >= 2) {
-      const name = inputs[0].value.trim();
-      const walk = inputs[1].value.trim();
+      const name = inputs[0].value.trim(), walk = inputs[1].value.trim();
       if (name) nearby.push({ name, walk });
     }
   });
   return nearby;
 }
 
+// ── Photo requirement checker ─────────────────────────────────────────────────
+function updatePhotoReq() {
+  if (_selectedVariant !== 'A') return;
+  const notice = document.getElementById('photo-req-notice');
+  if (!notice) return;
+
+  const hasK1 = !!document.getElementById('img-k1Image').value;
+  const hasK2 = !!document.getElementById('img-k2Image').value;
+  const hasK5 = !!document.getElementById('img-k5Image').value;
+  const hasK3 = !!document.getElementById('img-k3Image').value;
+  const nearbyItems = collectNearby();
+  const hasSchool = !!(
+    document.querySelector('[name="elemSchool"]')?.value?.trim() ||
+    document.querySelector('[name="juniorSchool"]')?.value?.trim()
+  );
+  const hasNearbyInfo = nearbyItems.length > 0 || hasSchool;
+  const base3ok = hasK1 && hasK2 && hasK5;
+  const allOk   = base3ok && (hasK3 || hasNearbyInfo);
+
+  notice.classList.toggle('ok', allOk);
+  if (allOk) {
+    notice.innerHTML = '<strong>✅ 写真要件を満たしています</strong>' +
+      (hasK3 ? '4枚の写真（外観・間取り・地図・内観）がアップロードされています。'
+             : '3枚の写真＋周辺環境情報が揃っています。');
+  } else {
+    const missing = [];
+    if (!hasK1) missing.push('外観写真（K1）');
+    if (!hasK2) missing.push('間取り図（K2）');
+    if (!hasK5) missing.push('地図（K5）');
+    notice.innerHTML =
+      '<strong>📷 写真の要件（標準レイアウト）</strong>' +
+      '外観写真（K1）・間取り図（K2）・地図（K5）の3枚が必須です。さらに <strong>内観写真（K3）を追加</strong>するか、<strong>周辺環境・学区情報を入力</strong>してください。<br>' +
+      '※ 内観写真をアップロードすると、周辺環境欄の代わりにチラシに掲載されます。' +
+      (missing.length ? '<br><span style="color:#c62828;">⚠ 不足: ' + missing.join('、') + '</span>' : '') +
+      '<br><span style="font-size:11px;color:#7d6330;">（写真要件：3枚＋周辺環境情報、または4枚 / 照片要求：3张＋周边信息，或4张）</span>';
+  }
+}
+
+// ── Generate flyer ────────────────────────────────────────────────────────────
 function generateFlyer() {
   const form = document.getElementById('propertyForm');
   const raw  = Object.fromEntries(new FormData(form));
@@ -1510,7 +1761,29 @@ function generateFlyer() {
     return;
   }
 
-  // Attach structured arrays
+  // Variant A: photo requirement gate
+  if (raw.templateVariant === 'A') {
+    const hasK1 = !!document.getElementById('img-k1Image').value;
+    const hasK2 = !!document.getElementById('img-k2Image').value;
+    const hasK5 = !!document.getElementById('img-k5Image').value;
+    const hasK3 = !!document.getElementById('img-k3Image').value;
+    const nearbyItems = collectNearby();
+    const hasSchool = !!(
+      document.querySelector('[name="elemSchool"]')?.value?.trim() ||
+      document.querySelector('[name="juniorSchool"]')?.value?.trim()
+    );
+    const hasNearbyInfo = nearbyItems.length > 0 || hasSchool;
+
+    if (!hasK1 || !hasK2 || !hasK5) {
+      alert('外観写真（K1）・間取り図（K2）・地図（K5）の3枚は必須です。\nPlease upload exterior photo (K1), floor plan (K2), and map (K5).');
+      return;
+    }
+    if (!hasK3 && !hasNearbyInfo) {
+      alert('内観写真（K3）をアップロードするか、周辺環境・学区情報を入力してください。\nPlease add interior photo (K3) or fill in neighborhood/school info.');
+      return;
+    }
+  }
+
   raw.stations = collectStations();
   raw.nearby   = collectNearby();
 
@@ -1562,17 +1835,17 @@ function resetSteps() {
   });
 }
 
-// ── Photo upload slots ────────────────────────────────────────────────────────
+// ── Photo upload slots (K1/K2/K5/K3/K4) ─────────────────────────────────────
 (function initPhotoSlots() {
+  // [slotId, fieldName, triggersPhotoReqCheck]
   const SLOTS = [
-    ['slot-k1Image',   'k1Image'],
-    ['slot-k2Image',   'k2Image'],
-    ['slot-k5Image',   'k5Image'],
-    ['slot-k3Image',   'k3Image'],
-    ['slot-k4Image',   'k4Image'],
-    ['slot-logoImage', 'logoImage'],
+    ['slot-k1Image', 'k1Image', true],
+    ['slot-k2Image', 'k2Image', true],
+    ['slot-k5Image', 'k5Image', true],
+    ['slot-k3Image', 'k3Image', true],
+    ['slot-k4Image', 'k4Image', false],
   ];
-  SLOTS.forEach(([slotId, field]) => {
+  SLOTS.forEach(([slotId, field, trigReq]) => {
     const slot      = document.getElementById(slotId);
     if (!slot) return;
     const fileInput = slot.querySelector('input[type="file"]');
@@ -1580,40 +1853,109 @@ function resetSteps() {
     const preview   = slot.querySelector('.preview');
     const clearBtn  = slot.querySelector('.clear-btn');
 
-    // Click anywhere on slot → open file picker
-    slot.addEventListener('click', e => {
-      if (e.target === clearBtn) return;
-      fileInput.click();
-    });
+    slot.addEventListener('click', e => { if (e.target !== clearBtn) fileInput.click(); });
 
-    // File selected → read as base64 DataURL
     fileInput.addEventListener('change', () => {
       const file = fileInput.files[0];
       if (!file) return;
-      // Warn if file is very large (>3MB)
       if (file.size > 3 * 1024 * 1024) {
         alert('ファイルが大きすぎます（3MB以下にしてください）。');
         fileInput.value = ''; return;
       }
       const reader = new FileReader();
-      reader.onload = e => {
-        hidden.value          = e.target.result;
-        preview.src           = e.target.result;
+      reader.onload = ev => {
+        hidden.value = ev.target.result;
+        preview.src  = ev.target.result;
         preview.style.display = 'block';
         slot.classList.add('has-image');
+        if (trigReq) updatePhotoReq();
       };
       reader.readAsDataURL(file);
     });
 
-    // ✕ button → clear slot
     clearBtn.addEventListener('click', e => {
       e.stopPropagation();
-      hidden.value          = '';
-      preview.src           = '';
-      preview.style.display = 'none';
-      slot.classList.remove('has-image');
-      fileInput.value = '';
+      hidden.value = ''; preview.src = ''; preview.style.display = 'none';
+      slot.classList.remove('has-image'); fileInput.value = '';
+      if (trigReq) updatePhotoReq();
     });
+  });
+})();
+
+// ── Company logo slot (in company section) ───────────────────────────────────
+(function initLogoSlot() {
+  const slot = document.getElementById('form-logo-slot');
+  if (!slot) return;
+  const fileInput = slot.querySelector('input[type="file"]');
+  const hidden    = document.getElementById('img-logoImage');
+  const preview   = slot.querySelector('.preview');
+  const clearBtn  = slot.querySelector('.clear-btn');
+
+  slot.addEventListener('click', e => { if (e.target !== clearBtn) fileInput.click(); });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { alert('3MB以下にしてください'); fileInput.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      hidden.value = ev.target.result;
+      preview.src  = ev.target.result;
+      preview.style.display = 'block';
+      slot.classList.add('has-image');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  clearBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    hidden.value = ''; preview.src = ''; preview.style.display = 'none';
+    slot.classList.remove('has-image'); fileInput.value = '';
+  });
+})();
+
+// ── Landing page profile logo slot ───────────────────────────────────────────
+(function initLpProfileLogoSlot() {
+  const slot     = document.getElementById('lp-profile-logo-slot');
+  if (!slot) return;
+  const fileInput = slot.querySelector('input[type="file"]');
+  const hidden    = document.getElementById('lp-profile-logo-hidden');
+  const preview   = slot.querySelector('img');
+  const clearBtn  = slot.querySelector('.logo-clear');
+
+  slot.addEventListener('click', e => { if (e.target !== clearBtn) fileInput.click(); });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { alert('3MB以下にしてください'); fileInput.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      hidden.value = ev.target.result;
+      preview.src  = ev.target.result;
+      preview.style.display = 'block';
+      slot.classList.add('has-image');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  clearBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    hidden.value = ''; preview.src = ''; preview.style.display = 'none';
+    slot.classList.remove('has-image'); fileInput.value = '';
+  });
+
+  // Pre-load saved profile into landing page fields
+  const profile = loadProfile();
+  if (profile.logoImage) {
+    hidden.value = profile.logoImage;
+    preview.src  = profile.logoImage;
+    preview.style.display = 'block';
+    slot.classList.add('has-image');
+  }
+  PROFILE_FIELDS.forEach(f => {
+    const el = document.querySelector('#lp-profile-section [name="' + f + '"]');
+    if (el && profile[f] !== undefined) el.value = profile[f];
   });
 })();
 
