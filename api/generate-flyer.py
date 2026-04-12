@@ -236,7 +236,7 @@ def generate(data: dict, out):
     ST_FONT = 10                     # station strip (same as pill)
 
     # ── Horizontal columns ────────────────────────────────────────────────────
-    LCW  = IW * 0.34 * 0.85 * 0.85  # left data column  (≈24.5% of IW)
+    LCW  = IW * 0.34 * 0.85 * 0.85 * 0.85  # left data column  (≈20.8% of IW)
     RW   = IW - LCW
     LX   = MX
     RX   = LX + LCW
@@ -245,14 +245,14 @@ def generate(data: dict, out):
     RX2  = RX + HALF
 
     # ── Vertical — footer first, then content above ───────────────────────────
-    FOOTER_H = 34 * mm               # FIXED footer height (27mm + 25%)
+    FOOTER_H = 27.2 * mm             # FIXED footer height (−20% from 34mm)
     FOOTER_Y = MY                    # footer bottom sits at bottom margin
 
     CTOP      = H - MY               # content top edge
     CBOT      = MY + FOOTER_H + 2*mm # content bottom edge (2mm gap above footer)
     CONTENT_H = CTOP - CBOT
 
-    TOP_H    = CONTENT_H * 0.48      # top photo band height
+    TOP_H    = CONTENT_H * 0.42      # top photo band height (shorter = tighter navy box)
     BAND_BOT = CTOP - TOP_H          # bottom of top band = top of mid section
     MID_BOT  = CBOT
     MID_TOP  = BAND_BOT
@@ -293,7 +293,7 @@ def generate(data: dict, out):
 
     # ── Property name zone (top third — only if provided) ────────────────────
     if prop_name:
-        pname_sz = autosize(prop_name, LCW - 10, 18, min_sz=7, bold=True)
+        pname_sz = autosize(prop_name, LCW - 6, 22, min_sz=7, bold=True)
         pname_y  = NAME_BOT + (zone_h - pname_sz) / 2
         draw_bold(c, prop_name, LX + LCW/2, pname_y, pname_sz,
                   color=C_WHITE, align='center')
@@ -312,7 +312,7 @@ def generate(data: dict, out):
           color=colors.HexColor('#2a5cbf'), lw=0.4)
 
     # ── Address zone (centered in its zone) ───────────────────────────────────
-    addr_sz = autosize(short, LCW - 10, 14, min_sz=6, bold=True)
+    addr_sz = autosize(short, LCW - 6, 16, min_sz=6, bold=True)
     addr_y  = ADDR_BOT + (zone_h - addr_sz) / 2
     draw_bold(c, short, LX + LCW/2, addr_y, addr_sz, color=C_WHITE, align='center')
 
