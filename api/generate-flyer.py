@@ -618,10 +618,10 @@ def generate(data: dict, out):
 
     # Fixed section widths (sum = IW)
     F_LOGO_W = FOOTER_H              # square logo
-    F_NAME_W = IW * 0.15
-    F_INFO_W = IW * 0.24
-    F_CONT_W = IW * 0.23
-    F_YELL_W = IW - F_LOGO_W - F_NAME_W - F_INFO_W - F_CONT_W
+    F_NAME_W = IW * 0.20             # company name — wider for legibility
+    F_INFO_W = IW * 0.18             # address / info — compact
+    F_CONT_W = IW * 0.17             # contact (担当者) — just fit
+    F_YELL_W = IW - F_LOGO_W - F_NAME_W - F_INFO_W - F_CONT_W  # yellow takes remainder
 
     # Left-edge x of each section
     F_LOGO_X = MX
@@ -718,12 +718,31 @@ def generate(data: dict, out):
     fee    = data.get('fee', '')
     YPW    = F_YELL_W - F_PAD*2
 
-    # Slogan in top ~65% of yellow area
+    # Slogan in top ~65% of yellow area — try 2-line wrap for larger display
     yell_top_zone = FOOTER_H * 0.65
     if slogan:
-        ssz = autosize(slogan, YPW, int(yell_top_zone * 0.7), min_sz=6, bold=True)
-        sy  = FY_TOP - ssz - F_PAD
-        draw_bold(c, slogan, F_YELL_X+F_PAD, sy, ssz, color=C_NAVYDK)
+        # Single-line size
+        ssz_1 = autosize(slogan, YPW, int(yell_top_zone * 0.82), min_sz=6, bold=True)
+        slogan_lines = [slogan]
+        best_ssz = ssz_1
+
+        # Try 2-line splits near midpoint; pick the split yielding the largest font
+        if len(slogan) >= 6:
+            mid = len(slogan) // 2
+            max2 = int(yell_top_zone / 2.4)   # max per-line size when 2 lines fit
+            for sp in range(max(2, mid - 4), min(len(slogan) - 1, mid + 5)):
+                l1, l2 = slogan[:sp], slogan[sp:]
+                longer = l1 if txt_width(l1, 1, bold=True) >= txt_width(l2, 1, bold=True) else l2
+                sz2 = autosize(longer, YPW, max2, min_sz=6, bold=True)
+                if sz2 > best_ssz:
+                    best_ssz = sz2
+                    slogan_lines = [l1, l2]
+
+        line_gap = max(2, best_ssz // 6)
+        sy = FY_TOP - F_PAD - best_ssz          # top-line baseline
+        for line in slogan_lines:
+            draw_bold(c, line, F_YELL_X + F_PAD, sy, best_ssz, color=C_NAVYDK)
+            sy -= best_ssz + line_gap
 
     # 取引態様 / 手数料 on one line in bottom ~35%
     bot_parts = list(filter(None, [
