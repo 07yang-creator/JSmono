@@ -480,6 +480,36 @@
       border-radius: 6px; padding: 8px 14px; font-size: 13px; color: var(--success);
     }
 
+    /* ── Photo upload slots ───────────────────────────────────────── */
+    .photo-note { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+    .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; }
+    .photo-slot {
+      position: relative; border: 2px dashed var(--border); border-radius: 8px;
+      cursor: pointer; overflow: hidden; aspect-ratio: 4/3;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg); transition: border-color .2s, background .2s;
+    }
+    .photo-slot:hover { border-color: var(--primary-light); background: #eef3fc; }
+    .photo-slot.has-image { border-style: solid; border-color: var(--primary); }
+    .photo-slot .preview {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; border-radius: 6px; display: none;
+    }
+    .photo-slot .slot-label {
+      font-size: 11px; color: var(--muted); text-align: center;
+      padding: 6px; line-height: 1.5; pointer-events: none; z-index: 1;
+    }
+    .photo-slot .slot-icon { font-size: 22px; display: block; margin-bottom: 3px; }
+    .photo-slot.has-image .slot-label { display: none; }
+    .photo-slot .clear-btn {
+      position: absolute; top: 5px; right: 5px; z-index: 3;
+      background: rgba(0,0,0,0.55); color: #fff; border: none;
+      border-radius: 50%; width: 22px; height: 22px; font-size: 11px;
+      cursor: pointer; display: none; align-items: center; justify-content: center;
+    }
+    .photo-slot.has-image .clear-btn { display: flex; }
+    .photo-slot.hidden-slot { display: none; }
+
     .divider {
       display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
       color: var(--muted); font-size: 12px;
@@ -1149,6 +1179,85 @@
           </div>
         </div>
 
+        <!-- 📷 写真アップロード -->
+        <div class="section-card full-width">
+          <div class="section-header">📷 写真・ロゴのアップロード（JPEG / PNG）</div>
+          <div class="section-body">
+            <p class="photo-note">各スロットをクリックして画像を選択してください。✕ で削除できます。</p>
+            <div class="photo-grid">
+
+              <!-- K1: 外観写真（常に表示） -->
+              <div class="photo-slot" id="slot-k1Image">
+                <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+                <img class="preview" alt="">
+                <button class="clear-btn" type="button">✕</button>
+                <div class="slot-label">
+                  <span class="slot-icon">🏠</span>外観写真<br><small>K1</small>
+                </div>
+              </div>
+
+              <!-- K2: 間取り図（常に表示） -->
+              <div class="photo-slot" id="slot-k2Image">
+                <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+                <img class="preview" alt="">
+                <button class="clear-btn" type="button">✕</button>
+                <div class="slot-label">
+                  <span class="slot-icon">📐</span>間取り図<br><small>K2</small>
+                </div>
+              </div>
+
+              <!-- K5: 地図（標準 Variant A のみ） -->
+              <div class="photo-slot" id="slot-k5Image">
+                <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+                <img class="preview" alt="">
+                <button class="clear-btn" type="button">✕</button>
+                <div class="slot-label">
+                  <span class="slot-icon">🗺</span>地図<br><small>K5（標準のみ）</small>
+                </div>
+              </div>
+
+              <!-- K3: 外観写真３（写真重視 Variant B のみ） -->
+              <div class="photo-slot hidden-slot" id="slot-k3Image">
+                <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+                <img class="preview" alt="">
+                <button class="clear-btn" type="button">✕</button>
+                <div class="slot-label">
+                  <span class="slot-icon">📷</span>外観写真３<br><small>K3（写真重視）</small>
+                </div>
+              </div>
+
+              <!-- K4: 外観写真４（写真重視 Variant B のみ） -->
+              <div class="photo-slot hidden-slot" id="slot-k4Image">
+                <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+                <img class="preview" alt="">
+                <button class="clear-btn" type="button">✕</button>
+                <div class="slot-label">
+                  <span class="slot-icon">📷</span>外観写真４<br><small>K4（写真重視）</small>
+                </div>
+              </div>
+
+              <!-- Logo: 会社ロゴ（常に表示） -->
+              <div class="photo-slot" id="slot-logoImage">
+                <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+                <img class="preview" alt="">
+                <button class="clear-btn" type="button">✕</button>
+                <div class="slot-label">
+                  <span class="slot-icon">🏢</span>会社ロゴ<br><small>Logo</small>
+                </div>
+              </div>
+
+            </div><!-- /photo-grid -->
+
+            <!-- Hidden inputs: values set by JS, picked up automatically by FormData -->
+            <input type="hidden" name="k1Image"    id="img-k1Image"    value="">
+            <input type="hidden" name="k2Image"    id="img-k2Image"    value="">
+            <input type="hidden" name="k5Image"    id="img-k5Image"    value="">
+            <input type="hidden" name="k3Image"    id="img-k3Image"    value="">
+            <input type="hidden" name="k4Image"    id="img-k4Image"    value="">
+            <input type="hidden" name="logoImage"  id="img-logoImage"  value="">
+          </div>
+        </div>
+
       </div><!-- /form-grid -->
 
       <!-- Submit Bar -->
@@ -1205,6 +1314,11 @@ function selectVariant(v) {
   document.querySelectorAll('.variant-card').forEach(el => el.classList.remove('selected'));
   document.getElementById('vcard-' + v).classList.add('selected');
   document.querySelector('#vcard-' + v + ' input[type="radio"]').checked = true;
+  // Show/hide variant-specific photo slots
+  const isA = v === 'A';
+  document.getElementById('slot-k5Image').classList.toggle('hidden-slot', !isA);
+  document.getElementById('slot-k3Image').classList.toggle('hidden-slot',  isA);
+  document.getElementById('slot-k4Image').classList.toggle('hidden-slot',  isA);
 }
 
 function togglePromo(checkbox) {
@@ -1447,6 +1561,61 @@ function resetSteps() {
     document.getElementById(id).className = 'step';
   });
 }
+
+// ── Photo upload slots ────────────────────────────────────────────────────────
+(function initPhotoSlots() {
+  const SLOTS = [
+    ['slot-k1Image',   'k1Image'],
+    ['slot-k2Image',   'k2Image'],
+    ['slot-k5Image',   'k5Image'],
+    ['slot-k3Image',   'k3Image'],
+    ['slot-k4Image',   'k4Image'],
+    ['slot-logoImage', 'logoImage'],
+  ];
+  SLOTS.forEach(([slotId, field]) => {
+    const slot      = document.getElementById(slotId);
+    if (!slot) return;
+    const fileInput = slot.querySelector('input[type="file"]');
+    const hidden    = document.getElementById('img-' + field);
+    const preview   = slot.querySelector('.preview');
+    const clearBtn  = slot.querySelector('.clear-btn');
+
+    // Click anywhere on slot → open file picker
+    slot.addEventListener('click', e => {
+      if (e.target === clearBtn) return;
+      fileInput.click();
+    });
+
+    // File selected → read as base64 DataURL
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      // Warn if file is very large (>3MB)
+      if (file.size > 3 * 1024 * 1024) {
+        alert('ファイルが大きすぎます（3MB以下にしてください）。');
+        fileInput.value = ''; return;
+      }
+      const reader = new FileReader();
+      reader.onload = e => {
+        hidden.value          = e.target.result;
+        preview.src           = e.target.result;
+        preview.style.display = 'block';
+        slot.classList.add('has-image');
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // ✕ button → clear slot
+    clearBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      hidden.value          = '';
+      preview.src           = '';
+      preview.style.display = 'none';
+      slot.classList.remove('has-image');
+      fileInput.value = '';
+    });
+  });
+})();
 
 function saveDraft() {
   const form = document.getElementById('propertyForm');
