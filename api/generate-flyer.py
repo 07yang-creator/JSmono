@@ -266,11 +266,12 @@ def generate(data: dict, out):
     # Navy box bottom y-coordinate
     nav_y   = BAND_BOT + PRICE_H + ST_H
 
-    # Navy box internal equal-thirds zones (bottom → top in y-coords):
-    NAV_ROW = NAV_H / 3
-    Z1_BOT  = nav_y              ; Z1_TOP = nav_y +   NAV_ROW   # address
-    Z2_BOT  = Z1_TOP             ; Z2_TOP = Z1_TOP +  NAV_ROW   # type pill
-    Z3_BOT  = Z2_TOP             ; Z3_TOP = Z2_TOP +  NAV_ROW   # property name
+    # Navy box internal zones: top half = pill, bottom half = address
+    Z2_BOT  = nav_y              ; Z2_TOP = nav_y + NAV_H / 2   # type pill (top)
+    Z1_BOT  = nav_y              ; Z1_TOP = nav_y + NAV_H / 2   # address   (bottom)
+    # Redefine cleanly: pill occupies upper half, address lower half
+    PILL_ZONE_BOT = nav_y + NAV_H / 2; PILL_ZONE_TOP = nav_y + NAV_H
+    ADDR_ZONE_BOT = nav_y;             ADDR_ZONE_TOP = nav_y + NAV_H / 2
 
     # ══════════════════════════════════════════════════════════════════════════
     # LEFT COLUMN — TOP BAND
@@ -280,32 +281,26 @@ def generate(data: dict, out):
     rect(c, LX, nav_y, LCW, NAV_H, fill=C_NAVY)
 
     prop_type = data.get('propertyType', '中古戸建')
-    prop_name = data.get('propertyName', '')
     addr_raw  = data.get('address', '')
     short     = addr_raw.replace('東京都','').replace('大阪府','').replace('神奈川県','')[:22]
 
-    # Zone 3 (top third): property name headline
-    if prop_name:
-        pname_sz = autosize(prop_name, LCW - 10, 18, min_sz=7, bold=True)
-        pname_y  = Z3_BOT + (NAV_ROW - pname_sz) / 2   # vertically centered baseline
-        draw_bold(c, prop_name, LX + LCW/2, pname_y, pname_sz,
-                  color=C_WHITE, align='center')
-        hline(c, LX + 4, LX + LCW - 4, Z3_BOT, color=C_AMBER, lw=0.7)
-
-    # Zone 2 (middle third): type pill, centered in zone
+    # Upper half of navy box: type pill, centered vertically and horizontally
     pill_pad_x, pill_pad_y = 8, 4
-    bw      = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
-    bh      = PILL_SZ + pill_pad_y * 2
-    pill_x  = LX + (LCW - bw) / 2
-    pill_y  = Z2_BOT + (NAV_ROW - bh) / 2
+    bw     = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
+    bh     = PILL_SZ + pill_pad_y * 2
+    pill_x = LX + (LCW - bw) / 2
+    pill_y = PILL_ZONE_BOT + (NAV_H/2 - bh) / 2
     rect(c, pill_x, pill_y, bw, bh, fill=C_ACCENT)
     draw_text(c, prop_type, pill_x + pill_pad_x, pill_y + pill_pad_y,
               PILL_SZ, color=C_WHITE)
-    hline(c, LX + 4, LX + LCW - 4, Z2_BOT, color=colors.HexColor('#2a5cbf'), lw=0.4)
 
-    # Zone 1 (bottom third): address, centered in zone
+    # Thin divider between pill zone and address zone
+    hline(c, LX + 4, LX + LCW - 4, ADDR_ZONE_TOP,
+          color=colors.HexColor('#2a5cbf'), lw=0.4)
+
+    # Lower half of navy box: address, centered vertically and horizontally
     addr_sz = autosize(short, LCW - 10, 14, min_sz=6, bold=True)
-    addr_y  = Z1_BOT + (NAV_ROW - addr_sz) / 2
+    addr_y  = ADDR_ZONE_BOT + (NAV_H/2 - addr_sz) / 2
     draw_bold(c, short, LX + LCW/2, addr_y, addr_sz, color=C_WHITE, align='center')
 
     # ── Station strip (fixed height ST_H = 14mm) ──────────────────────────────
