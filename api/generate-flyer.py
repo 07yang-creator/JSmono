@@ -776,15 +776,23 @@ def generate(data: dict, out):
             draw_bold(c, line, F_YELL_X + F_PAD, sy, best_ssz, color=C_NAVYDK)
             sy -= best_ssz + line_gap
 
-    # 取引態様 / 手数料 on one line in bottom ~35%
+    # 取引態様 / 手数料 — fixed ISZ size (matches company info column),
+    # centred horizontally and vertically in the bottom ~35% zone of yellow area.
+    BSZ       = ISZ                              # same size as company info text
+    bot_zone_h = FOOTER_H * 0.35                # bottom zone height
     bot_parts = list(filter(None, [
         f'【取引態様】{ttype}' if ttype else '',
         f'【手数料】{fee}'     if fee   else '',
     ]))
     if bot_parts:
         bot_line = '　　'.join(bot_parts)
-        bsz = autosize(bot_line, YPW, 14, min_sz=6, bold=True)
-        draw_bold(c, bot_line, F_YELL_X+F_PAD, FOOTER_Y+F_PAD, bsz, color=C_NAVYDK)
+        # Vertically: centre in the bottom zone, minimum F_PAD above footer edge
+        bot_ctr_y = FOOTER_Y + bot_zone_h / 2   # centre of bottom zone
+        bot_y     = max(bot_ctr_y, FOOTER_Y + F_PAD + BSZ * 0.2)
+        # Horizontally: centre in yellow area
+        bw_txt = txt_width(bot_line, BSZ, bold=True)
+        bot_x  = F_YELL_X + (F_YELL_W - bw_txt) / 2
+        draw_bold(c, bot_line, bot_x, bot_y, BSZ, color=C_NAVYDK)
 
     c.save()
 

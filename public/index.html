@@ -883,12 +883,17 @@
           <input type="text" name="email" placeholder="例：s-aoki@brilliant-corp.jp">
         </div>
         <div class="profile-field">
-          <label>取引態様</label>
+          <label>取引態様（任意）</label>
           <select name="transactionType">
+            <option value="">─ 未選択 ─</option>
             <option>売主</option>
             <option>媒介</option>
             <option>代理</option>
           </select>
+        </div>
+        <div class="profile-field">
+          <label>手数料（任意）</label>
+          <input type="text" name="fee" placeholder="例：3%＋6万円（税別）">
         </div>
         <div class="profile-field">
           <label>所属団体</label>
@@ -1321,13 +1326,20 @@
             </div>
             <div class="field-row">
               <div class="field">
-                <label>取引態様</label>
+                <label>取引態様（任意）</label>
                 <select name="transactionType">
+                  <option value="">─ 未選択 ─</option>
                   <option>売主</option>
                   <option>媒介</option>
                   <option>代理</option>
                 </select>
               </div>
+              <div class="field">
+                <label>手数料（任意）</label>
+                <input type="text" name="fee" placeholder="例：3%＋6万円（税別）">
+              </div>
+            </div>
+            <div class="field-row">
               <div class="field">
                 <label>所属団体</label>
                 <input type="text" name="association" placeholder="例：（公社）東京都宅地建物取引業協会会員">
@@ -1479,7 +1491,7 @@
 // ═══════════════════════════════════════════════════════════════
 const PROFILE_KEY = 'jjc_company_profile';
 const PROFILE_FIELDS = ['companyName','brandName','companyAddress','licenseNo',
-                        'agentName','tel','fax','email','transactionType','association','catchcopy'];
+                        'agentName','tel','fax','email','transactionType','fee','association','catchcopy'];
 
 // ═══════════════════════════════════════════════════════════════
 // LANDING PAGE
