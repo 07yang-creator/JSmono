@@ -1658,8 +1658,14 @@ async function initAuth() {
     });
     // Handle redirect after Auth0 login
     if (window.location.search.includes('code=') && window.location.search.includes('state=')) {
-      await _auth0Client.handleRedirectCallback();
-      window.history.replaceState({}, document.title, window.location.pathname);
+      try {
+        await _auth0Client.handleRedirectCallback();
+      } catch (cbErr) {
+        console.error('[Auth0] callback exchange failed:', cbErr.message);
+      } finally {
+        // Always clear code/state from URL — even on failure — prevents loops
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
     await _applyAuthState();
   } catch (e) {
