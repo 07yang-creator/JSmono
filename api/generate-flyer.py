@@ -138,6 +138,13 @@ def rect(c, x, y, w, h, fill=None, stroke=None, lw=0.5):
     c.rect(x, y, w, h, fill=1 if fill else 0, stroke=1 if stroke else 0)
     c.restoreState()
 
+def rounded_rect(c, x, y, w, h, fill=None, stroke=None, lw=0.5, r=4):
+    c.saveState()
+    if fill:   c.setFillColor(fill)
+    if stroke: c.setStrokeColor(stroke); c.setLineWidth(lw)
+    c.roundRect(x, y, w, h, r, fill=1 if fill else 0, stroke=1 if stroke else 0)
+    c.restoreState()
+
 def vline(c, x, y1, y2, color=C_DIV, lw=0.4):
     c.saveState(); c.setStrokeColor(color); c.setLineWidth(lw)
     c.line(x, y1, x, y2); c.restoreState()
@@ -284,8 +291,8 @@ def generate(data: dict, out):
     # LEFT COLUMN — TOP BAND
     # ══════════════════════════════════════════════════════════════════════════
 
-    # ── Navy box background ───────────────────────────────────────────────────
-    rect(c, LX, nav_y, LCW, NAV_H, fill=C_NAVY)
+    # ── Navy box background (rounded corners) ────────────────────────────────
+    rounded_rect(c, LX, nav_y, LCW, NAV_H, fill=C_NAVY, r=5)
 
     prop_type = data.get('propertyType', '中古戸建')
     addr_raw  = data.get('address', '')
@@ -305,7 +312,7 @@ def generate(data: dict, out):
     bh     = PILL_SZ + pill_pad_y * 2
     pill_x = LX + (LCW - bw) / 2
     pill_y = PILL_BOT + (zone_h - bh) / 2
-    rect(c, pill_x, pill_y, bw, bh, fill=C_ACCENT)
+    rounded_rect(c, pill_x, pill_y, bw, bh, fill=C_ACCENT, r=4)
     draw_text(c, prop_type, pill_x + pill_pad_x, pill_y + pill_pad_y,
               PILL_SZ, color=C_WHITE)
     hline(c, LX + 4, LX + LCW - 4, PILL_BOT,
@@ -525,10 +532,6 @@ def generate(data: dict, out):
         rect(c, LX+LLBW,   ly, LVBW, LRH, fill=bg, stroke=C_DIV, lw=0.3)
         draw_text(c, truncate_text(val, LVBW-5, 6.5), LX+LLBW+3, ly+3, 6.5, color=C_BLACK)
 
-    # 所在地
-    lsec('■ 所在地')
-    lrow('所在地', addr_raw)
-
     # 物件概要
     lsec('■ 物件概要')
     la = f"{data.get('landArea','')}㎡"
@@ -618,7 +621,7 @@ def generate(data: dict, out):
 
     # Fixed section widths (sum = IW)
     F_LOGO_W = FOOTER_H              # square logo
-    F_NAME_W = IW * 0.20             # company name — wider for legibility
+    F_NAME_W = IW * 0.30             # company name — +50% width
     F_INFO_W = IW * 0.18             # address / info — compact
     F_CONT_W = IW * 0.17             # contact (担当者) — just fit
     F_YELL_W = IW - F_LOGO_W - F_NAME_W - F_INFO_W - F_CONT_W  # yellow takes remainder
@@ -656,18 +659,19 @@ def generate(data: dict, out):
     co_sz    = autosize(co,    av_nw, 18, min_sz=7, bold=True) if (co and co != brand) else 0
     N_GAP = 4
     have_b = bool(brand); have_c = bool(co and co != brand)
-    # Centre the text block vertically — baseline of top line
+    # Vertical centering — compute total block height first
     if have_b and have_c:
-        ny = FOOTER_Y + FOOTER_H / 2 + (brand_sz + N_GAP) / 2
-    elif have_b or have_c:
-        ny = FOOTER_Y + FOOTER_H / 2
+        block_h = brand_sz + N_GAP + co_sz
+        ny = FOOTER_Y + FOOTER_H / 2 + block_h / 2
     else:
         ny = FOOTER_Y + FOOTER_H / 2
+    # Right-align: anchor text at right edge of section (minus padding)
+    name_rx = F_NAME_X + F_NAME_W - F_PAD
     if have_b:
-        draw_bold(c, brand, F_NAME_X+F_PAD, ny, brand_sz, color=C_WHITE)
+        draw_bold(c, brand, name_rx, ny, brand_sz, color=C_WHITE, align='right')
         ny -= brand_sz + N_GAP
     if have_c:
-        draw_bold(c, co, F_NAME_X+F_PAD, ny, co_sz, color=C_WHITE)
+        draw_bold(c, co, name_rx, ny, co_sz, color=C_WHITE, align='right')
 
     vline(c, F_INFO_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
