@@ -273,55 +273,51 @@ def generate(data: dict, out):
     # Navy box bottom y-coordinate
     nav_y   = BAND_BOT + PRICE_H + ST_H
 
-    # Navy box internal zones — BOX OUTLINE IS ALWAYS FIXED (NAV_H never changes).
-    # If propertyName given → 3 equal thirds (name / pill / address)
-    # If no propertyName  → 2 equal halves (pill / address)
-    prop_name = data.get('propertyName', '').strip()
-    if prop_name:
-        zone_h   = NAV_H / 3
-        NAME_BOT = nav_y + 2 * zone_h;  NAME_TOP = nav_y + NAV_H   # top third
-        PILL_BOT = nav_y + zone_h;      PILL_TOP = nav_y + 2*zone_h # middle third
-        ADDR_BOT = nav_y;               ADDR_TOP = nav_y + zone_h   # bottom third
-    else:
-        zone_h   = NAV_H / 2
-        PILL_BOT = nav_y + zone_h;      PILL_TOP = nav_y + NAV_H   # top half
-        ADDR_BOT = nav_y;               ADDR_TOP = nav_y + zone_h  # bottom half
-
     # ══════════════════════════════════════════════════════════════════════════
     # LEFT COLUMN — TOP BAND
     # ══════════════════════════════════════════════════════════════════════════
 
-    # ── Navy box background (rounded corners) ────────────────────────────────
-    rounded_rect(c, LX, nav_y, LCW, NAV_H, fill=C_NAVY, r=5)
-
     prop_type = data.get('propertyType', '中古戸建')
     addr_raw  = data.get('address', '')
     short     = addr_raw.replace('東京都','').replace('大阪府','').replace('神奈川県','')[:22]
+    prop_name = data.get('propertyName', '').strip()
 
-    # ── Property name zone (top third — only if provided) ────────────────────
-    if prop_name:
-        pname_sz = autosize(prop_name, LCW - 6, 22, min_sz=7, bold=True)
-        pname_y  = NAME_BOT + (zone_h - pname_sz) / 2
-        draw_bold(c, prop_name, LX + LCW/2, pname_y, pname_sz,
-                  color=C_WHITE, align='center')
-        hline(c, LX + 4, LX + LCW - 4, NAME_BOT, color=C_AMBER, lw=0.7)
-
-    # ── Pill zone (centered in its zone) ─────────────────────────────────────
+    # ── Navy box: size computed from content, then centred in NAV_H zone ─────
+    NAV_INNER = 5    # top/bottom inner padding
+    NAV_GAP   = 4    # gap between items
     pill_pad_x, pill_pad_y = 8, 4
-    bw     = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
-    bh     = PILL_SZ + pill_pad_y * 2
-    pill_x = LX + (LCW - bw) / 2
-    pill_y = PILL_BOT + (zone_h - bh) / 2
-    rounded_rect(c, pill_x, pill_y, bw, bh, fill=C_ACCENT, r=4)
-    draw_text(c, prop_type, pill_x + pill_pad_x, pill_y + pill_pad_y,
-              PILL_SZ, color=C_WHITE)
-    hline(c, LX + 4, LX + LCW - 4, PILL_BOT,
-          color=colors.HexColor('#2a5cbf'), lw=0.4)
 
-    # ── Address zone (centered in its zone) ───────────────────────────────────
-    addr_sz = autosize(short, LCW - 6, 16, min_sz=6, bold=True)
-    addr_y  = ADDR_BOT + (zone_h - addr_sz) / 2
-    draw_bold(c, short, LX + LCW/2, addr_y, addr_sz, color=C_WHITE, align='center')
+    pname_sz = autosize(prop_name, LCW - 6, 22, min_sz=7, bold=True) if prop_name else 0
+    pill_bh  = PILL_SZ + pill_pad_y * 2          # pill badge height (fixed by font)
+    addr_sz  = autosize(short, LCW - 6, 16, min_sz=6, bold=True)
+
+    items_h  = ([pname_sz] if prop_name else []) + [pill_bh, addr_sz]
+    content_h = sum(items_h) + NAV_GAP * (len(items_h) - 1)
+    box_h    = min(content_h + NAV_INNER * 2, NAV_H)   # never taller than zone
+    box_y    = nav_y + (NAV_H - box_h) / 2             # centred in zone
+
+    rounded_rect(c, LX, box_y, LCW, box_h, fill=C_NAVY, r=5)
+
+    # Draw content top-down inside the box
+    cur_y = box_y + box_h - NAV_INNER   # just inside top edge
+
+    if prop_name:
+        cur_y -= pname_sz
+        draw_bold(c, prop_name, LX + LCW/2, cur_y, pname_sz,
+                  color=C_WHITE, align='center')
+        cur_y -= NAV_GAP
+        hline(c, LX + 6, LX + LCW - 6, cur_y + NAV_GAP/2, color=C_AMBER, lw=0.7)
+
+    bw     = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
+    cur_y -= pill_bh
+    pill_x = LX + (LCW - bw) / 2
+    rounded_rect(c, pill_x, cur_y, bw, pill_bh, fill=C_ACCENT, r=4)
+    draw_text(c, prop_type, pill_x + pill_pad_x, cur_y + pill_pad_y,
+              PILL_SZ, color=C_WHITE)
+    cur_y -= NAV_GAP
+
+    cur_y -= addr_sz
+    draw_bold(c, short, LX + LCW/2, cur_y, addr_sz, color=C_WHITE, align='center')
 
     # ── Station strip (fixed height ST_H = 14mm) ──────────────────────────────
     rect(c, LX, BAND_BOT + PRICE_H, LCW, ST_H,
@@ -665,13 +661,13 @@ def generate(data: dict, out):
         ny = FOOTER_Y + FOOTER_H / 2 + block_h / 2
     else:
         ny = FOOTER_Y + FOOTER_H / 2
-    # Right-align: anchor text at right edge of section (minus padding)
-    name_rx = F_NAME_X + F_NAME_W - F_PAD
+    # Left-align: anchor text at left edge of section plus padding
+    name_lx = F_NAME_X + F_PAD
     if have_b:
-        draw_bold(c, brand, name_rx, ny, brand_sz, color=C_WHITE, align='right')
+        draw_bold(c, brand, name_lx, ny, brand_sz, color=C_WHITE)
         ny -= brand_sz + N_GAP
     if have_c:
-        draw_bold(c, co, name_rx, ny, co_sz, color=C_WHITE, align='right')
+        draw_bold(c, co, name_lx, ny, co_sz, color=C_WHITE)
 
     vline(c, F_INFO_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
@@ -707,22 +703,40 @@ def generate(data: dict, out):
     vline(c, F_CONT_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
     # ── d) Contact ────────────────────────────────────────────────────────────
-    OBC_H = int(FOOTER_H * 0.16)    # orange strip ≈16% of footer height
-    rect(c, F_CONT_X, FY_TOP-OBC_H, F_CONT_W, OBC_H, fill=C_ACCENT)
-    draw_bold(c, 'お問い合わせ先',
-              F_CONT_X+F_CONT_W/2, FY_TOP-OBC_H+3, 9, color=C_WHITE, align='center')
+    OBC_H        = int(FOOTER_H * 0.16)          # strip height ≈16% of footer
+    strip_w      = F_CONT_W * 0.60               # 40% narrower (floats)
+    strip_margin = (F_CONT_W - strip_w) / 2
+    strip_x      = F_CONT_X + strip_margin
+    strip_y      = FY_TOP - OBC_H * 1.5          # lowered by half strip height
 
-    ag     = data.get('agentName', '')
-    ag_tel = data.get('agentTel', '')
-    CW     = F_CONT_W - F_PAD*2
-    cy2    = FY_TOP - OBC_H - 4
-    if ag:
-        asz = autosize(f'【担当】{ag}', CW, 14, min_sz=7, bold=True)
-        draw_bold(c, f'【担当】{ag}', F_CONT_X+F_PAD, cy2, asz, color=C_WHITE)
-        cy2 -= asz + 3
+    rounded_rect(c, strip_x, strip_y, strip_w, OBC_H, fill=C_ACCENT, r=3)
+    draw_bold(c, 'お問い合わせ先',
+              strip_x + strip_w/2, strip_y + 3, 9, color=C_WHITE, align='center')
+
+    ag      = data.get('agentName', '')
+    ag_tel  = data.get('agentTel', '')
     tel_str = ag_tel or tel
-    if tel_str:
-        tsz = autosize(f'TEL：{tel_str}', CW, 15, min_sz=7, bold=True)
+    CW      = F_CONT_W - F_PAD * 2
+
+    # Compute text sizes before positioning
+    asz = autosize(f'【担当】{ag}', CW, 14, min_sz=7, bold=True) if ag else 0
+    tsz = autosize(f'TEL：{tel_str}', CW, 15, min_sz=7, bold=True) if tel_str else 0
+    ROW_GAP = 3
+    have_ag  = bool(ag); have_tel = bool(tel_str)
+    if have_ag and have_tel:   block_h = asz + ROW_GAP + tsz
+    elif have_ag:              block_h = asz
+    elif have_tel:             block_h = tsz
+    else:                      block_h = 0
+
+    # Vertically centre block in the space below the strip
+    below_top = strip_y                          # top of space below strip
+    below_ctr = FOOTER_Y + (below_top - FOOTER_Y) / 2
+    cy2 = below_ctr + block_h / 2               # top baseline of first row
+
+    if have_ag:
+        draw_bold(c, f'【担当】{ag}', F_CONT_X+F_PAD, cy2, asz, color=C_WHITE)
+        cy2 -= asz + ROW_GAP
+    if have_tel:
         draw_bold(c, f'TEL：{tel_str}', F_CONT_X+F_PAD, cy2, tsz, color=C_WHITE)
 
     vline(c, F_YELL_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
