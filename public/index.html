@@ -582,6 +582,45 @@
     .btn-generate:hover { background: #d44e24; }
     .btn-generate:active { transform: scale(0.98); }
 
+    /* ── Preview button ───────────────────────────────────────────── */
+    .btn-preview {
+      background: none; border: 1.5px solid var(--primary); color: var(--primary);
+      padding: 10px 22px; border-radius: 7px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.18s; display: flex; align-items: center; gap: 8px;
+    }
+    .btn-preview:hover { background: var(--primary); color: #fff; }
+
+    /* ── Preview modal ────────────────────────────────────────────── */
+    #previewModal {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
+    }
+    #previewModal.visible { display: flex; }
+    .preview-box {
+      background: #fff; border-radius: 12px; width: 94vw; height: 92vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+    }
+    .preview-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 18px; border-bottom: 1px solid #e0e0e0; background: #f6f8fa;
+      flex-shrink: 0;
+    }
+    .preview-header h3 { margin: 0; font-size: 15px; color: #333; }
+    .preview-header-right { display: flex; gap: 10px; align-items: center; }
+    .btn-preview-dl {
+      background: var(--accent); border: none; color: #fff;
+      padding: 8px 20px; border-radius: 7px; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .btn-preview-dl:hover { background: #d44e24; }
+    .btn-preview-close {
+      background: none; border: none; font-size: 24px; line-height: 1;
+      cursor: pointer; color: #888; padding: 0 4px; transition: color 0.15s;
+    }
+    .btn-preview-close:hover { color: #222; }
+    #previewFrame { flex: 1; border: none; width: 100%; }
+
     /* ── Profile section (landing page) ──────────────────────────── */
     .lp-profile-card {
       background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
@@ -1458,6 +1497,7 @@
         </div>
         <div class="actions">
           <button type="button" class="btn-save" onclick="saveDraft()">💾 下書き保存</button>
+          <button type="button" class="btn-preview" onclick="previewFlyer()">👁 プレビュー</button>
           <button type="button" class="btn-generate" onclick="generateFlyer()">
             <span>🖨</span> チラシPDFを生成
           </button>
@@ -1466,6 +1506,20 @@
 
     </form>
   </div><!-- /container -->
+
+  <!-- Preview Modal -->
+  <div id="previewModal" onclick="if(event.target===this)closePreview()">
+    <div class="preview-box">
+      <div class="preview-header">
+        <h3>👁 チラシプレビュー</h3>
+        <div class="preview-header-right">
+          <button class="btn-preview-dl" onclick="downloadFromPreview()">⬇ ダウンロード</button>
+          <button class="btn-preview-close" onclick="closePreview()" title="閉じる">✕</button>
+        </div>
+      </div>
+      <iframe id="previewFrame" src="" title="チラシプレビュー"></iframe>
+    </div>
+  </div>
 
   <!-- Progress Overlay -->
   <div class="progress-overlay" id="progressOverlay">
@@ -1765,15 +1819,33 @@ function updatePhotoReq() {
 
 // ── Generate flyer ────────────────────────────────────────────────────────────
 function generateFlyer() {
+  const raw = _collectAndValidate(); if (!raw) return;
+  const filename = (raw.address || '物件').replace(/\s/g,'_') + '_チラシ.pdf';
+  _runGenerate(raw, blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+  });
+}
+
+function resetSteps() {
+  const labels = ['PDFデータを解析中','レイアウトを構築中','画像を合成中','PDFを書き出し中'];
+  ['step1','step2','step3','step4'].forEach((id, i) => {
+    document.getElementById(id).textContent = '⬜ ' + labels[i];
+    document.getElementById(id).className = 'step';
+  });
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+let _previewBlobUrl = null;
+let _previewFilename = 'チラシ.pdf';
+
+function _collectAndValidate() {
   const form = document.getElementById('propertyForm');
   const raw  = Object.fromEntries(new FormData(form));
-
   if (!raw.address || !raw.price) {
-    alert('所在地と販売価格は必須です。');
-    return;
+    alert('所在地と販売価格は必須です。'); return null;
   }
-
-  // Variant A: photo requirement gate
   if (raw.templateVariant === 'A') {
     const hasK1 = !!document.getElementById('img-k1Image').value;
     const hasK2 = !!document.getElementById('img-k2Image').value;
@@ -1784,24 +1856,23 @@ function generateFlyer() {
       document.querySelector('[name="elemSchool"]')?.value?.trim() ||
       document.querySelector('[name="juniorSchool"]')?.value?.trim()
     );
-    const hasNearbyInfo = nearbyItems.length > 0 || hasSchool;
-
     if (!hasK1 || !hasK2 || !hasK5) {
       alert('外観写真（K1）・間取り図（K2）・地図（K5）の3枚は必須です。\nPlease upload exterior photo (K1), floor plan (K2), and map (K5).');
-      return;
+      return null;
     }
-    if (!hasK3 && !hasNearbyInfo) {
+    if (!hasK3 && !(nearbyItems.length > 0 || hasSchool)) {
       alert('内観写真（K3）をアップロードするか、周辺環境・学区情報を入力してください。\nPlease add interior photo (K3) or fill in neighborhood/school info.');
-      return;
+      return null;
     }
   }
-
   raw.stations = collectStations();
   raw.nearby   = collectNearby();
+  return raw;
+}
 
+function _runGenerate(raw, onSuccess) {
   const overlay = document.getElementById('progressOverlay');
   overlay.classList.add('visible');
-
   const steps = ['step1','step2','step3','step4'];
   let i = 0;
   const interval = setInterval(() => {
@@ -1811,41 +1882,50 @@ function generateFlyer() {
       prev.className = 'step done';
     }
     if (i < steps.length) {
-      document.getElementById(steps[i]).className = 'step active';
-      i++;
+      document.getElementById(steps[i]).className = 'step active'; i++;
     } else {
       clearInterval(interval);
       fetch('/api/generate-flyer', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify(raw)
       })
       .then(r => r.blob())
-      .then(blob => {
-        overlay.classList.remove('visible');
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = (raw.address || '物件').replace(/\s/g,'_') + '_チラシ.pdf';
-        a.click();
-        resetSteps();
-      })
+      .then(blob => { overlay.classList.remove('visible'); resetSteps(); onSuccess(blob); })
       .catch(() => {
-        overlay.classList.remove('visible');
-        resetSteps();
+        overlay.classList.remove('visible'); resetSteps();
         alert('チラシの生成中にエラーが発生しました。');
       });
     }
   }, 700);
 }
 
-function resetSteps() {
-  const labels = ['PDFデータを解析中','レイアウトを構築中','画像を合成中','PDFを書き出し中'];
-  ['step1','step2','step3','step4'].forEach((id, i) => {
-    document.getElementById(id).textContent = '⬜ ' + labels[i];
-    document.getElementById(id).className = 'step';
+function previewFlyer() {
+  const raw = _collectAndValidate(); if (!raw) return;
+  _previewFilename = (raw.address || '物件').replace(/\s/g,'_') + '_チラシ.pdf';
+  _runGenerate(raw, blob => {
+    if (_previewBlobUrl) URL.revokeObjectURL(_previewBlobUrl);
+    _previewBlobUrl = URL.createObjectURL(blob);
+    document.getElementById('previewFrame').src = _previewBlobUrl;
+    document.getElementById('previewModal').classList.add('visible');
+    document.body.style.overflow = 'hidden';
   });
 }
+
+function closePreview() {
+  document.getElementById('previewModal').classList.remove('visible');
+  document.body.style.overflow = '';
+}
+
+function downloadFromPreview() {
+  if (!_previewBlobUrl) return;
+  const a = document.createElement('a');
+  a.href = _previewBlobUrl; a.download = _previewFilename; a.click();
+}
+
+// Close preview on Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePreview();
+});
 
 // ── Photo upload slots (K1/K2/K5/K3/K4) ─────────────────────────────────────
 (function initPhotoSlots() {
