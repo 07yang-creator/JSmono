@@ -1652,25 +1652,26 @@ const AUTH0_REDIRECT_URI = 'https://jjconnect.online';
 
 async function initAuth() {
   try {
-    console.log('[Auth0] redirect_uri =', AUTH0_REDIRECT_URI);
-    _auth0Client = await window.auth0.createAuth0Client({
+    _auth0Client = new window.auth0.Auth0Client({
       domain: AUTH0_DOMAIN,
       clientId: AUTH0_CLIENT_ID,
       authorizationParams: { redirect_uri: AUTH0_REDIRECT_URI },
-      cacheLocation: 'localstorage'
+      cacheLocation: 'memory'
     });
-    // Handle redirect after Auth0 login
+
+    // Handle the redirect callback ONCE — check URL before the SDK can consume it
     if (window.location.search.includes('code=') && window.location.search.includes('state=')) {
+      console.log('[Auth0] handling redirect callback…');
       try {
-        console.log('[Auth0] exchanging code for token…');
         await _auth0Client.handleRedirectCallback();
         console.log('[Auth0] token exchange OK');
       } catch (cbErr) {
-        console.error('[Auth0] callback exchange failed:', cbErr.message, cbErr);
-      } finally {
-        window.history.replaceState({}, document.title, window.location.pathname);
+        console.error('[Auth0] callback failed:', cbErr.message);
       }
+      // Always clean the URL regardless of outcome
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
+
     await _applyAuthState();
   } catch (e) {
     console.error('[Auth0] init error:', e);
