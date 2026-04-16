@@ -1647,23 +1647,27 @@ const AUTH0_CLIENT_ID = 'oGyqJ3R55KbNjZ6hOru7tpCaPgAHe5Ph';  // SPA app
 let _auth0Client = null;
 let _authToken   = null;   // current access token
 
+// Explicit redirect URI — must exactly match Auth0 Allowed Callback URLs
+const AUTH0_REDIRECT_URI = 'https://jjconnect.online';
+
 async function initAuth() {
   try {
+    console.log('[Auth0] redirect_uri =', AUTH0_REDIRECT_URI);
     _auth0Client = await window.auth0.createAuth0Client({
       domain: AUTH0_DOMAIN,
       clientId: AUTH0_CLIENT_ID,
-      authorizationParams: { redirect_uri: window.location.origin },
-      cacheLocation: 'localstorage',
-      useRefreshTokens: true
+      authorizationParams: { redirect_uri: AUTH0_REDIRECT_URI },
+      cacheLocation: 'localstorage'
     });
     // Handle redirect after Auth0 login
     if (window.location.search.includes('code=') && window.location.search.includes('state=')) {
       try {
+        console.log('[Auth0] exchanging code for token…');
         await _auth0Client.handleRedirectCallback();
+        console.log('[Auth0] token exchange OK');
       } catch (cbErr) {
-        console.error('[Auth0] callback exchange failed:', cbErr.message);
+        console.error('[Auth0] callback exchange failed:', cbErr.message, cbErr);
       } finally {
-        // Always clear code/state from URL — even on failure — prevents loops
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
@@ -1697,7 +1701,7 @@ async function _applyAuthState() {
 async function authLogin() {
   if (!_auth0Client) return;
   await _auth0Client.loginWithRedirect({
-    authorizationParams: { redirect_uri: window.location.origin }
+    authorizationParams: { redirect_uri: AUTH0_REDIRECT_URI }
   });
 }
 
