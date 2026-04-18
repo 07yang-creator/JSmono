@@ -681,13 +681,16 @@
     .btn-generate:hover { background: #d44e24; }
     .btn-generate:active { transform: scale(0.98); }
 
-    /* ── Preview button ───────────────────────────────────────────── */
+    /* ── Preview button (primary CTA — replaces generate) ───────── */
     .btn-preview {
-      background: none; border: 1.5px solid var(--primary); color: var(--primary);
-      padding: 10px 22px; border-radius: 7px; font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: all 0.18s; display: flex; align-items: center; gap: 8px;
+      background: var(--accent); border: none; color: #fff;
+      padding: 11px 28px; border-radius: 7px; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: background 0.18s, transform 0.1s;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 3px 10px rgba(232,93,47,0.35);
     }
-    .btn-preview:hover { background: var(--primary); color: #fff; }
+    .btn-preview:hover  { background: #d44e24; }
+    .btn-preview:active { transform: scale(0.98); }
 
     /* ── Preview modal ────────────────────────────────────────────── */
     #previewModal {
@@ -709,10 +712,17 @@
     .preview-header-right { display: flex; gap: 10px; align-items: center; }
     .btn-preview-dl {
       background: var(--accent); border: none; color: #fff;
-      padding: 8px 20px; border-radius: 7px; font-size: 13px; font-weight: 700;
-      cursor: pointer; transition: background 0.15s;
+      padding: 10px 28px; border-radius: 7px; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 3px 12px rgba(232,93,47,0.45);
+      animation: dl-pulse 2.2s ease-in-out infinite;
     }
-    .btn-preview-dl:hover { background: #d44e24; }
+    .btn-preview-dl:hover  { background: #d44e24; animation: none; }
+    .btn-preview-dl:active { transform: scale(0.97); }
+    @keyframes dl-pulse {
+      0%,100% { box-shadow: 0 3px 12px rgba(232,93,47,0.45); }
+      50%      { box-shadow: 0 3px 22px rgba(232,93,47,0.75); }
+    }
     .btn-preview-close {
       background: none; border: none; font-size: 24px; line-height: 1;
       cursor: pointer; color: #888; padding: 0 4px; transition: color 0.15s;
@@ -1222,7 +1232,7 @@
           <button class="ctrl-btn active" data-val="all"  >全角</button>
           <button class="ctrl-btn"        data-val="top"  >上のみ</button>
           <button class="ctrl-btn"        data-val="outer">対角線</button>
-          <button class="ctrl-btn"        data-val="tl"   >左上のみ</button>
+          <button class="ctrl-btn"        data-val="br"   >右下のみ</button>
         </div>
       </div>
 
@@ -1740,10 +1750,7 @@
         </div>
         <div class="actions">
           <button type="button" class="btn-save" onclick="saveDraft()">💾 下書き保存</button>
-          <button type="button" class="btn-preview" onclick="previewFlyer()">👁 プレビュー</button>
-          <button type="button" class="btn-generate" onclick="generateFlyer()">
-            <span>🖨</span> チラシPDFを生成
-          </button>
+          <button type="button" class="btn-preview" onclick="previewFlyer()">👁 プレビュー &amp; ダウンロード</button>
         </div>
       </div>
 

@@ -297,10 +297,10 @@ def generate(data: dict, out):
     _csel = data.get('cornerSel', 'all')
     # Corner masks (bl, br, tl, tr) per element
     _MASKS = {
-        'all':   {'nav': (True, False, True, False), 'border': (True, True, True, True)},
-        'top':   {'nav': (False,False, True, False), 'border': (False,False, True, True)},
-        'outer': {'nav': (False,False, True, False), 'border': (True, False,False, True)},
-        'tl':    {'nav': (False,False, True, False), 'border': (False,False, True, False)},
+        'all':   {'nav': (True, False, True, False), 'border': (True,  True,  True,  True )},
+        'top':   {'nav': (False,False, True, False), 'border': (False, False, True,  True )},
+        'outer': {'nav': (False,False, True, False), 'border': (True,  False, False, True )},
+        'br':    {'nav': (False,True,  False,False), 'border': (False, True,  False, False)},
     }
     _cm = _MASKS.get(_csel, _MASKS['all'])
     _nav_mask    = _cm['nav']
