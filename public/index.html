@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Justsalemono — 不動産チラシ自動生成 by JJconnect</title>
+  <title>Justsalemono — 不動産チラシ自動生成 by JJconnect.online</title>
   <style>
     :root {
       --primary:       #1a4fa0;
@@ -54,6 +54,12 @@
       font-size: 18px; font-weight: 900; color: #0e2a5a;
       flex-shrink: 0;
       letter-spacing: -1px;
+    }
+    .lp-logo-img {
+      height: 46px;
+      width: auto;
+      flex-shrink: 0;
+      object-fit: contain;
     }
     .lp-brand { display: flex; flex-direction: column; }
     .lp-brand-main {
@@ -793,13 +799,13 @@
 <div id="landing-page">
 
   <header class="lp-header">
-    <div class="lp-logo-circle">JJ</div>
+    <img src="/logo.png" alt="JJconnect" class="lp-logo-img">
     <div class="lp-brand">
-      <div class="lp-brand-main">JJ<span>connect</span>.jp</div>
+      <div class="lp-brand-main">JJ<span>connect</span>.online</div>
       <div class="lp-brand-sub">JUSTSALEMONO — 不動産チラシ自動生成</div>
     </div>
     <div class="lp-header-right">
-      <a href="https://jjconnect.jp" class="lp-header-link" target="_blank">🌐 jjconnect.jp</a>
+      <a href="https://jjconnect.online" class="lp-header-link" target="_blank">🌐 jjconnect.online</a>
       <button id="btn-login" class="btn-auth-login" onclick="authLogin()">ログイン</button>
       <div id="auth-user">
         <span class="auth-user-name" id="auth-user-name"></span>
@@ -1058,7 +1064,7 @@
   </main>
 
   <footer class="lp-footer">
-    &copy; 2026 <a href="https://jjconnect.jp" target="_blank">JJconnect.jp</a> — Justsalemono v1.0 &nbsp;|&nbsp;
+    &copy; 2026 <a href="https://jjconnect.online" target="_blank">JJconnect.online</a> — Justsalemono v1.0 &nbsp;|&nbsp;
     Powered by ReportLab &amp; Claude AI
   </footer>
 
@@ -1081,9 +1087,12 @@
 
   <!-- Header -->
   <header>
-    <div>
-      <div class="logo">Just<span>Sale</span>mono</div>
-      <div class="tagline">不動産広告チラシ 自動生成システム by JJconnect.jp</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img src="/logo.png" alt="JJconnect" style="height:36px;width:auto;object-fit:contain;">
+      <div>
+        <div class="logo">Just<span>Sale</span>mono</div>
+        <div class="tagline">不動産広告チラシ 自動生成システム by JJconnect.online</div>
+      </div>
     </div>
     <div class="user-area">
       <div class="avatar">田</div>
