@@ -290,25 +290,27 @@ def generate(data: dict, out):
 
     rounded_rect(c, LX, BAND_BOT, LCW, TOP_H, fill=C_NAVY, r=0)   # full-height, square
 
-    # Content is centred within NAV_H (the top sub-zone, above station/price)
+    # Content in NAV_H zone: small top pad, equal gaps between items
     pname_sz = autosize(prop_name, LCW - 6, 22, min_sz=7, bold=True) if prop_name else 0
     pill_bh  = PILL_SZ + pill_pad_y * 2
     addr_sz  = autosize(short, LCW - 6, 16, min_sz=6, bold=True)
 
-    items_h   = ([pname_sz] if prop_name else []) + [pill_bh, addr_sz]
-    content_h = sum(items_h) + NAV_GAP * (len(items_h) - 1)
-    # True visual centre in NAV_H zone
-    nav_center = nav_y + NAV_H / 2
-    first_sz   = items_h[0] if items_h else 0
-    last_sz    = items_h[-1] if items_h else 0
-    cur_y = nav_center + (content_h - 0.72 * first_sz - 0.80 * last_sz) / 2
+    items_h = ([pname_sz] if prop_name else []) + [pill_bh, addr_sz]
+    n_items  = len(items_h)
+    total_items_h = sum(items_h)
+    TOP_PAD  = 8                                    # small fixed top margin
+    remaining = NAV_H - TOP_PAD - total_items_h
+    gap = max(4, remaining / (n_items - 1)) if n_items > 1 else 0
+
+    # Start just below the top of NAV_H zone (CTOP)
+    cur_y = (nav_y + NAV_H) - TOP_PAD              # top of first item (cap level)
 
     if prop_name:
         cur_y -= pname_sz
         draw_bold(c, prop_name, LX + LCW/2, cur_y, pname_sz,
                   color=C_WHITE, align='center')
-        cur_y -= NAV_GAP
-        hline(c, LX + 6, LX + LCW - 6, cur_y + NAV_GAP/2, color=C_AMBER, lw=0.7)
+        cur_y -= gap
+        hline(c, LX + 6, LX + LCW - 6, cur_y + gap/2, color=C_AMBER, lw=0.7)
 
     bw     = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
     cur_y -= pill_bh
@@ -316,7 +318,7 @@ def generate(data: dict, out):
     rounded_rect(c, pill_x, cur_y, bw, pill_bh, fill=C_ACCENT, r=4)
     draw_text(c, prop_type, pill_x + pill_pad_x, cur_y + pill_pad_y,
               PILL_SZ, color=C_WHITE)
-    cur_y -= NAV_GAP
+    cur_y -= gap
 
     cur_y -= addr_sz
     draw_bold(c, short, LX + LCW/2, cur_y, addr_sz, color=C_WHITE, align='center')
@@ -336,9 +338,9 @@ def generate(data: dict, out):
         st_y  = BAND_BOT + PRICE_H + ST_H - (i + 0.5) * st_line_h - ST_FONT * 0.3
         draw_text(c, line_t, LX + LCW/2, st_y, ST_FONT, color=C_WHITE, align='center')
 
-    # ── Price strip — accent overlay at bottom of navy box ───────────────────
-    rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=colors.HexColor('#0d2450'))  # deepest navy
-    hline(c, LX, LX + LCW, BAND_BOT + PRICE_H, color=colors.HexColor('#2a5090'), lw=0.5)
+    # ── Price strip — light background at bottom of top band ─────────────────
+    rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=C_LBLUE)
+    hline(c, LX, LX + LCW, BAND_BOT + PRICE_H, color=colors.HexColor('#b0c8e8'), lw=0.5)
 
     price_raw = data.get('price', '')
     num_part  = price_raw.replace('万円', '').strip()
@@ -354,7 +356,7 @@ def generate(data: dict, out):
     draw_text(c, tax_lbl,
               price_x + txt_width(num_part, price_sz, bold=True) + 4,
               price_y + 2, tax_sz, color=C_ACCENT)
-    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - 8, 5.5, color=colors.HexColor('#8aaacf'))
+    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - 8, 5.5, color=C_MUTED)
 
     rebuild = data.get('rebuild', '')
     if rebuild:
