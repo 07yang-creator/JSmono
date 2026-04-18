@@ -265,11 +265,10 @@ def generate(data: dict, out):
     MID_TOP  = BAND_BOT
     MID_H    = MID_TOP - MID_BOT
 
-    # ── Left column top-band zones — equal thirds of TOP_H ───────────────────
-    SEC_H   = TOP_H / 3              # each section gets one third
-    PRICE_H = SEC_H                  # price strip  (bottom)
-    ST_H    = SEC_H                  # station strip (middle)
-    NAV_H   = TOP_H - PRICE_H - ST_H # nav box      (top) = SEC_H
+    # ── Left column top-band zones — fixed heights for sections 2+3 ─────────
+    PRICE_H = 15 * mm               # price strip  (bottom) — compact
+    ST_H    = 17 * mm               # station strip (middle) — fits 3 lines
+    NAV_H   = TOP_H - PRICE_H - ST_H # nav box      (top) — gets the rest
 
     # Navy box bottom y-coordinate
     nav_y   = BAND_BOT + PRICE_H + ST_H
@@ -327,27 +326,29 @@ def generate(data: dict, out):
     cur_y -= addr_sz
     draw_bold(c, short, LX + LCW/2, cur_y, addr_sz, color=C_WHITE, align='center')
 
-    # ── Section 2: Station strip — equal padding top and bottom ─────────────
-    rect(c, LX, BAND_BOT + PRICE_H, LCW, ST_H,
-         fill=colors.HexColor('#1a3a6e'))
-    hline(c, LX, LX + LCW, BAND_BOT + PRICE_H + ST_H, color=colors.HexColor('#2a5090'), lw=0.5)
+    # ── Section 2: Station strip — white bg, dark text, tight spacing ───────
+    rect(c, LX, BAND_BOT + PRICE_H, LCW, ST_H, fill=C_WHITE)
+    hline(c, LX, LX + LCW, BAND_BOT + PRICE_H + ST_H, color=C_DIV, lw=0.5)
     stations  = data.get('stations', [])[:3]
-    ST_PAD    = 4                               # equal top/bottom padding inside strip
+    ST_PAD    = 3                               # tight top/bottom padding
     n_st      = max(len(stations), 1)
     st_avail  = ST_H - ST_PAD * 2              # drawable height
-    st_line_h = st_avail / n_st
+    # Tighter lines: cap each slice at font + 3pt gap
+    st_line_h = min(st_avail / n_st, ST_FONT + 3)
+    # Centre the whole block of lines vertically
+    block_top = BAND_BOT + PRICE_H + ST_H / 2 + (n_st * st_line_h) / 2
     for i, st in enumerate(stations):
         ln     = st.get('line', '')
         stn    = st.get('station', '').replace('駅', '')
         wk     = st.get('walk', '')
         line_t = truncate_text(f"{ln}　{stn}駅 徒歩{wk}分", LCW - 10, ST_FONT)
-        # Baseline centred in each slice within the padded area
-        st_y   = BAND_BOT + PRICE_H + ST_PAD + st_avail - (i + 0.5) * st_line_h - ST_FONT * 0.26
-        draw_text(c, line_t, LX + LCW/2, st_y, ST_FONT, color=C_WHITE, align='center')
+        # Baseline centred in each line slice
+        st_y   = block_top - (i + 0.5) * st_line_h - ST_FONT * 0.26
+        draw_text(c, line_t, LX + LCW/2, st_y, ST_FONT, color=C_NAVY, align='center')
 
-    # ── Section 3: Price strip — equal padding top and bottom ────────────────
-    rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=C_LBLUE)
-    hline(c, LX, LX + LCW, BAND_BOT + PRICE_H, color=colors.HexColor('#b0c8e8'), lw=0.5)
+    # ── Section 3: Price strip — white bg, dark label, orange price number ──
+    rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=C_WHITE)
+    hline(c, LX, LX + LCW, BAND_BOT + PRICE_H, color=C_DIV, lw=0.5)
 
     price_raw = data.get('price', '')
     num_part  = price_raw.replace('万円', '').strip()
@@ -365,7 +366,7 @@ def generate(data: dict, out):
     draw_text(c, tax_lbl,
               price_x + txt_width(num_part, price_sz, bold=True) + 4,
               price_y + 2, tax_sz, color=C_ACCENT)
-    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - PRICE_PAD - 1, 5.5, color=C_MUTED)
+    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - PRICE_PAD - 1, 5.5, color=C_NAVY)
 
     rebuild = data.get('rebuild', '')
     if rebuild:
