@@ -635,11 +635,18 @@ def generate(data: dict, out):
             if ly - LRH < MID_BOT: break
             ly -= LRH
             bg = C_LBLUE if alt else C_WHITE
-            rect(c, LX,       ly, LLBW, LRH, fill=C_SECBG, stroke=C_DIV, lw=0.3)
-            draw_text(c, lbl, LX+2, ly + LRH*0.22, FSZ, color=C_NAVY)
-            rect(c, LX+LLBW,  ly, LVBW, LRH, fill=bg,     stroke=C_DIV, lw=0.3)
-            draw_text(c, truncate_text(val, LVBW-5, FSZ),
-                      LX+LLBW+3, ly + LRH*0.22, FSZ, color=C_BLACK)
+            if lbl:
+                # Normal two-cell row: label | value
+                rect(c, LX,       ly, LLBW, LRH, fill=C_SECBG, stroke=C_DIV, lw=0.3)
+                draw_text(c, lbl, LX+2, ly + LRH*0.22, FSZ, color=C_NAVY)
+                rect(c, LX+LLBW,  ly, LVBW, LRH, fill=bg,     stroke=C_DIV, lw=0.3)
+                draw_text(c, truncate_text(val, LVBW-5, FSZ),
+                          LX+LLBW+3, ly + LRH*0.22, FSZ, color=C_BLACK)
+            else:
+                # Full-width merged row (e.g. 備考 lines — no label)
+                rect(c, LX, ly, LCW, LRH, fill=bg, stroke=C_DIV, lw=0.3)
+                draw_text(c, truncate_text(val, LCW-5, FSZ),
+                          LX+3, ly + LRH*0.22, FSZ, color=C_BLACK)
 
         elif entry[0] == 'util':
             if ly - LRH < MID_BOT: break
