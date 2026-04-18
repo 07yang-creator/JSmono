@@ -335,8 +335,8 @@ from http.server import BaseHTTPRequestHandler
 class handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
+        self.send_response(204)
         self._cors()
-        self.send_response(200)
         self.end_headers()
 
     def do_POST(self):
@@ -348,8 +348,7 @@ class handler(BaseHTTPRequestHandler):
             # Parse multipart/form-data
             ctype, pdict = cgi.parse_header(content_type)
             if ctype != 'multipart/form-data':
-                self._send(400, b'Expected multipart/form-data')
-                return
+                return self._send(400, b'Expected multipart/form-data')
 
             pdict['boundary'] = bytes(pdict['boundary'], 'utf-8')
             pdict['CONTENT-LENGTH'] = content_length
@@ -357,8 +356,7 @@ class handler(BaseHTTPRequestHandler):
 
             file_data = fields.get('file', [None])[0]
             if not file_data:
-                self._send(400, b'No file field in form data')
-                return
+                return self._send(400, b'No file field in form data')
 
             with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
                 tmp.write(file_data)
@@ -368,21 +366,22 @@ class handler(BaseHTTPRequestHandler):
             os.unlink(tmp_path)
 
             body_out = json.dumps(result, ensure_ascii=False).encode('utf-8')
-            self._cors()
             self.send_response(200)
+            self._cors()
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Content-Length', str(len(body_out)))
             self.end_headers()
             self.wfile.write(body_out)
 
         except Exception as e:
-            msg = str(e).encode('utf-8')
+            import traceback
+            msg = traceback.format_exc().encode('utf-8')
             self._send(500, msg)
 
     def _send(self, code, body: bytes):
-        self._cors()
         self.send_response(code)
-        self.send_header('Content-Type', 'text/plain')
+        self._cors()
+        self.send_header('Content-Type', 'text/plain; charset=utf-8')
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)

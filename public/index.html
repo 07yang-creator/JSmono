@@ -510,6 +510,14 @@
       display: none; margin-top: 12px; background: #e8f5e9; border: 1px solid #a5d6a7;
       border-radius: 6px; padding: 8px 14px; font-size: 13px; color: var(--success);
     }
+    .upload-zone.parsing { opacity: 0.6; pointer-events: none; }
+    .pdf-status {
+      margin-top: 10px; padding: 10px 16px; border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+    }
+    .pdf-status.loading { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
+    .pdf-status.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+    .pdf-status.error   { background: #fdecea; color: #c62828; border: 1px solid #ef9a9a; }
 
     /* ── Photo upload slots ───────────────────────────────────────── */
     .photo-note { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
@@ -1156,8 +1164,9 @@
         <p>フォームが自動入力されます — 内容確認・修正後にチラシを生成してください</p>
         <label class="btn-upload">📂 PDFを選択してアップロード</label>
         <input type="file" id="pdfInput" accept=".pdf" onchange="handleFileSelect(event)">
-        <div class="file-selected" id="fileSelected">✅ <span id="fileName"></span> を読み込みました — 下のフォームを確認してください</div>
+        <div class="file-selected" id="fileSelected">📄 <span id="fileName"></span></div>
       </div>
+      <div id="pdfParseStatus" class="pdf-status" style="display:none;"></div>
     </div>
 
     <div class="divider">STEP 2 — 物件情報を入力・確認する</div>
@@ -2054,20 +2063,55 @@ zone.addEventListener('drop', e => {
 });
 
 function parsePDF(file) {
+  const zone   = document.getElementById('uploadZone');
+  const status = document.getElementById('pdfParseStatus');
+
+  // Show loading state
+  zone.classList.add('parsing');
+  if (status) { status.textContent = '📄 PDFを解析中…'; status.style.display = 'block'; status.className = 'pdf-status loading'; }
+
   const fd = new FormData();
   fd.append('file', file);
   fetch('/api/parse-pdf', { method: 'POST', body: fd })
-    .then(r => r.json()).then(data => autofillForm(data))
-    .catch(err => console.warn('PDF parse error (demo mode):', err));
+    .then(r => {
+      if (!r.ok) return r.text().then(t => { throw new Error(`サーバーエラー ${r.status}: ${t}`); });
+      return r.json();
+    })
+    .then(data => {
+      autofillForm(data);
+      const count = Object.keys(data).filter(k => data[k] && k !== 'stations' && k !== 'nearby').length;
+      if (status) { status.textContent = `✅ ${count}項目を自動入力しました。内容を確認してください。`; status.className = 'pdf-status success'; }
+    })
+    .catch(err => {
+      console.error('PDF parse error:', err);
+      if (status) { status.textContent = `⚠️ 読み取りエラー: ${err.message}`; status.className = 'pdf-status error'; }
+    })
+    .finally(() => {
+      zone.classList.remove('parsing');
+    });
 }
 
 function autofillForm(data) {
+  // Clear existing dynamic rows first
+  document.querySelectorAll('.station-row').forEach(r => r.remove());
+  document.querySelectorAll('.nearby-row').forEach(r => r.remove());
+  stationCount = 0; nearbyCount = 0;
+
   for (const [key, val] of Object.entries(data)) {
-    const el = document.querySelector(`[name="${key}"]`);
-    if (el) el.value = val;
+    if (key === 'stations' || key === 'nearby') continue;
+    const el = document.querySelector(`#propertyForm [name="${key}"]`);
+    if (el && val !== undefined && val !== null) el.value = val;
   }
-  if (data.stations) data.stations.forEach(s => addStation(s.line, s.station, s.walk));
-  if (data.nearby)   data.nearby.forEach(n => addNearby(n.name, n.walk));
+  if (data.stations && data.stations.length) {
+    data.stations.forEach(s => addStation(s.line, s.station, s.walk));
+  } else {
+    addStation(); addStation(); // default empty rows
+  }
+  if (data.nearby && data.nearby.length) {
+    data.nearby.forEach(n => addNearby(n.name, n.walk));
+  } else {
+    addNearby();
+  }
 }
 
 document.getElementById('landArea')?.addEventListener('input', function() {
