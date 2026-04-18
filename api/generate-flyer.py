@@ -408,75 +408,89 @@ def generate(data: dict, out):
             # Q1-bottom: K3 内観写真 replaces the H/I info box when uploaded
             draw_photo(c, RX1, MID_BOT, HALF, MID_H, k3_img, '内　観', '（内観写真）')
         else:
-            # Q1-bottom: H/I 周辺環境・学区 info box
-            rect(c, RX1, MID_BOT, HALF, MID_H,
-                 fill=colors.HexColor('#f0f5ff'), stroke=C_DIV, lw=0.5)
+            # Q1-bottom: poster-style info panel
+            rect(c, RX1, MID_BOT, HALF, MID_H, fill=C_WHITE, stroke=C_DIV, lw=0.5)
 
-            q2y    = MID_BOT + MID_H - 4
-            qpad   = 4
-            qiw    = HALF - qpad * 2
+            BOX_PAD = 12   # equal margin from all 4 boundaries
 
-            # G — 借地条件
-            if lease or grent:
-                if q2y - 11 >= MID_BOT:
-                    q2y -= 11
-                    rect(c, RX1, q2y, HALF, 11, fill=C_NAVY)
-                    draw_bold(c, '借地条件', RX1+qpad, q2y+3, 6.5, color=C_WHITE)
-                if grent and q2y - 10 >= MID_BOT:
-                    q2y -= 10
-                    draw_text(c, f'地代　{grent}', RX1+qpad, q2y+2, 6.5, color=C_BLACK)
-                if lease and q2y - 9 >= MID_BOT:
-                    q2y -= 9
-                    draw_text(c, truncate_text(lease, qiw, 6.5), RX1+qpad, q2y+2, 6.5, color=C_BLACK)
-                if (status or handover) and q2y - 10 >= MID_BOT:
-                    q2y -= 2
-                    rect(c, RX1, q2y-10, HALF, 10, fill=C_MBLUE)
-                    draw_text(c, f'現況:{status}　引渡:{handover}', RX1+qpad, q2y-7, 6, color=C_NAVY)
-                    q2y -= 12
-                q2y -= 4
+            # ── Collect display sections ──────────────────────────────────────
+            # Each entry: {'title': str, 'rows': [(left_text, right_text), ...]}
+            poster_secs = []
+            INNER_W = HALF - BOX_PAD * 2
 
-            # H — 周辺環境 (flowing text)
             nearby = data.get('nearby', [])
-            if nearby and q2y - 11 >= MID_BOT:
-                q2y -= 11
-                rect(c, RX1, q2y, HALF, 11, fill=C_NAVY)
-                draw_bold(c, '■ 周辺環境', RX1+qpad, q2y+3, 6.5, color=C_WHITE)
 
-            if nearby:
-                nb_sz   = 7; line_h = nb_sz + 3; SEP = '　・　'
-                avail_w = HALF - qpad * 2
-                parts   = [f"{nb.get('name','')}({nb.get('walk','')})"
-                           for nb in nearby if nb.get('name')]
-                nb_lines = []; cur = ''
-                for p in parts:
-                    chunk = (SEP if cur else '') + p
-                    if cur and txt_width(cur+chunk, nb_sz) > avail_w:
-                        nb_lines.append(cur); cur = p
-                    else: cur += chunk
-                if cur: nb_lines.append(cur)
-                for line in nb_lines[:5]:
-                    if q2y - line_h < MID_BOT: break
-                    q2y -= line_h
-                    draw_text(c, line, RX1+qpad, q2y+2, nb_sz, color=C_BLACK)
+            # G — 借地条件 / 現況
+            if lease or grent or status or handover:
+                grows = []
+                if grent:
+                    grows.append((f'地代　{grent}', ''))
+                if lease:
+                    grows.append((truncate_text(lease, INNER_W * 0.80, 8), ''))
+                if status or handover:
+                    grows.append((f'現況：{status}　　引渡：{handover}', ''))
+                if grows:
+                    poster_secs.append({'title': '借地条件', 'rows': grows})
+
+            # H — 周辺環境
+            nb_rows = [(nb.get('name', ''),
+                        f"徒歩約{nb.get('walk', '')}" if nb.get('walk') else '')
+                       for nb in nearby if nb.get('name')]
+            if nb_rows:
+                poster_secs.append({'title': '周辺環境', 'rows': nb_rows})
 
             # I — 学区
-            school_lines = []
+            school_rows = []
             if data.get('elemSchool'):
-                school_lines.append(('小', data['elemSchool'], data.get('elemSchoolDist','')))
+                school_rows.append((f"小学校：{data['elemSchool']}",
+                                    f"徒歩{data.get('elemSchoolDist','')}"))
             if data.get('juniorSchool'):
-                school_lines.append(('中', data['juniorSchool'], data.get('juniorSchoolDist','')))
-            if school_lines and q2y - 11 >= MID_BOT:
-                q2y -= 15
-                rect(c, RX1, q2y, HALF, 11, fill=C_NAVY)
-                draw_bold(c, '■ 学区', RX1+qpad, q2y+3, 6.5, color=C_WHITE)
-            for i, (tag, nm, dist) in enumerate(school_lines):
-                if q2y - 10 < MID_BOT: break
-                q2y -= 10
-                bg = C_LBLUE if i % 2 else C_WHITE
-                rect(c, RX1, q2y, HALF, 10, fill=bg, stroke=C_DIV, lw=0.2)
-                draw_text(c, truncate_text(f'{tag}:  {nm}', qiw*.62, 6.5),
-                          RX1+qpad, q2y+2, 6.5, color=C_BLACK)
-                draw_text(c, dist, RX1+HALF-qpad, q2y+2, 6, color=C_MUTED, align='right')
+                school_rows.append((f"中学校：{data['juniorSchool']}",
+                                    f"徒歩{data.get('juniorSchoolDist','')}"))
+            if school_rows:
+                poster_secs.append({'title': '学区', 'rows': school_rows})
+
+            # ── Auto-size fonts to fill the space ────────────────────────────
+            n_secs = len(poster_secs)
+            n_rows = sum(len(s['rows']) for s in poster_secs)
+
+            if n_secs > 0:
+                avail_h = MID_H - BOX_PAD * 2
+                # Units: each row = 1.0, each title slot = 1.5, inter-sec gap = 0.6
+                total_u = n_rows + n_secs * 1.5 + max(0, n_secs - 1) * 0.6
+                row_h   = min(avail_h / max(total_u, 1), 26)
+                row_h   = max(row_h, 10)
+
+                item_sz  = max(7, min(int(row_h * 0.68), 15))
+                title_sz = min(item_sz + 2, 14)
+                title_slot = row_h * 1.5      # space reserved per section title
+                sec_gap    = row_h * 0.6       # gap between sections
+
+                cy = MID_BOT + MID_H - BOX_PAD   # work top-down
+
+                for si, sec in enumerate(poster_secs):
+                    # Section title + underline
+                    cy -= title_sz + 2
+                    draw_bold(c, sec['title'],
+                              RX1 + BOX_PAD, cy, title_sz, color=C_NAVY)
+                    cy -= 3
+                    hline(c, RX1 + BOX_PAD, RX1 + HALF - BOX_PAD, cy + 1.5,
+                          color=C_STEELBL, lw=0.8)
+                    cy -= (title_slot - title_sz - 5)  # gap below underline
+
+                    # Rows
+                    for (ltext, rtext) in sec['rows']:
+                        if ltext:
+                            draw_text(c, truncate_text(ltext, INNER_W * 0.74, item_sz),
+                                      RX1 + BOX_PAD, cy, item_sz, color=C_BLACK)
+                        if rtext:
+                            draw_text(c, rtext, RX1 + HALF - BOX_PAD, cy,
+                                      item_sz, color=C_MUTED, align='right')
+                        cy -= row_h
+
+                    # Gap between sections
+                    if si < n_secs - 1:
+                        cy -= sec_gap
 
     # ── Promo ribbon (auto-scale) ─────────────────────────────────────────────
     promo = data.get('specialPromo', '').strip()
