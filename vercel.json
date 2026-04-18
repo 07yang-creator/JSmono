@@ -1,7 +1,10 @@
 {
   "framework": null,
   "outputDirectory": "public",
+  "buildCommand": "python3 scripts/download_fonts.py",
   "env": {
-    "FONT_PATH": "/var/task/fonts/DroidSansFallbackFull.ttf"
+    "FONT_PATH": "/var/task/fonts/DroidSansFallbackFull.ttf",
+    "NOTO_REGULAR_PATH": "/var/task/fonts/NotoSansJP-Regular.ttf",
+    "NOTO_BOLD_PATH": "/var/task/fonts/NotoSansJP-Bold.ttf"
   }
 }

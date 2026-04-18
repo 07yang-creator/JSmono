@@ -313,6 +313,50 @@
       transform: rotate(-8deg);
       display: inline-block;
     }
+    /* ── Banner style picker ── */
+    .banner-style-row {
+      display: flex; gap: 8px; margin-top: 12px;
+    }
+    .banner-opt {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
+      padding: 9px 6px 7px;
+      border: 2px solid var(--border); border-radius: 10px;
+      background: #fff; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      user-select: none;
+    }
+    .banner-opt:hover { border-color: var(--accent); color: var(--accent); }
+    .banner-opt.active {
+      border-color: var(--accent); background: #fff5f2; color: var(--accent);
+    }
+    .banner-opt-icon {
+      width: 40px; height: 40px; position: relative; overflow: hidden;
+    }
+    /* Ribbon icon — diagonal band */
+    .bico-ribbon {
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg,
+        transparent 30%, var(--accent) 30%, var(--accent) 70%, transparent 70%);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    /* Stamp icon — circle */
+    .bico-stamp {
+      position: absolute; inset: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent);
+    }
+    /* Flag icon — rectangle with V-notch */
+    .bico-flag {
+      position: absolute;
+      left: 50%; top: 0;
+      transform: translateX(-50%);
+      width: 28px; height: 36px;
+      background: var(--accent);
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%);
+    }
 
     /* ── Coming soon section ── */
     .lp-coming-soon {
@@ -1083,7 +1127,23 @@
           <div class="promo-preview">
             <span style="color:#999;">プレビュー：</span>
             <span class="promo-stamp" id="promo-stamp-preview">価格改定！</span>
-            <span style="font-size:11px; color:var(--muted);">最大8文字 — チラシ右上に斜めで配置されます</span>
+            <span style="font-size:11px; color:var(--muted);">最大8文字 — チラシ右上にバナーを配置</span>
+          </div>
+          <!-- Banner style picker -->
+          <div style="margin-top:10px; font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.05em;">バナースタイル</div>
+          <div class="banner-style-row">
+            <div class="banner-opt active" onclick="_setBannerStyle(this,'ribbon')">
+              <div class="banner-opt-icon"><div class="bico-ribbon"></div></div>
+              リボン
+            </div>
+            <div class="banner-opt" onclick="_setBannerStyle(this,'stamp')">
+              <div class="banner-opt-icon"><div class="bico-stamp"></div></div>
+              スタンプ
+            </div>
+            <div class="banner-opt" onclick="_setBannerStyle(this,'flag')">
+              <div class="banner-opt-icon"><div class="bico-flag"></div></div>
+              フラッグ
+            </div>
           </div>
         </div>
       </div>
@@ -1188,6 +1248,15 @@
         </div>
       </div>
 
+      <!-- Row: Nav box font -->
+      <div class="style-row">
+        <span class="style-label">左上フォント</span>
+        <div class="ctrl-group" id="navFontBtns">
+          <button class="ctrl-btn active" data-val="droid" title="標準フォント（日本語対応）">標準</button>
+          <button class="ctrl-btn"        data-val="noto"  title="Noto Sans JP（要デプロイ）">Noto Sans JP</button>
+        </div>
+      </div>
+
       <!-- Row 3: Size + which corners (hidden when square) -->
       <div class="style-row" id="cornerExtraRow">
         <span class="style-label">サイズ</span>
@@ -1264,6 +1333,7 @@
       <input type="hidden" name="templateId" id="f-templateId" value="1">
       <input type="hidden" name="templateVariant" id="f-templateVariant" value="A">
       <input type="hidden" name="specialPromo" id="f-specialPromo" value="">
+      <input type="hidden" name="bannerStyle" id="f-bannerStyle" value="ribbon">
 
       <div class="form-grid">
 
@@ -2073,6 +2143,14 @@ function selectVariant(v) {
   updatePhotoReq();
 }
 
+let _bannerStyle = 'ribbon';
+
+function _setBannerStyle(el, style) {
+  _bannerStyle = style;
+  document.querySelectorAll('.banner-opt').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+}
+
 function togglePromo(checkbox) {
   document.getElementById('promo-input-wrap').classList.toggle('visible', checkbox.checked);
 }
@@ -2095,6 +2173,7 @@ function startApp() {
   document.getElementById('f-templateId').value      = _selectedTemplate;
   document.getElementById('f-templateVariant').value = _selectedVariant;
   document.getElementById('f-specialPromo').value    = promoEnabled ? promoText : '';
+  document.getElementById('f-bannerStyle').value     = _bannerStyle;
   if (buildingName) document.getElementById('f-propertyName').value = buildingName;
 
   const variantLabels = { A: '標準（写真2枚+地図+周辺環境）', B: '写真重視（写真4枚・周辺環境なし）' };
@@ -2329,6 +2408,7 @@ let _style = {
   cornerStyle: 'square',
   cornerSize:  'medium',
   cornerSel:   'all',
+  navFont:     'droid',
 };
 
 // Render palette chips
@@ -2371,6 +2451,7 @@ function _initCtrlGroup(groupId, stateKey) {
 _initCtrlGroup('cornerStyleBtns', 'cornerStyle');
 _initCtrlGroup('cornerSizeBtns',  'cornerSize');
 _initCtrlGroup('cornerSelBtns',   'cornerSel');
+_initCtrlGroup('navFontBtns',     'navFont');
 
 // ── Preset save / load (stored in Auth0 user_metadata) ───────────────────
 const MAX_PRESETS = 3;
@@ -2407,8 +2488,8 @@ function _loadPreset(i) {
       c.classList.toggle('active', c.dataset.palette === _style.palette);
     });
   });
-  ['cornerStyleBtns','cornerSizeBtns','cornerSelBtns'].forEach((gid, gi) => {
-    const key = ['cornerStyle','cornerSize','cornerSel'][gi];
+  ['cornerStyleBtns','cornerSizeBtns','cornerSelBtns','navFontBtns'].forEach((gid, gi) => {
+    const key = ['cornerStyle','cornerSize','cornerSel','navFont'][gi];
     document.getElementById(gid).querySelectorAll('.ctrl-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.val === _style[key]);
     });
@@ -2531,6 +2612,7 @@ function _collectAndValidate() {
   raw.cornerStyle = _style.cornerStyle;
   raw.cornerSize  = _style.cornerSize;
   raw.cornerSel   = _style.cornerSel;
+  raw.navFont     = _style.navFont;
   return raw;
 }
 

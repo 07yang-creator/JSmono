@@ -39,40 +39,72 @@ from reportlab.lib.utils import ImageReader
 from http.server import BaseHTTPRequestHandler
 
 # ── Font ──────────────────────────────────────────────────────────────────────
+_FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'fonts')
+
 def _resolve_font():
     for p in [
         os.environ.get('FONT_PATH', ''),
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                     'fonts', 'DroidSansFallbackFull.ttf'),
+        os.path.join(_FONT_DIR, 'DroidSansFallbackFull.ttf'),
         '/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf',
     ]:
         if p and os.path.exists(p):
             return p
     raise FileNotFoundError('DroidSansFallbackFull.ttf not found.')
 
-JP_FONT = 'JP'
-LA_FONT = 'Helvetica'
-LA_BOLD = 'Helvetica-Bold'
+def _resolve_noto(bold=False):
+    """Return path to Noto Sans JP Regular/Bold, or None if not available."""
+    suffix = 'Bold' if bold else 'Regular'
+    for p in [
+        os.environ.get('NOTO_BOLD_PATH' if bold else 'NOTO_REGULAR_PATH', ''),
+        os.path.join(_FONT_DIR, f'NotoSansJP-{suffix}.ttf'),
+    ]:
+        if p and os.path.exists(p) and os.path.getsize(p) > 100_000:
+            return p
+    return None
+
+JP_FONT      = 'JP'          # DroidSansFallback — full document body
+LA_FONT      = 'Helvetica'
+LA_BOLD      = 'Helvetica-Bold'
+# Noto Sans JP — nav box (upper-left) optional font; registered lazily per request
+NOTO_REG     = 'NotoJP'
+NOTO_BOLD_F  = 'NotoJP-Bold'
+_noto_available = False      # updated at module load below
+
 pdfmetrics.registerFont(TTFont(JP_FONT, _resolve_font()))
+
+# Register Noto Sans JP if the font files exist
+_noto_reg_path  = _resolve_noto(bold=False)
+_noto_bold_path = _resolve_noto(bold=True)
+if _noto_reg_path and _noto_bold_path:
+    pdfmetrics.registerFont(TTFont(NOTO_REG,    _noto_reg_path))
+    pdfmetrics.registerFont(TTFont(NOTO_BOLD_F, _noto_bold_path))
+    _noto_available = True
 
 # ── Text helpers ──────────────────────────────────────────────────────────────
 def is_latin(ch): return ord(ch) <= 0x00FF
 
-def txt_width(s, size, bold=False):
+def _jp_font(bold=False, nav_font='droid'):
+    """Return the correct JP font name given user's nav_font choice."""
+    if nav_font == 'noto' and _noto_available:
+        return NOTO_BOLD_F if bold else NOTO_REG
+    return JP_FONT
+
+def txt_width(s, size, bold=False, nav_font='droid'):
     return sum(pdfmetrics.stringWidth(ch,
-               (LA_BOLD if bold else LA_FONT) if is_latin(ch) else JP_FONT,
+               (LA_BOLD if bold else LA_FONT) if is_latin(ch) else _jp_font(bold, nav_font),
                size) for ch in s)
 
-def draw_text(c, s, x, y, size, color=None, align='left', bold=False):
+def draw_text(c, s, x, y, size, color=None, align='left', bold=False, nav_font='droid'):
     if not s: return
     if color: c.setFillColor(color)
+    jpf = _jp_font(bold, nav_font)
     if align in ('center', 'right'):
-        w = txt_width(s, size, bold)
+        w = sum(pdfmetrics.stringWidth(ch, (LA_BOLD if bold else LA_FONT) if is_latin(ch) else jpf, size) for ch in s)
         x = (x - w/2) if align == 'center' else (x - w)
     cur_x, run, run_lat = x, '', None
     def flush(seg, lat, cx):
         if not seg: return cx
-        f = (LA_BOLD if lat else JP_FONT) if bold else (LA_FONT if lat else JP_FONT)
+        f = (LA_BOLD if lat else jpf) if bold else (LA_FONT if lat else jpf)
         c.setFont(f, size); c.drawString(cx, y, seg)
         return cx + pdfmetrics.stringWidth(seg, f, size)
     for ch in s:
@@ -82,8 +114,8 @@ def draw_text(c, s, x, y, size, color=None, align='left', bold=False):
         else: run += ch
     flush(run, run_lat, cur_x)
 
-def draw_bold(c, s, x, y, size, color=None, align='left'):
-    draw_text(c, s, x, y, size, color, align, bold=True)
+def draw_bold(c, s, x, y, size, color=None, align='left', nav_font='droid'):
+    draw_text(c, s, x, y, size, color, align, bold=True, nav_font=nav_font)
 
 def _draw_rotated_text(c, s, x, y, size):
     if not s: return
@@ -107,10 +139,10 @@ def truncate_text(s, max_w, size, bold=False, ellipsis='…'):
         if txt_width(cand, size, bold) <= max_w: return cand
     return ellipsis
 
-def autosize(s, max_w, max_sz, min_sz=6, bold=False):
+def autosize(s, max_w, max_sz, min_sz=6, bold=False, nav_font='droid'):
     """Return the largest font size ≤ max_sz where text fits in max_w."""
     for sz in range(max_sz, min_sz - 1, -1):
-        if txt_width(s, sz, bold) <= max_w: return sz
+        if txt_width(s, sz, bold, nav_font=nav_font) <= max_w: return sz
     return min_sz
 
 # ── Colour palettes ──────────────────────────────────────────────────────────
@@ -328,6 +360,10 @@ def generate(data: dict, out):
     _c_info_dim  = colors.HexColor('#8aa8cc') if not _light_theme else C_TEXT_ON_PRI
     _c_info_dept = colors.HexColor('#aabbd4') if not _light_theme else C_TEXT_ON_PRI
 
+    _nav_font = data.get('navFont', 'droid')   # 'droid' | 'noto'
+    if _nav_font == 'noto' and not _noto_available:
+        _nav_font = 'droid'               # graceful fallback if font not installed
+
     _cs  = data.get('cornerStyle', 'square')          # 'square' | 'round' | 'cut'
     _cr  = {'small': 4, 'medium': 8, 'large': 14}.get(data.get('cornerSize', 'medium'), 8)
     _csel = data.get('cornerSel', 'all')
@@ -412,9 +448,9 @@ def generate(data: dict, out):
     INNER_GAP = 5      # gap between pill and address
     LINE_GAP  = 12     # breathing room for the amber divider line (6pt above + 6pt below)
 
-    pname_sz = autosize(prop_name, LCW - 8, 20, min_sz=7, bold=True) if prop_name else 0
+    pname_sz = autosize(prop_name, LCW - 8, 20, min_sz=7, bold=True, nav_font=_nav_font) if prop_name else 0
     pill_bh  = PILL_SZ + pill_pad_y * 2
-    addr_sz  = autosize(short, LCW - 8, 14, min_sz=6, bold=True)
+    addr_sz  = autosize(short, LCW - 8, 14, min_sz=6, bold=True, nav_font=_nav_font)
 
     # Group height: name→line uses LINE_GAP, pill→addr uses INNER_GAP
     if prop_name:
@@ -431,20 +467,21 @@ def generate(data: dict, out):
     if prop_name:
         cur_y -= pname_sz
         draw_bold(c, prop_name, LX + LCW/2, cur_y, pname_sz,
-                  color=C_TEXT_ON_PRI, align='center')
+                  color=C_TEXT_ON_PRI, align='center', nav_font=_nav_font)
         cur_y -= LINE_GAP
         hline(c, LX + 8, LX + LCW - 8, cur_y + LINE_GAP/2, color=C_AMBER, lw=0.8)
 
-    bw     = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
+    bw     = txt_width(prop_type, PILL_SZ, nav_font=_nav_font) + pill_pad_x * 2
     cur_y -= pill_bh
     pill_x = LX + (LCW - bw) / 2
     rounded_rect(c, pill_x, cur_y, bw, pill_bh, fill=C_ACCENT, r=4)
     draw_text(c, prop_type, pill_x + pill_pad_x, cur_y + pill_pad_y,
-              PILL_SZ, color=C_WHITE)
+              PILL_SZ, color=C_WHITE, nav_font=_nav_font)
     cur_y -= INNER_GAP
 
     cur_y -= addr_sz
-    draw_bold(c, short, LX + LCW/2, cur_y, addr_sz, color=C_TEXT_ON_PRI, align='center')
+    draw_bold(c, short, LX + LCW/2, cur_y, addr_sz, color=C_TEXT_ON_PRI, align='center',
+              nav_font=_nav_font)
 
     # ── Section 2: Station strip — white bg, dark text, tight spacing ───────
     rect(c, LX, BAND_BOT + PRICE_H, LCW, ST_H, fill=C_WHITE)
@@ -614,48 +651,93 @@ def generate(data: dict, out):
                     if si < n_secs - 1:
                         cy -= sec_gap
 
-    # ── Promo ribbon — upper-right corner diagonal banner ────────────────────
-    promo = data.get('specialPromo', '').strip()[:8]   # hard cap 8 chars
+    # ── Promo banner — upper-right corner, 3 style choices ──────────────────
+    promo       = data.get('specialPromo', '').strip()[:8]
+    banner_style = data.get('bannerStyle', 'ribbon')   # 'ribbon' | 'stamp' | 'flag'
     if promo:
-        cx_r = W - MX          # right edge of content area
-        cy_t = CTOP            # top edge
-        # Font size: large enough to read, auto-shrink only if text is very wide
+        cx_r = W - MX    # right edge of content area
+        cy_t = CTOP      # top edge
         rsz  = 13.0
         ptw  = txt_width(promo, rsz, bold=True)
-        # Band width = font height + generous top/bottom padding
-        bw2  = int(rsz * 2.2)                          # ≈ 28–30pt
-        # Diagonal arm: text travels at 45° so projected width = ptw/√2;
-        # add half-band on each side so text sits centred in the ribbon
-        a    = int(ptw / math.sqrt(2)) + bw2 + 16      # +16pt margin
-        a    = max(a, 80)                               # minimum visible size
-        # Four corners of the ribbon parallelogram
-        P1 = (cx_r - a,        cy_t)
-        P2 = (cx_r - a + bw2,  cy_t)
-        P3 = (cx_r,            cy_t - a + bw2)
-        P4 = (cx_r,            cy_t - a)
         c.saveState()
-        # Clip to the right photo area so ribbon never bleeds into left column
+        # Clip to right photo area only
         cl = c.beginPath(); cl.rect(RX, CBOT, RW, CONTENT_H); c.clipPath(cl, stroke=0)
-        # Drop shadow
-        c.setFillColor(colors.HexColor('#00000033'))
-        sh = c.beginPath()
-        sh.moveTo(P1[0]+3, P1[1]-3); sh.lineTo(P2[0]+3, P2[1]-3)
-        sh.lineTo(P3[0]+3, P3[1]-3); sh.lineTo(P4[0]+3, P4[1]-3)
-        sh.close(); c.drawPath(sh, fill=1, stroke=0)
-        # Ribbon fill (accent colour)
-        c.setFillColor(C_ACCENT)
-        pr = c.beginPath()
-        pr.moveTo(*P1); pr.lineTo(*P2); pr.lineTo(*P3); pr.lineTo(*P4)
-        pr.close(); c.drawPath(pr, fill=1, stroke=0)
-        # Gold edge lines
-        c.setStrokeColor(C_AMBER); c.setLineWidth(1.0)
-        c.line(*P1, *P4); c.line(*P2, *P3)
-        # Text centred on ribbon
-        mid_x = (P1[0] + P3[0]) / 2
-        mid_y = (P1[1] + P3[1]) / 2
-        c.translate(mid_x, mid_y); c.rotate(-45)
-        c.setFillColor(C_WHITE)
-        _draw_rotated_text(c, promo, -ptw / 2, -rsz / 2, rsz)
+
+        if banner_style == 'ribbon':
+            # ── Diagonal parallelogram band ──────────────────────────────────
+            bw2 = int(rsz * 2.2)
+            a   = max(int(ptw / math.sqrt(2)) + bw2 + 16, 80)
+            P1  = (cx_r - a,       cy_t)
+            P2  = (cx_r - a + bw2, cy_t)
+            P3  = (cx_r,           cy_t - a + bw2)
+            P4  = (cx_r,           cy_t - a)
+            c.setFillColor(colors.HexColor('#00000033'))
+            sh = c.beginPath()
+            sh.moveTo(P1[0]+3,P1[1]-3); sh.lineTo(P2[0]+3,P2[1]-3)
+            sh.lineTo(P3[0]+3,P3[1]-3); sh.lineTo(P4[0]+3,P4[1]-3)
+            sh.close(); c.drawPath(sh, fill=1, stroke=0)
+            c.setFillColor(C_ACCENT)
+            pr = c.beginPath()
+            pr.moveTo(*P1); pr.lineTo(*P2); pr.lineTo(*P3); pr.lineTo(*P4)
+            pr.close(); c.drawPath(pr, fill=1, stroke=0)
+            c.setStrokeColor(C_AMBER); c.setLineWidth(1.0)
+            c.line(*P1, *P4); c.line(*P2, *P3)
+            mid_x = (P1[0] + P3[0]) / 2
+            mid_y = (P1[1] + P3[1]) / 2
+            c.translate(mid_x, mid_y); c.rotate(-45)
+            c.setFillColor(C_WHITE)
+            _draw_rotated_text(c, promo, -ptw / 2, -rsz / 2, rsz)
+
+        elif banner_style == 'stamp':
+            # ── Circular stamp in upper-right ────────────────────────────────
+            radius  = max(ptw / 2 + 14, rsz + 14)
+            margin  = 10
+            scx = cx_r - radius - margin
+            scy = cy_t - radius - margin
+            # Shadow
+            c.setFillColor(colors.HexColor('#00000033'))
+            c.circle(scx + 3, scy - 3, radius, fill=1, stroke=0)
+            # Fill circle
+            c.setFillColor(C_ACCENT)
+            c.circle(scx, scy, radius, fill=1, stroke=0)
+            # Inner dashed ring (stamp effect)
+            c.setStrokeColor(C_AMBER); c.setLineWidth(1.2)
+            c.setDash([3, 3]); c.circle(scx, scy, radius - 5, fill=0, stroke=1)
+            c.setDash([])
+            # Text centred, slight tilt
+            c.translate(scx, scy); c.rotate(-15)
+            c.setFillColor(C_WHITE)
+            _draw_rotated_text(c, promo, -ptw / 2, -rsz / 2, rsz)
+
+        elif banner_style == 'flag':
+            # ── Vertical flag tab hanging from top-right corner ──────────────
+            pad  = 10
+            fh   = int(rsz * 2.2) + pad * 2   # total flag height
+            fw   = max(int(ptw) + pad * 2, 60) # flag width
+            notch = int(fh * 0.38)              # depth of bottom V-notch
+            fx   = cx_r - fw                   # left edge of flag
+            fy   = cy_t - fh                   # bottom edge (before notch)
+            # Shadow
+            c.setFillColor(colors.HexColor('#00000033'))
+            sh = c.beginPath()
+            sh.moveTo(fx+3, cy_t-3); sh.lineTo(cx_r+3, cy_t-3)
+            sh.lineTo(cx_r+3, fy-3); sh.lineTo(fx+fw/2+3, fy+notch-3)
+            sh.lineTo(fx+3, fy-3); sh.close(); c.drawPath(sh, fill=1, stroke=0)
+            # Flag fill
+            c.setFillColor(C_ACCENT)
+            fl = c.beginPath()
+            fl.moveTo(fx, cy_t); fl.lineTo(cx_r, cy_t)
+            fl.lineTo(cx_r, fy); fl.lineTo(fx + fw/2, fy + notch)
+            fl.lineTo(fx, fy); fl.close()
+            c.drawPath(fl, fill=1, stroke=0)
+            # Gold border
+            c.setStrokeColor(C_AMBER); c.setLineWidth(1.0)
+            c.drawPath(fl, fill=0, stroke=1)
+            # Text centred horizontally and vertically in flag body
+            tx = fx + fw / 2
+            ty = fy + (fh - notch - rsz) / 2 + (fh - notch) * 0.05
+            draw_bold(c, promo, tx, ty, rsz, color=C_WHITE, align='center')
+
         c.restoreState()
 
     # ── Outer content border (styled corners) ────────────────────────────────
