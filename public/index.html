@@ -1655,12 +1655,16 @@ async function initAuth() {
     _auth0Client = new window.auth0.Auth0Client({
       domain: AUTH0_DOMAIN,
       clientId: AUTH0_CLIENT_ID,
-      authorizationParams: { redirect_uri: AUTH0_REDIRECT_URI },
-      cacheLocation: 'memory'
+      authorizationParams: {
+        redirect_uri: AUTH0_REDIRECT_URI,
+        scope: 'openid profile email offline_access'
+      },
+      cacheLocation: 'localstorage',
+      useRefreshTokens: true
     });
 
-    // Handle the redirect callback ONCE — check URL before the SDK can consume it
     if (window.location.search.includes('code=') && window.location.search.includes('state=')) {
+      // ── Fresh redirect from Auth0 login ──────────────────────────────
       console.log('[Auth0] handling redirect callback…');
       try {
         await _auth0Client.handleRedirectCallback();
@@ -1668,8 +1672,17 @@ async function initAuth() {
       } catch (cbErr) {
         console.error('[Auth0] callback failed:', cbErr.message);
       }
-      // Always clean the URL regardless of outcome
+      // Always clean URL regardless of outcome
       window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      // ── Returning visitor — restore session from cache / silent auth ──
+      try {
+        await _auth0Client.checkSession();
+        console.log('[Auth0] session restored');
+      } catch (sessErr) {
+        // Silently ignore — user simply isn't logged in
+        console.log('[Auth0] no active session:', sessErr.message);
+      }
     }
 
     await _applyAuthState();
@@ -1679,7 +1692,9 @@ async function initAuth() {
 }
 
 async function _applyAuthState() {
-  const isAuth = await _auth0Client.isAuthenticated();
+  let isAuth = false;
+  try { isAuth = await _auth0Client.isAuthenticated(); } catch (_) {}
+
   // Header
   document.getElementById('btn-login').style.display  = isAuth ? 'none' : '';
   document.getElementById('auth-user').style.display  = isAuth ? 'flex' : 'none';
@@ -1692,10 +1707,22 @@ async function _applyAuthState() {
   });
 
   if (isAuth) {
-    const user  = await _auth0Client.getUser();
-    _authToken  = await _auth0Client.getTokenSilently();
-    document.getElementById('auth-user-name').textContent = user.name || user.email || '';
-    await _loadProfileFromAuth0();
+    try {
+      const user = await _auth0Client.getUser();
+      _authToken = await _auth0Client.getTokenSilently();
+      document.getElementById('auth-user-name').textContent = user.name || user.email || '';
+      await _loadProfileFromAuth0();
+    } catch (e) {
+      console.error('[Auth0] getToken failed:', e.message);
+      // Token silently failed — treat as logged out
+      _authToken = null;
+      document.getElementById('btn-login').style.display  = '';
+      document.getElementById('auth-user').style.display  = 'none';
+      if (gate) gate.style.display = 'flex';
+      ['btn-generate','btn-preview'].forEach(cls => {
+        document.querySelectorAll('.' + cls).forEach(b => b.disabled = true);
+      });
+    }
   }
 }
 

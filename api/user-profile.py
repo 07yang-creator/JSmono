@@ -15,6 +15,13 @@ AUTH0_DOMAIN        = os.environ.get('AUTH0_DOMAIN', '')
 AUTH0_CLIENT_ID     = os.environ.get('AUTH0_MGMT_CLIENT_ID', '')   # RWA app — Management API
 AUTH0_CLIENT_SECRET = os.environ.get('AUTH0_MGMT_CLIENT_SECRET', '')
 
+# Check required env vars once at module load — surface missing config clearly
+_MISSING_ENV = [k for k, v in {
+    'AUTH0_DOMAIN': AUTH0_DOMAIN,
+    'AUTH0_MGMT_CLIENT_ID': AUTH0_CLIENT_ID,
+    'AUTH0_MGMT_CLIENT_SECRET': AUTH0_CLIENT_SECRET,
+}.items() if not v]
+
 
 # ── Auth0 helpers ─────────────────────────────────────────────────────────────
 
@@ -102,7 +109,15 @@ class handler(BaseHTTPRequestHandler):
         self._cors()
         self.end_headers()
 
+    def _check_env(self):
+        """Return True if OK, else send 503 with which env vars are missing."""
+        if _MISSING_ENV:
+            self._send(503, {'error': f'Server misconfigured — missing env vars: {", ".join(_MISSING_ENV)}'})
+            return False
+        return True
+
     def do_GET(self):
+        if not self._check_env(): return
         tok = self._token()
         if not tok:
             return self._send(401, {'error': 'Missing token'})
@@ -115,11 +130,13 @@ class handler(BaseHTTPRequestHandler):
             meta    = _get_metadata(sub, mgmt)
             self._send(200, meta)
         except urllib.error.HTTPError as e:
-            self._send(e.code, {'error': e.reason})
+            body = e.read().decode('utf-8', errors='replace')
+            self._send(e.code, {'error': e.reason, 'detail': body})
         except Exception as e:
             self._send(500, {'error': str(e)})
 
     def do_POST(self):
+        if not self._check_env(): return
         tok = self._token()
         if not tok:
             return self._send(401, {'error': 'Missing token'})
@@ -134,6 +151,7 @@ class handler(BaseHTTPRequestHandler):
             _set_metadata(sub, body, mgmt)
             self._send(200, {'ok': True})
         except urllib.error.HTTPError as e:
-            self._send(e.code, {'error': e.reason})
+            body = e.read().decode('utf-8', errors='replace')
+            self._send(e.code, {'error': e.reason, 'detail': body})
         except Exception as e:
             self._send(500, {'error': str(e)})
