@@ -290,27 +290,30 @@ def generate(data: dict, out):
 
     rounded_rect(c, LX, BAND_BOT, LCW, TOP_H, fill=C_NAVY, r=0)   # full-height, square
 
-    # Content in NAV_H zone: small top pad, equal gaps between items
-    pname_sz = autosize(prop_name, LCW - 6, 22, min_sz=7, bold=True) if prop_name else 0
+    # ── Section 1: NAV_H zone ────────────────────────────────────────────────
+    # Elements (name, pill, address) stay tightly together as ONE group.
+    # Group is centred in NAV_H with equal space above and below.
+    INNER_GAP = 5      # tight gap between elements inside the group
+
+    pname_sz = autosize(prop_name, LCW - 8, 20, min_sz=7, bold=True) if prop_name else 0
     pill_bh  = PILL_SZ + pill_pad_y * 2
-    addr_sz  = autosize(short, LCW - 6, 16, min_sz=6, bold=True)
+    addr_sz  = autosize(short, LCW - 8, 14, min_sz=6, bold=True)
 
-    items_h = ([pname_sz] if prop_name else []) + [pill_bh, addr_sz]
-    n_items  = len(items_h)
-    total_items_h = sum(items_h)
-    TOP_PAD  = 8                                    # small fixed top margin
-    remaining = NAV_H - TOP_PAD - total_items_h
-    gap = max(4, remaining / (n_items - 1)) if n_items > 1 else 0
+    group_items = ([pname_sz] if prop_name else []) + [pill_bh, addr_sz]
+    group_h     = sum(group_items) + INNER_GAP * (len(group_items) - 1)
 
-    # Start just below the top of NAV_H zone (CTOP)
-    cur_y = (nav_y + NAV_H) - TOP_PAD              # top of first item (cap level)
+    # Equal space top and bottom of group inside NAV_H
+    side_pad = max(6, (NAV_H - group_h) / 2)
+
+    # cur_y = top of first element's cap (in PDF coords, top of zone minus padding)
+    cur_y = (nav_y + NAV_H) - side_pad
 
     if prop_name:
         cur_y -= pname_sz
         draw_bold(c, prop_name, LX + LCW/2, cur_y, pname_sz,
                   color=C_WHITE, align='center')
-        cur_y -= gap
-        hline(c, LX + 6, LX + LCW - 6, cur_y + gap/2, color=C_AMBER, lw=0.7)
+        cur_y -= INNER_GAP
+        hline(c, LX + 8, LX + LCW - 8, cur_y + INNER_GAP/2, color=C_AMBER, lw=0.8)
 
     bw     = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
     cur_y -= pill_bh
@@ -318,27 +321,30 @@ def generate(data: dict, out):
     rounded_rect(c, pill_x, cur_y, bw, pill_bh, fill=C_ACCENT, r=4)
     draw_text(c, prop_type, pill_x + pill_pad_x, cur_y + pill_pad_y,
               PILL_SZ, color=C_WHITE)
-    cur_y -= gap
+    cur_y -= INNER_GAP
 
     cur_y -= addr_sz
     draw_bold(c, short, LX + LCW/2, cur_y, addr_sz, color=C_WHITE, align='center')
 
-    # ── Station strip — semi-transparent overlay on navy background ──────────
+    # ── Section 2: Station strip — equal padding top and bottom ─────────────
     rect(c, LX, BAND_BOT + PRICE_H, LCW, ST_H,
-         fill=colors.HexColor('#1a3a6e'))   # darker navy tint (overlay on navy)
+         fill=colors.HexColor('#1a3a6e'))
     hline(c, LX, LX + LCW, BAND_BOT + PRICE_H + ST_H, color=colors.HexColor('#2a5090'), lw=0.5)
-    stations = data.get('stations', [])[:3]
+    stations  = data.get('stations', [])[:3]
+    ST_PAD    = 4                               # equal top/bottom padding inside strip
     n_st      = max(len(stations), 1)
-    st_line_h = ST_H / n_st
+    st_avail  = ST_H - ST_PAD * 2              # drawable height
+    st_line_h = st_avail / n_st
     for i, st in enumerate(stations):
-        ln    = st.get('line', '')
-        stn   = st.get('station', '').replace('駅', '')
-        wk    = st.get('walk', '')
+        ln     = st.get('line', '')
+        stn    = st.get('station', '').replace('駅', '')
+        wk     = st.get('walk', '')
         line_t = truncate_text(f"{ln}　{stn}駅 徒歩{wk}分", LCW - 10, ST_FONT)
-        st_y  = BAND_BOT + PRICE_H + ST_H - (i + 0.5) * st_line_h - ST_FONT * 0.3
+        # Baseline centred in each slice within the padded area
+        st_y   = BAND_BOT + PRICE_H + ST_PAD + st_avail - (i + 0.5) * st_line_h - ST_FONT * 0.26
         draw_text(c, line_t, LX + LCW/2, st_y, ST_FONT, color=C_WHITE, align='center')
 
-    # ── Price strip — light background at bottom of top band ─────────────────
+    # ── Section 3: Price strip — equal padding top and bottom ────────────────
     rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=C_LBLUE)
     hline(c, LX, LX + LCW, BAND_BOT + PRICE_H, color=colors.HexColor('#b0c8e8'), lw=0.5)
 
@@ -346,17 +352,19 @@ def generate(data: dict, out):
     num_part  = price_raw.replace('万円', '').strip()
     tax_lbl   = '万円（税込）' if '税込' in data.get('taxIncluded', '税込') else '万円（税別）'
     tax_sz    = ST_FONT
+    PRICE_PAD = 5                               # equal top/bottom padding inside strip
 
     price_sz  = autosize(num_part, LCW - txt_width(tax_lbl, tax_sz, True) - 14,
-                         int(PRICE_H * 0.80), min_sz=9, bold=True)
+                         int((PRICE_H - PRICE_PAD * 2) * 0.85), min_sz=9, bold=True)
     combo_w   = txt_width(num_part, price_sz, bold=True) + txt_width(tax_lbl, tax_sz, bold=True) + 4
     price_x   = LX + (LCW - combo_w) / 2
-    price_y   = BAND_BOT + (PRICE_H - price_sz) / 2
+    # Vertically centre price number in padded area
+    price_y   = BAND_BOT + PRICE_PAD + ((PRICE_H - PRICE_PAD * 2) - price_sz) / 2
     draw_bold(c, num_part, price_x, price_y, price_sz, color=C_ACCENT)
     draw_text(c, tax_lbl,
               price_x + txt_width(num_part, price_sz, bold=True) + 4,
               price_y + 2, tax_sz, color=C_ACCENT)
-    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - 8, 5.5, color=C_MUTED)
+    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - PRICE_PAD - 1, 5.5, color=C_MUTED)
 
     rebuild = data.get('rebuild', '')
     if rebuild:
