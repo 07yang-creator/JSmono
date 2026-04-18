@@ -208,14 +208,39 @@ def hline(c, x1, x2, y, color=C_DIV, lw=0.4):
     c.saveState(); c.setStrokeColor(color); c.setLineWidth(lw)
     c.line(x1, y, x2, y); c.restoreState()
 
-def photo_placeholder(c, x, y, w, h, label, sublabel=''):
-    rect(c, x, y, w, h, fill=colors.HexColor('#c8d4e8'), stroke=C_DIV, lw=0.5)
+def _photo_clip_path(c, x, y, w, h, cs='square', cr=6):
+    """Build a clipping path with rounded or cut corners for photo masking."""
+    r = min(cr, w / 2, h / 2)
+    p = c.beginPath()
+    if cs == 'round' and r > 0:
+        p.moveTo(x + r, y)
+        p.lineTo(x + w - r, y)
+        p.arcTo(x+w-2*r, y,       x+w,   y+2*r,   270, 90)
+        p.lineTo(x + w, y + h - r)
+        p.arcTo(x+w-2*r, y+h-2*r, x+w,   y+h,       0, 90)
+        p.lineTo(x + r, y + h)
+        p.arcTo(x,       y+h-2*r, x+2*r, y+h,      90, 90)
+        p.lineTo(x, y + r)
+        p.arcTo(x,       y,       x+2*r, y+2*r,   180, 90)
+    elif cs == 'cut' and r > 0:
+        p.moveTo(x + r, y);       p.lineTo(x+w-r, y)
+        p.lineTo(x+w, y+r);       p.lineTo(x+w, y+h-r)
+        p.lineTo(x+w-r, y+h);     p.lineTo(x+r, y+h)
+        p.lineTo(x, y+h-r);       p.lineTo(x, y+r)
+    else:
+        p.rect(x, y, w, h)
+    p.close()
+    return p
+
+def photo_placeholder(c, x, y, w, h, label, sublabel='', cs='square', cr=6):
+    styled_rect(c, x, y, w, h, fill=colors.HexColor('#c8d4e8'), stroke=None,
+                corner_style=cs, corner_r=cr)
     cx = x + w / 2
     draw_text(c, label,    cx, y + h/2 + 6,  12, color=colors.HexColor('#7a8faa'), align='center')
     if sublabel:
         draw_text(c, sublabel, cx, y + h/2 - 9, 7.5, color=colors.HexColor('#7a8faa'), align='center')
 
-def draw_photo(c, x, y, w, h, b64_data, label, sublabel=''):
+def draw_photo(c, x, y, w, h, b64_data, label, sublabel='', cs='square', cr=6):
     if b64_data:
         try:
             raw = b64_data.split(',', 1)[-1] if ',' in b64_data else b64_data
@@ -224,12 +249,13 @@ def draw_photo(c, x, y, w, h, b64_data, label, sublabel=''):
             scale = min(w / iw, h / ih)
             dw, dh = iw * scale, ih * scale
             c.saveState()
-            cp = c.beginPath(); cp.rect(x, y, w, h); c.clipPath(cp, stroke=0)
+            cp = _photo_clip_path(c, x, y, w, h, cs, cr)
+            c.clipPath(cp, stroke=0)
             c.drawImage(img, x + (w-dw)/2, y + (h-dh)/2, dw, dh,
                         preserveAspectRatio=True, mask='auto')
             c.restoreState(); return
         except Exception: pass
-    photo_placeholder(c, x, y, w, h, label, sublabel)
+    photo_placeholder(c, x, y, w, h, label, sublabel, cs, cr)
 
 def _img_ar(b64_data, default=4/3):
     if b64_data:
@@ -241,7 +267,7 @@ def _img_ar(b64_data, default=4/3):
         except Exception: pass
     return default
 
-def draw_flex_grid(c, images, x, y, w, h):
+def draw_flex_grid(c, images, x, y, w, h, cs='square', cr=6):
     """Aspect-ratio-aware photo grid with white gaps (shadow/mat effect)."""
     GAP = 3
     n = len(images)
@@ -254,19 +280,19 @@ def draw_flex_grid(c, images, x, y, w, h):
         for i, (img_t, ar) in enumerate(zip(imgs, ars_r)):
             cw = usable * ar / total
             if i == ni - 1: cw = rx + rw - cur_x
-            draw_photo(c, cur_x, ry, cw, rh, *img_t)
+            draw_photo(c, cur_x, ry, cw, rh, *img_t, cs=cs, cr=cr)
             cur_x += cw
             if i < ni - 1:
                 rect(c, cur_x, ry, GAP, rh, fill=C_WHITE); cur_x += GAP
 
     if n == 1:
-        draw_photo(c, x, y, w, h, *images[0])
+        draw_photo(c, x, y, w, h, *images[0], cs=cs, cr=cr)
     elif n == 2:
         row(images, ars, x, y, w, h)
     elif n == 3:
         rh0 = w / ars[0]; rh1 = w / ((ars[1]+ars[2])/2); tot = rh0+rh1 or 1
         h0 = max(h*.35, min(h*.65, h*rh0/tot)); h1 = h - h0 - GAP
-        draw_photo(c, x, y+h1+GAP, w, h0, *images[0])
+        draw_photo(c, x, y+h1+GAP, w, h0, *images[0], cs=cs, cr=cr)
         rect(c, x, y+h1, w, GAP, fill=C_WHITE)
         row(images[1:], ars[1:], x, y, w, h1)
     else:
@@ -315,6 +341,8 @@ def generate(data: dict, out):
     _cm = _MASKS.get(_csel, _MASKS['all'])
     _nav_mask    = _cm['nav']
     _border_mask = _cm['border']
+    # Footer bottom corners match the border bottom corners (bl, br only)
+    _footer_mask = (_border_mask[0], _border_mask[1], False, False)
 
     # ══════════════════════════════════════════════════════════════════════════
     # FIXED GEOMETRY — all constants, computed once.  Nothing resizes at runtime.
@@ -477,11 +505,11 @@ def generate(data: dict, out):
             (data.get('k2Image',''), '外観写真２',  '（K2）'),
             (data.get('k3Image',''), '外観写真３',  '（K3）'),
             (data.get('k4Image',''), '間取り / 地図','（K4）'),
-        ], RX, MID_BOT, RW, CONTENT_H)
+        ], RX, MID_BOT, RW, CONTENT_H, cs=_cs, cr=_cr)
 
-    # White background for entire right photo area; photos will be inset by PPAD
+    # White background for entire right photo area; no stroke (grid removed)
     PPAD = 4                            # gap around each photo → 8pt between adjacent photos
-    rect(c, RX, MID_BOT, RW, CONTENT_H, fill=C_WHITE, stroke=C_DIV, lw=0.5)
+    rect(c, RX, MID_BOT, RW, CONTENT_H, fill=C_WHITE)
 
     lease    = data.get('leasePeriod', '')
     grent    = data.get('groundRent', '')
@@ -491,17 +519,17 @@ def generate(data: dict, out):
     if variant != 'B':
         # Q1-top: K1 exterior photo (inset by PPAD for white breathing gap)
         draw_photo(c, RX1 + PPAD, BAND_BOT + PPAD, HALF - PPAD * 2, TOP_H - PPAD * 2,
-                   data.get('k1Image',''), '外　観', '（写真をここに挿入）')
+                   data.get('k1Image',''), '外　観', '（写真をここに挿入）', cs=_cs, cr=_cr)
         # Q2-top: K5 map (inset by PPAD)
         draw_photo(c, RX2 + PPAD, BAND_BOT + PPAD, HALF - PPAD * 2, TOP_H - PPAD * 2,
-                   data.get('k5Image',''), '地　図', '（地図を挿入）')
+                   data.get('k5Image',''), '地　図', '（地図を挿入）', cs=_cs, cr=_cr)
 
     if variant != 'B':
         k3_img = data.get('k3Image', '').strip()
         if k3_img:
             # Q1-bottom: K3 内観写真 replaces the H/I info box when uploaded
             draw_photo(c, RX1 + PPAD, MID_BOT + PPAD, HALF - PPAD * 2, MID_H - PPAD * 2,
-                       k3_img, '内　観', '（内観写真）')
+                       k3_img, '内　観', '（内観写真）', cs=_cs, cr=_cr)
         else:
             # Q1-bottom: poster-style info panel
             rect(c, RX1, MID_BOT, HALF, MID_H, fill=C_WHITE, stroke=C_DIV, lw=0.5)
@@ -620,11 +648,8 @@ def generate(data: dict, out):
                 fill=None, stroke=C_DIV, lw=0.8,
                 corner_style=_cs, corner_r=_cr, corners=_border_mask)
 
-    # ── Grid dividers (Variant A only) ────────────────────────────────────────
+    # ── Single divider: left column | right photo area (no internal photo grid) ─
     vline(c, RX, CBOT, CTOP, color=C_DIV, lw=0.8)
-    if variant != 'B':
-        vline(c, RX2, CBOT, CTOP, color=C_DIV, lw=0.5)
-        hline(c, RX, W-MX, BAND_BOT, color=C_DIV, lw=0.6)
 
     # ══════════════════════════════════════════════════════════════════════════
     # LEFT COLUMN — MIDDLE SECTION (property data rows)
@@ -759,7 +784,7 @@ def generate(data: dict, out):
     # Q2-bottom: K2 floor plan (Variant A) — inset by PPAD
     if variant != 'B':
         draw_photo(c, RX2 + PPAD, MID_BOT + PPAD, HALF - PPAD * 2, MID_H - PPAD * 2,
-                   data.get('k2Image',''), '間取り図', '（間取り図を挿入）')
+                   data.get('k2Image',''), '間取り図', '（間取り図を挿入）', cs=_cs, cr=_cr)
 
     # ══════════════════════════════════════════════════════════════════════════
     # FOOTER — FIXED 34mm, IW width, left→right: Logo|Name|Info|Contact|Yellow
@@ -782,8 +807,9 @@ def generate(data: dict, out):
     F_CONT_X = F_INFO_X + F_INFO_W
     F_YELL_X = F_CONT_X + F_CONT_W
 
-    # Navy background (full IW width)
-    rect(c, MX, FOOTER_Y, IW, FOOTER_H, fill=C_NAVYDK)
+    # Navy background (full IW width) — styled bottom corners
+    styled_rect(c, MX, FOOTER_Y, IW, FOOTER_H, fill=C_NAVYDK,
+                corner_style=_cs, corner_r=_cr, corners=_footer_mask)
 
     # ── a) Logo (leftmost square) ─────────────────────────────────────────────
     logo_b64 = data.get('logoImage', '')
@@ -798,7 +824,7 @@ def generate(data: dict, out):
                         dw, dh, preserveAspectRatio=True, mask='auto')
         except Exception: pass
 
-    vline(c, F_NAME_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
+    # (no vline dividers inside footer — clean solid band)
 
     # ── b) Company name — vertically centred in footer ───────────────────────
     brand = data.get('brandName', '')
@@ -829,7 +855,6 @@ def generate(data: dict, out):
     if have_c:
         draw_bold(c, co, name_lx, ny, co_sz, color=C_TEXT_ON_PRI)
 
-    vline(c, F_INFO_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
     # ── c) Company info — vertically centred ─────────────────────────────────
     ISZ       = 7.0
@@ -860,8 +885,6 @@ def generate(data: dict, out):
             draw_text(c, truncate_text(txt, F_INFO_W - F_PAD * 2, sz),
                       F_INFO_X + F_PAD, iy, sz, color=col)
             iy -= sz + IGAP
-
-    vline(c, F_CONT_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
     # ── d) Contact ────────────────────────────────────────────────────────────
     OBC_H        = int(FOOTER_H * 0.16)          # strip height ≈16% of footer
@@ -906,11 +929,12 @@ def generate(data: dict, out):
     if have_tel:
         draw_bold(c, f'TEL：{tel_str}', F_CONT_X+F_PAD, cy2, tsz, color=C_TEXT_ON_PRI)
 
-    vline(c, F_YELL_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
-
     # ── e) Yellow slogan area (rightmost) ─────────────────────────────────────
-    rect(c, F_YELL_X, FOOTER_Y, F_YELL_W, FOOTER_H,
-         fill=colors.HexColor('#f5c800'))
+    # Right corner of footer matches border_mask tr corner
+    _yell_mask = (False, _border_mask[1], False, False)
+    styled_rect(c, F_YELL_X, FOOTER_Y, F_YELL_W, FOOTER_H,
+                fill=colors.HexColor('#f5c800'),
+                corner_style=_cs, corner_r=_cr, corners=_yell_mask)
 
     slogan = data.get('catchcopy', data.get('companySlogan', ''))
     ttype  = data.get('transactionType', '')
