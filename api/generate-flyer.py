@@ -655,12 +655,19 @@ def generate(data: dict, out):
     co_sz    = autosize(co,    av_nw, 18, min_sz=7, bold=True) if (co and co != brand) else 0
     N_GAP = 4
     have_b = bool(brand); have_c = bool(co and co != brand)
-    # Vertical centering — compute total block height first
+    # True visual centering: ReportLab baseline ≠ visual midpoint
+    # Text ascends ~0.72×sz above baseline, descends ~0.20×sz below.
+    # Formula: ny = center + (block_h - 0.72*first_sz - 0.80*last_sz) / 2
+    fc_y = FOOTER_Y + FOOTER_H / 2          # footer visual centre
     if have_b and have_c:
         block_h = brand_sz + N_GAP + co_sz
-        ny = FOOTER_Y + FOOTER_H / 2 + block_h / 2
+        ny = fc_y + (block_h - 0.72 * brand_sz - 0.80 * co_sz) / 2
+    elif have_b:
+        ny = fc_y - 0.26 * brand_sz         # single line: baseline below centre
+    elif have_c:
+        ny = fc_y - 0.26 * co_sz
     else:
-        ny = FOOTER_Y + FOOTER_H / 2
+        ny = fc_y
     # Left-align: anchor text at left edge of section plus padding
     name_lx = F_NAME_X + F_PAD
     if have_b:
@@ -729,8 +736,16 @@ def generate(data: dict, out):
     elif have_tel:             block_h = tsz
     else:                      block_h = 0
 
-    # Vertically centre agent/tel block in full footer height
-    cy2 = FOOTER_Y + FOOTER_H / 2 + block_h / 2  # top baseline of first row
+    # Vertically centre agent/tel in the space BELOW the orange strip
+    sub_center = FOOTER_Y + (strip_y - FOOTER_Y) / 2   # mid of sub-strip space
+    if have_ag and have_tel:
+        cy2 = sub_center + (block_h - 0.72 * asz - 0.80 * tsz) / 2
+    elif have_ag:
+        cy2 = sub_center - 0.26 * asz
+    elif have_tel:
+        cy2 = sub_center - 0.26 * tsz
+    else:
+        cy2 = sub_center
 
     if have_ag:
         draw_bold(c, f'【担当】{ag}', F_CONT_X+F_PAD, cy2, asz, color=C_WHITE)
