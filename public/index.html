@@ -539,6 +539,12 @@
       padding: 6px; line-height: 1.5; pointer-events: none; z-index: 1;
     }
     .photo-slot .slot-icon { font-size: 22px; display: block; margin-bottom: 3px; }
+    .photo-slot .slot-ratio {
+      display: inline-block; margin-top: 4px;
+      font-size: 9px; font-weight: 700; letter-spacing: .03em;
+      color: var(--primary); background: #dce8fa;
+      padding: 1px 7px; border-radius: 20px;
+    }
     .photo-slot.has-image .slot-label { display: none; }
     .photo-slot .clear-btn {
       position: absolute; top: 5px; right: 5px; z-index: 3;
@@ -1555,7 +1561,8 @@
                 <img class="preview" alt="">
                 <button class="clear-btn" type="button">✕</button>
                 <div class="slot-label">
-                  <span class="slot-icon">🏠</span>外観写真<br><small>K1</small>
+                  <span class="slot-icon">🏠</span>外観写真<br><small>K1</small><br>
+                  <span class="slot-ratio">推奨 3:2 横長</span>
                 </div>
               </div>
 
@@ -1565,7 +1572,8 @@
                 <img class="preview" alt="">
                 <button class="clear-btn" type="button">✕</button>
                 <div class="slot-label">
-                  <span class="slot-icon">📐</span>間取り図<br><small>K2</small>
+                  <span class="slot-icon">📐</span>間取り図<br><small>K2</small><br>
+                  <span class="slot-ratio">推奨 4:3</span>
                 </div>
               </div>
 
@@ -1575,7 +1583,8 @@
                 <img class="preview" alt="">
                 <button class="clear-btn" type="button">✕</button>
                 <div class="slot-label">
-                  <span class="slot-icon">🗺</span>地図<br><small>K5（標準のみ）</small>
+                  <span class="slot-icon">🗺</span>地図<br><small>K5（標準のみ）</small><br>
+                  <span class="slot-ratio">推奨 3:2 横長</span>
                 </div>
               </div>
 
@@ -1587,7 +1596,8 @@
                 <div class="slot-label">
                   <span class="slot-icon">📷</span>
                   <span id="k3-label-text">内観写真</span><br>
-                  <small id="k3-label-sub">K3（任意）</small>
+                  <small id="k3-label-sub">K3（任意）</small><br>
+                  <span class="slot-ratio">推奨 4:3</span>
                 </div>
               </div>
 
@@ -1597,7 +1607,8 @@
                 <img class="preview" alt="">
                 <button class="clear-btn" type="button">✕</button>
                 <div class="slot-label">
-                  <span class="slot-icon">📷</span>外観写真４<br><small>K4（写真重視）</small>
+                  <span class="slot-icon">📷</span>外観写真４<br><small>K4（写真重視）</small><br>
+                  <span class="slot-ratio">推奨 3:2 横長</span>
                 </div>
               </div>
 

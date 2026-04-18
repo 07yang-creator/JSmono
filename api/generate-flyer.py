@@ -387,7 +387,9 @@ def generate(data: dict, out):
             (data.get('k4Image',''), '間取り / 地図','（K4）'),
         ], RX, MID_BOT, RW, CONTENT_H)
 
-    rect(c, RX, MID_BOT, RW, CONTENT_H, fill=None, stroke=C_DIV, lw=0.5)
+    # White background for entire right photo area; photos will be inset by PPAD
+    PPAD = 4                            # gap around each photo → 8pt between adjacent photos
+    rect(c, RX, MID_BOT, RW, CONTENT_H, fill=C_WHITE, stroke=C_DIV, lw=0.5)
 
     lease    = data.get('leasePeriod', '')
     grent    = data.get('groundRent', '')
@@ -395,18 +397,19 @@ def generate(data: dict, out):
     handover = data.get('handover', '')
 
     if variant != 'B':
-        # Q1-top: K1 exterior photo
-        draw_photo(c, RX1, BAND_BOT, HALF, TOP_H,
+        # Q1-top: K1 exterior photo (inset by PPAD for white breathing gap)
+        draw_photo(c, RX1 + PPAD, BAND_BOT + PPAD, HALF - PPAD * 2, TOP_H - PPAD * 2,
                    data.get('k1Image',''), '外　観', '（写真をここに挿入）')
-        # Q2-top: K5 map
-        draw_photo(c, RX2, BAND_BOT, HALF, TOP_H,
+        # Q2-top: K5 map (inset by PPAD)
+        draw_photo(c, RX2 + PPAD, BAND_BOT + PPAD, HALF - PPAD * 2, TOP_H - PPAD * 2,
                    data.get('k5Image',''), '地　図', '（地図を挿入）')
 
     if variant != 'B':
         k3_img = data.get('k3Image', '').strip()
         if k3_img:
             # Q1-bottom: K3 内観写真 replaces the H/I info box when uploaded
-            draw_photo(c, RX1, MID_BOT, HALF, MID_H, k3_img, '内　観', '（内観写真）')
+            draw_photo(c, RX1 + PPAD, MID_BOT + PPAD, HALF - PPAD * 2, MID_H - PPAD * 2,
+                       k3_img, '内　観', '（内観写真）')
         else:
             # Q1-bottom: poster-style info panel
             rect(c, RX1, MID_BOT, HALF, MID_H, fill=C_WHITE, stroke=C_DIV, lw=0.5)
@@ -650,9 +653,9 @@ def generate(data: dict, out):
         draw_text(c, '※現況と図面が相違する場合は現況を優先します。',
                   LX+2, MID_BOT+4, 5.0, color=C_MUTED)
 
-    # Q2-bottom: K2 floor plan (Variant A)
+    # Q2-bottom: K2 floor plan (Variant A) — inset by PPAD
     if variant != 'B':
-        draw_photo(c, RX2, MID_BOT, HALF, MID_H,
+        draw_photo(c, RX2 + PPAD, MID_BOT + PPAD, HALF - PPAD * 2, MID_H - PPAD * 2,
                    data.get('k2Image',''), '間取り図', '（間取り図を挿入）')
 
     # ══════════════════════════════════════════════════════════════════════════
