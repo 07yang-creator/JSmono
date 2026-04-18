@@ -1042,87 +1042,6 @@
 
     </div><!-- /lp-card -->
 
-    <!-- Company Profile Card -->
-    <div id="lp-profile-section" class="lp-card" style="padding:28px 40px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div>
-          <div class="lp-section-title" style="margin-bottom:4px;">⑤ 会社プロフィールを登録（任意・保存可能）</div>
-          <div style="font-size:12px;color:var(--muted);">保存しておくと、チラシ作成時にワンクリックで会社情報を自動入力できます</div>
-        </div>
-        <span id="profile-saved-badge" class="profile-saved-badge">✅ 保存しました</span>
-      </div>
-      <div class="profile-grid">
-        <div class="profile-field">
-          <label>会社名</label>
-          <input type="text" name="companyName" placeholder="例：株式会社ブリリアント">
-        </div>
-        <div class="profile-field">
-          <label>屋号・ブランド名</label>
-          <input type="text" name="brandName" placeholder="例：リクシル不動産ショップ">
-        </div>
-        <div class="profile-field">
-          <label>会社住所</label>
-          <input type="text" name="companyAddress" placeholder="例：東京都新宿区西新宿1-2-3">
-        </div>
-        <div class="profile-field">
-          <label>免許番号</label>
-          <input type="text" name="licenseNo" placeholder="例：東京都知事（3）第92862号">
-        </div>
-        <div class="profile-field">
-          <label>担当者名</label>
-          <input type="text" name="agentName" placeholder="例：青木（アオキ）">
-        </div>
-        <div class="profile-field">
-          <label>TEL</label>
-          <input type="text" name="tel" placeholder="例：070-4238-7811">
-        </div>
-        <div class="profile-field">
-          <label>FAX</label>
-          <input type="text" name="fax" placeholder="例：03-6803-2967">
-        </div>
-        <div class="profile-field">
-          <label>メール</label>
-          <input type="text" name="email" placeholder="例：s-aoki@brilliant-corp.jp">
-        </div>
-        <div class="profile-field">
-          <label>取引態様（任意）</label>
-          <select name="transactionType">
-            <option value="">─ 未選択 ─</option>
-            <option>売主</option>
-            <option>媒介</option>
-            <option>代理</option>
-          </select>
-        </div>
-        <div class="profile-field">
-          <label>手数料（任意）</label>
-          <input type="text" name="fee" placeholder="例：3%＋6万円（税別）">
-        </div>
-        <div class="profile-field">
-          <label>所属団体</label>
-          <input type="text" name="association" placeholder="例：（公社）東京都宅地建物取引業協会会員">
-        </div>
-        <div class="profile-field full">
-          <label>キャッチコピー・PR文</label>
-          <input type="text" name="catchcopy" placeholder="例：実需・投資・借地・再建築不可など積極買取中">
-        </div>
-      </div>
-      <div class="profile-logo-row">
-        <div class="profile-logo-slot" id="lp-profile-logo-slot">
-          <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
-          <img alt="" style="display:none;width:100%;height:100%;object-fit:contain;">
-          <button type="button" class="logo-clear">✕</button>
-          <span style="font-size:10px;color:var(--muted);text-align:center;padding:4px;pointer-events:none;">🏢<br>ロゴ</span>
-        </div>
-        <div class="profile-logo-meta">
-          <strong style="font-size:12px;">会社ロゴ</strong><br>
-          JPEG / PNG・3MB以下<br>
-          チラシのフッターに表示されます
-        </div>
-      </div>
-      <input type="hidden" id="lp-profile-logo-hidden" value="">
-      <button type="button" class="btn-profile-save" onclick="saveProfile()">💾 プロフィールを保存</button>
-    </div><!-- /lp-profile-section -->
-
     <!-- Coming soon features -->
     <div class="lp-coming-soon">
       <div class="lp-coming-title">Coming Soon — 近日公開予定の機能</div>
@@ -1737,6 +1656,87 @@
             <input type="hidden" name="k4Image"    id="img-k4Image"    value="">
           </div>
         </div>
+
+        <!-- 🏢 会社プロフィール -->
+        <div class="section-card full-width" id="lp-profile-section">
+          <div class="section-header">🏢 会社プロフィール（任意・保存可能）</div>
+          <div class="section-body">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+              保存しておくと、次回からワンクリックで自動入力できます
+              <span id="profile-saved-badge" class="profile-saved-badge">✅ 保存しました</span>
+            </div>
+            <div class="profile-grid">
+              <div class="profile-field">
+                <label>会社名</label>
+                <input type="text" name="companyName" placeholder="例：株式会社ブリリアント">
+              </div>
+              <div class="profile-field">
+                <label>屋号・ブランド名</label>
+                <input type="text" name="brandName" placeholder="例：リクシル不動産ショップ">
+              </div>
+              <div class="profile-field">
+                <label>会社住所</label>
+                <input type="text" name="companyAddress" placeholder="例：東京都新宿区西新宿1-2-3">
+              </div>
+              <div class="profile-field">
+                <label>免許番号</label>
+                <input type="text" name="licenseNo" placeholder="例：東京都知事（3）第92862号">
+              </div>
+              <div class="profile-field">
+                <label>担当者名</label>
+                <input type="text" name="agentName" placeholder="例：青木（アオキ）">
+              </div>
+              <div class="profile-field">
+                <label>TEL</label>
+                <input type="text" name="tel" placeholder="例：070-4238-7811">
+              </div>
+              <div class="profile-field">
+                <label>FAX</label>
+                <input type="text" name="fax" placeholder="例：03-6803-2967">
+              </div>
+              <div class="profile-field">
+                <label>メール</label>
+                <input type="text" name="email" placeholder="例：s-aoki@brilliant-corp.jp">
+              </div>
+              <div class="profile-field">
+                <label>取引態様（任意）</label>
+                <select name="transactionType">
+                  <option value="">─ 未選択 ─</option>
+                  <option>売主</option>
+                  <option>媒介</option>
+                  <option>代理</option>
+                </select>
+              </div>
+              <div class="profile-field">
+                <label>手数料（任意）</label>
+                <input type="text" name="fee" placeholder="例：3%＋6万円（税別）">
+              </div>
+              <div class="profile-field">
+                <label>所属団体</label>
+                <input type="text" name="association" placeholder="例：（公社）東京都宅地建物取引業協会会員">
+              </div>
+              <div class="profile-field full">
+                <label>キャッチコピー・PR文</label>
+                <input type="text" name="catchcopy" placeholder="例：実需・投資・借地・再建築不可など積極買取中">
+              </div>
+            </div>
+            <div class="profile-logo-row">
+              <div class="profile-logo-slot" id="lp-profile-logo-slot">
+                <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+                <img alt="" style="display:none;width:100%;height:100%;object-fit:contain;">
+                <button type="button" class="logo-clear">✕</button>
+                <span style="font-size:10px;color:var(--muted);text-align:center;padding:4px;pointer-events:none;">🏢<br>ロゴ</span>
+              </div>
+              <div class="profile-logo-meta">
+                <strong style="font-size:12px;">会社ロゴ</strong><br>
+                JPEG / PNG・3MB以下<br>
+                チラシのフッターに表示されます
+              </div>
+            </div>
+            <input type="hidden" id="lp-profile-logo-hidden" value="">
+            <button type="button" class="btn-profile-save" onclick="saveProfile()">💾 プロフィールを保存</button>
+          </div>
+        </div><!-- /lp-profile-section -->
 
       </div><!-- /form-grid -->
 
