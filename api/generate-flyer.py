@@ -436,20 +436,21 @@ def generate(data: dict, out):
                     poster_secs.append({'title': '借地条件', 'rows': grows})
 
             # H — 周辺環境
-            nb_rows = [(nb.get('name', ''),
-                        f"徒歩約{nb.get('walk', '')}" if nb.get('walk') else '')
+            # walk field may already contain "徒歩約X分" — use as-is to avoid duplication
+            nb_rows = [(nb.get('name', ''), nb.get('walk', ''))
                        for nb in nearby if nb.get('name')]
             if nb_rows:
                 poster_secs.append({'title': '周辺環境', 'rows': nb_rows})
 
             # I — 学区
+            # dist fields may already contain "徒歩X分" — use as-is
             school_rows = []
             if data.get('elemSchool'):
                 school_rows.append((f"小学校：{data['elemSchool']}",
-                                    f"徒歩{data.get('elemSchoolDist','')}"))
+                                    data.get('elemSchoolDist', '')))
             if data.get('juniorSchool'):
                 school_rows.append((f"中学校：{data['juniorSchool']}",
-                                    f"徒歩{data.get('juniorSchoolDist','')}"))
+                                    data.get('juniorSchoolDist', '')))
             if school_rows:
                 poster_secs.append({'title': '学区', 'rows': school_rows})
 
@@ -459,15 +460,15 @@ def generate(data: dict, out):
 
             if n_secs > 0:
                 avail_h = MID_H - BOX_PAD * 2
-                # Units: each row = 1.0, each title slot = 1.5, inter-sec gap = 0.6
-                total_u = n_rows + n_secs * 1.5 + max(0, n_secs - 1) * 0.6
+                # Units: each row = 1.0, each title slot = 2.0, inter-sec gap = 0.8
+                total_u = n_rows + n_secs * 2.0 + max(0, n_secs - 1) * 0.8
                 row_h   = min(avail_h / max(total_u, 1), 26)
                 row_h   = max(row_h, 10)
 
                 item_sz  = max(7, min(int(row_h * 0.68), 15))
                 title_sz = min(item_sz + 2, 14)
-                title_slot = row_h * 1.5      # space reserved per section title
-                sec_gap    = row_h * 0.6       # gap between sections
+                title_slot = row_h * 2.0      # space reserved per section title (roomier)
+                sec_gap    = row_h * 0.8       # gap between sections
 
                 cy = MID_BOT + MID_H - BOX_PAD   # work top-down
 
@@ -479,7 +480,7 @@ def generate(data: dict, out):
                     cy -= 3
                     hline(c, RX1 + BOX_PAD, RX1 + HALF - BOX_PAD, cy + 1.5,
                           color=C_STEELBL, lw=0.8)
-                    cy -= (title_slot - title_sz - 5)  # gap below underline
+                    cy -= max(7, title_slot - title_sz - 5)  # generous gap below underline
 
                     # Rows
                     for (ltext, rtext) in sec['rows']:
