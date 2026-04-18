@@ -506,102 +506,121 @@ def generate(data: dict, out):
 
     LLBW = LCW * 0.34
     LVBW = LCW - LLBW
-    LRH  = 13
-    LBAR = 12
-    ly   = MID_TOP
 
-    def lsec(title):
-        nonlocal ly
-        if ly - LBAR < MID_BOT: return
-        ly -= LBAR
-        rect(c, LX, ly, LCW, LBAR, fill=C_NAVY)
-        draw_bold(c, title, LX+4, ly+3, 7, color=C_WHITE)
-
-    def lrow(lbl, val, alt=False):
-        nonlocal ly
-        if not val: return
-        if ly - LRH < MID_BOT: return
-        ly -= LRH
-        bg = C_LBLUE if alt else C_WHITE
-        rect(c, LX,        ly, LLBW, LRH, fill=C_SECBG, stroke=C_DIV, lw=0.3)
-        draw_text(c, lbl,  LX+2, ly+3, 6.5, color=C_NAVY)
-        rect(c, LX+LLBW,   ly, LVBW, LRH, fill=bg, stroke=C_DIV, lw=0.3)
-        draw_text(c, truncate_text(val, LVBW-5, 6.5), LX+LLBW+3, ly+3, 6.5, color=C_BLACK)
-
-    # 物件概要
-    lsec('■ 物件概要')
+    # ── Pre-build all rows so we can auto-scale row height to fit ─────────────
+    # Each entry is either ('sec', title) or ('row', label, value, alt)
     la = f"{data.get('landArea','')}㎡"
     if data.get('landAreaTsubo'): la += f"  ({data['landAreaTsubo']}坪)"
     fa_parts = [data.get(f'floorArea{i}','') for i in range(1,5)]
     fa = '  '.join(x for x in fa_parts if x)
     tf = f"{data.get('totalFloorArea','')}㎡" if data.get('totalFloorArea') else ''
 
-    lrow('土地面積', la)
-    lrow('土地権利', data.get('landRight',''),     alt=True)
-    lrow('地目',     data.get('landCategory',''))
-    lrow('接面道路', data.get('frontRoad',''),      alt=True)
-    lrow('再建築',   rebuild)
-    lrow('築年月',   data.get('builtYear',''),      alt=True)
-    lrow('構造',     data.get('structure',''))
-    lrow('床面積',   fa,                            alt=True)
-    if tf: lrow('合計床面積', tf)
-    lrow('間取り',   data.get('layout',''),         alt=True)
-    lrow('現況',     status)
-    lrow('引渡し',   handover,                      alt=True)
-
-    # マンション専用
-    if data.get('propertyType','') == 'マンション':
-        lsec('■ マンション情報')
-        lrow('建物名',    data.get('buildingName',''))
-        lrow('所在階',    data.get('floorInfo',''),    alt=True)
-        ea = f"{data.get('exclusiveArea','')}㎡" if data.get('exclusiveArea') else ''
-        ba = f"{data.get('balconyArea','')}㎡"  if data.get('balconyArea')   else ''
-        lrow('専有面積',  ea)
-        lrow('バルコニー',ba,                          alt=True)
-        mf = f"{data.get('managementFee','')}円/月" if data.get('managementFee') else ''
-        rf = f"{data.get('repairFund','')}円/月"    if data.get('repairFund')    else ''
-        lrow('管理費',    mf)
-        lrow('修繕積立',  rf,                          alt=True)
-        lrow('管理会社',  data.get('managementCo',''))
-        lrow('管理形態',  data.get('managementType',''),alt=True)
-
-    # 法令制限
-    if data.get('propertyType','') != 'マンション':
-        lsec('■ 法令制限')
-        lrow('都市計画', data.get('cityPlan',''))
-        lrow('用途地域', data.get('useZone',''),        alt=True)
-        lrow('防火指定', data.get('fireZone',''))
-        lrow('建ぺい率', data.get('bcr',''),            alt=True)
-        lrow('容積率',   data.get('far',''))
-        lrow('高度地区', data.get('heightDistrict',''), alt=True)
-        if data.get('otherLegal'):
-            lrow('その他', data['otherLegal'])
-
-    # ライフライン
+    DISC = '現況と図面が相違する場合は現況を優先します'
+    remarks = [r.strip() for r in data.get('remarks','').split('\n')
+               if r.strip() and DISC not in r]
     up = []
     if data.get('electric'): up.append(f"電気：{data['electric']}")
     if data.get('gas'):      up.append(f"ガス：{data['gas']}")
     if data.get('water'):    up.append(f"水道：{data['water']}")
+
+    entries = []
+    def esec(t):  entries.append(('sec', t))
+    def erow(l, v, alt=False):
+        if v: entries.append(('row', l, v, alt))
+
+    esec('■ 物件概要')
+    erow('土地面積', la)
+    erow('土地権利', data.get('landRight',''),     True)
+    erow('地目',     data.get('landCategory',''))
+    erow('接面道路', data.get('frontRoad',''),      True)
+    erow('再建築',   rebuild)
+    erow('築年月',   data.get('builtYear',''),      True)
+    erow('構造',     data.get('structure',''))
+    erow('床面積',   fa,                            True)
+    if tf: erow('合計床面積', tf)
+    erow('間取り',   data.get('layout',''),         True)
+    erow('現況',     status)
+    erow('引渡し',   handover,                      True)
+
+    if data.get('propertyType','') == 'マンション':
+        esec('■ マンション情報')
+        erow('建物名',    data.get('buildingName',''))
+        erow('所在階',    data.get('floorInfo',''),    True)
+        ea = f"{data.get('exclusiveArea','')}㎡" if data.get('exclusiveArea') else ''
+        ba = f"{data.get('balconyArea','')}㎡"  if data.get('balconyArea')   else ''
+        erow('専有面積',  ea)
+        erow('バルコニー',ba,                          True)
+        mf = f"{data.get('managementFee','')}円/月" if data.get('managementFee') else ''
+        rf = f"{data.get('repairFund','')}円/月"    if data.get('repairFund')    else ''
+        erow('管理費',    mf)
+        erow('修繕積立',  rf,                          True)
+        erow('管理会社',  data.get('managementCo',''))
+        erow('管理形態',  data.get('managementType',''),True)
+
+    if data.get('propertyType','') != 'マンション':
+        esec('■ 法令制限')
+        erow('都市計画', data.get('cityPlan',''))
+        erow('用途地域', data.get('useZone',''),        True)
+        erow('防火指定', data.get('fireZone',''))
+        erow('建ぺい率', data.get('bcr',''),            True)
+        erow('容積率',   data.get('far',''))
+        erow('高度地区', data.get('heightDistrict',''), True)
+        if data.get('otherLegal'): erow('その他', data['otherLegal'])
+
     if up:
-        lsec('■ ライフライン')
-        if ly - LRH >= MID_BOT:
+        esec('■ ライフライン')
+        entries.append(('util', '　'.join(up)))
+
+    if remarks:
+        esec('■ 備考')
+        for i, r in enumerate(remarks):
+            erow('', r, bool(i % 2))
+
+    # ── Compute adaptive row height so ALL rows fit in MID_H ──────────────────
+    n_sec  = sum(1 for e in entries if e[0] == 'sec')
+    n_rows = sum(1 for e in entries if e[0] in ('row', 'util'))
+    LBAR_RATIO = 0.92          # section bar ≈ 92% of row height
+    # total_h = n_rows * LRH + n_sec * LRH * LBAR_RATIO
+    # solve: LRH = MID_H / (n_rows + n_sec * LBAR_RATIO)
+    avail   = MID_H - 7        # 7pt reserved for disclaimer at bottom
+    if (n_rows + n_sec * LBAR_RATIO) > 0:
+        LRH = min(13, avail / (n_rows + n_sec * LBAR_RATIO))
+    else:
+        LRH = 13
+    LRH  = max(LRH, 7)         # never shrink below 7pt (unreadable)
+    LBAR = LRH * LBAR_RATIO
+    FSZ  = max(5.0, LRH * 0.50)   # label/value font scales with row height
+
+    # ── Draw all collected entries ─────────────────────────────────────────────
+    ly = MID_TOP
+    for entry in entries:
+        if entry[0] == 'sec':
+            if ly - LBAR < MID_BOT: break
+            ly -= LBAR
+            rect(c, LX, ly, LCW, LBAR, fill=C_NAVY)
+            draw_bold(c, entry[1], LX+4, ly + LBAR*0.25, FSZ+0.5, color=C_WHITE)
+
+        elif entry[0] == 'row':
+            _, lbl, val, alt = entry
+            if ly - LRH < MID_BOT: break
+            ly -= LRH
+            bg = C_LBLUE if alt else C_WHITE
+            rect(c, LX,       ly, LLBW, LRH, fill=C_SECBG, stroke=C_DIV, lw=0.3)
+            draw_text(c, lbl, LX+2, ly + LRH*0.22, FSZ, color=C_NAVY)
+            rect(c, LX+LLBW,  ly, LVBW, LRH, fill=bg,     stroke=C_DIV, lw=0.3)
+            draw_text(c, truncate_text(val, LVBW-5, FSZ),
+                      LX+LLBW+3, ly + LRH*0.22, FSZ, color=C_BLACK)
+
+        elif entry[0] == 'util':
+            if ly - LRH < MID_BOT: break
             ly -= LRH
             rect(c, LX, ly, LCW, LRH, fill=C_WHITE, stroke=C_DIV, lw=0.3)
-            draw_text(c, truncate_text('　'.join(up), LCW-6, 6.5),
-                      LX+3, ly+3, 6.5, color=C_BLACK)
-
-    # 備考
-    DISC = '現況と図面が相違する場合は現況を優先します'
-    remarks = [r.strip() for r in data.get('remarks','').split('\n')
-               if r.strip() and DISC not in r]
-    if remarks:
-        lsec('■ 備考')
-        for i, r in enumerate(remarks):
-            lrow('', r, alt=(i%2==1))
+            draw_text(c, truncate_text(entry[1], LCW-6, FSZ),
+                      LX+3, ly + LRH*0.22, FSZ, color=C_BLACK)
 
     if MID_BOT + 8 < ly:
         draw_text(c, '※現況と図面が相違する場合は現況を優先します。',
-                  LX+2, MID_BOT+4, 5.5, color=C_MUTED)
+                  LX+2, MID_BOT+4, 5.0, color=C_MUTED)
 
     # Q2-bottom: K2 floor plan (Variant A)
     if variant != 'B':
