@@ -762,6 +762,18 @@
     }
     .btn-auth-login:hover { opacity: 0.85; }
     #auth-user { display: none; align-items: center; gap: 10px; }
+    .auth-avatar-img {
+      width: 32px; height: 32px; border-radius: 50%;
+      object-fit: cover; border: 2px solid rgba(255,255,255,0.5);
+      flex-shrink: 0;
+    }
+    .auth-avatar-fallback {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--gold); color: #0e2a5a;
+      font-size: 13px; font-weight: 800;
+      align-items: center; justify-content: center;
+      flex-shrink: 0; border: 2px solid rgba(255,255,255,0.5);
+    }
     .auth-user-name {
       color: rgba(255,255,255,0.9); font-size: 12px; font-weight: 600;
       max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -805,9 +817,10 @@
       <div class="lp-brand-sub">JUSTSALEMONO — 不動産チラシ自動生成</div>
     </div>
     <div class="lp-header-right">
-      <a href="https://jjconnect.online" class="lp-header-link" target="_blank">🌐 jjconnect.online</a>
       <button id="btn-login" class="btn-auth-login" onclick="authLogin()">ログイン</button>
-      <div id="auth-user">
+      <div id="auth-user" style="display:none;">
+        <img id="auth-avatar" class="auth-avatar-img" src="" alt="" onerror="this.style.display='none';document.getElementById('auth-avatar-fallback').style.display='flex';">
+        <div id="auth-avatar-fallback" class="auth-avatar-fallback" style="display:none;"></div>
         <span class="auth-user-name" id="auth-user-name"></span>
         <button class="btn-auth-logout" onclick="authLogout()">ログアウト</button>
       </div>
@@ -1719,7 +1732,24 @@ async function _applyAuthState() {
     try {
       const user = await _auth0Client.getUser();
       _authToken = await _auth0Client.getTokenSilently();
-      document.getElementById('auth-user-name').textContent = user.name || user.email || '';
+
+      // Name
+      const displayName = user.name || user.email || '';
+      document.getElementById('auth-user-name').textContent = displayName;
+
+      // Avatar — use profile picture if available, else initials fallback
+      const avatarImg      = document.getElementById('auth-avatar');
+      const avatarFallback = document.getElementById('auth-avatar-fallback');
+      if (user.picture) {
+        avatarImg.src = user.picture;
+        avatarImg.style.display = 'block';
+        if (avatarFallback) avatarFallback.style.display = 'none';
+      } else if (avatarFallback) {
+        avatarImg.style.display = 'none';
+        avatarFallback.textContent = (displayName[0] || '?').toUpperCase();
+        avatarFallback.style.display = 'flex';
+      }
+
       await _loadProfileFromAuth0();
     } catch (e) {
       console.error('[Auth0] getToken failed:', e.message);
