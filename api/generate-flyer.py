@@ -614,33 +614,48 @@ def generate(data: dict, out):
                     if si < n_secs - 1:
                         cy -= sec_gap
 
-    # ── Promo ribbon (auto-scale) ─────────────────────────────────────────────
-    promo = data.get('specialPromo', '').strip()
+    # ── Promo ribbon — upper-right corner diagonal banner ────────────────────
+    promo = data.get('specialPromo', '').strip()[:8]   # hard cap 8 chars
     if promo:
-        cx_r = W - MX; cy_t = CTOP
-        rsz  = 7.5
+        cx_r = W - MX          # right edge of content area
+        cy_t = CTOP            # top edge
+        # Font size: large enough to read, auto-shrink only if text is very wide
+        rsz  = 13.0
         ptw  = txt_width(promo, rsz, bold=True)
-        a    = max(55, int(ptw / math.sqrt(2)) + 20)
-        bw2  = max(28, int(a * 0.55))
-        P1   = (cx_r-a, cy_t); P2 = (cx_r-a+bw2, cy_t)
-        P3   = (cx_r, cy_t-a+bw2); P4 = (cx_r, cy_t-a)
+        # Band width = font height + generous top/bottom padding
+        bw2  = int(rsz * 2.2)                          # ≈ 28–30pt
+        # Diagonal arm: text travels at 45° so projected width = ptw/√2;
+        # add half-band on each side so text sits centred in the ribbon
+        a    = int(ptw / math.sqrt(2)) + bw2 + 16      # +16pt margin
+        a    = max(a, 80)                               # minimum visible size
+        # Four corners of the ribbon parallelogram
+        P1 = (cx_r - a,        cy_t)
+        P2 = (cx_r - a + bw2,  cy_t)
+        P3 = (cx_r,            cy_t - a + bw2)
+        P4 = (cx_r,            cy_t - a)
         c.saveState()
+        # Clip to the right photo area so ribbon never bleeds into left column
         cl = c.beginPath(); cl.rect(RX, CBOT, RW, CONTENT_H); c.clipPath(cl, stroke=0)
-        c.setFillColor(colors.HexColor('#c0000066'))
+        # Drop shadow
+        c.setFillColor(colors.HexColor('#00000033'))
         sh = c.beginPath()
-        sh.moveTo(P1[0]+2,P1[1]-2); sh.lineTo(P2[0]+2,P2[1]-2)
-        sh.lineTo(P3[0]+2,P3[1]-2); sh.lineTo(P4[0]+2,P4[1]-2)
+        sh.moveTo(P1[0]+3, P1[1]-3); sh.lineTo(P2[0]+3, P2[1]-3)
+        sh.lineTo(P3[0]+3, P3[1]-3); sh.lineTo(P4[0]+3, P4[1]-3)
         sh.close(); c.drawPath(sh, fill=1, stroke=0)
-        c.setFillColor(C_RED)
+        # Ribbon fill (accent colour)
+        c.setFillColor(C_ACCENT)
         pr = c.beginPath()
         pr.moveTo(*P1); pr.lineTo(*P2); pr.lineTo(*P3); pr.lineTo(*P4)
         pr.close(); c.drawPath(pr, fill=1, stroke=0)
-        c.setStrokeColor(C_AMBER); c.setLineWidth(0.8)
-        c.line(*P1,*P4); c.line(*P2,*P3)
-        mid_x = (P1[0]+P3[0])/2; mid_y = (P1[1]+P3[1])/2
+        # Gold edge lines
+        c.setStrokeColor(C_AMBER); c.setLineWidth(1.0)
+        c.line(*P1, *P4); c.line(*P2, *P3)
+        # Text centred on ribbon
+        mid_x = (P1[0] + P3[0]) / 2
+        mid_y = (P1[1] + P3[1]) / 2
         c.translate(mid_x, mid_y); c.rotate(-45)
         c.setFillColor(C_WHITE)
-        _draw_rotated_text(c, promo, -ptw/2, -rsz/2, rsz)
+        _draw_rotated_text(c, promo, -ptw / 2, -rsz / 2, rsz)
         c.restoreState()
 
     # ── Outer content border (styled corners) ────────────────────────────────
