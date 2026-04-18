@@ -282,24 +282,26 @@ def generate(data: dict, out):
     short     = addr_raw.replace('東京都','').replace('大阪府','').replace('神奈川県','')[:22]
     prop_name = data.get('propertyName', '').strip()
 
-    # ── Navy box: size computed from content, then centred in NAV_H zone ─────
-    NAV_INNER = 5    # top/bottom inner padding
-    NAV_GAP   = 4    # gap between items
+    # ── Navy box: full TOP_H height, flush to top corner ────────────────────
+    # Spans BAND_BOT → CTOP (same boundary as the right-side photos)
+    NAV_INNER  = 5
+    NAV_GAP    = 4
     pill_pad_x, pill_pad_y = 8, 4
 
+    rounded_rect(c, LX, BAND_BOT, LCW, TOP_H, fill=C_NAVY, r=0)   # full-height, square
+
+    # Content is centred within NAV_H (the top sub-zone, above station/price)
     pname_sz = autosize(prop_name, LCW - 6, 22, min_sz=7, bold=True) if prop_name else 0
-    pill_bh  = PILL_SZ + pill_pad_y * 2          # pill badge height (fixed by font)
+    pill_bh  = PILL_SZ + pill_pad_y * 2
     addr_sz  = autosize(short, LCW - 6, 16, min_sz=6, bold=True)
 
-    items_h  = ([pname_sz] if prop_name else []) + [pill_bh, addr_sz]
+    items_h   = ([pname_sz] if prop_name else []) + [pill_bh, addr_sz]
     content_h = sum(items_h) + NAV_GAP * (len(items_h) - 1)
-    box_h    = min(content_h + NAV_INNER * 2, NAV_H)   # never taller than zone
-    box_y    = nav_y + (NAV_H - box_h) / 2             # centred in zone
-
-    rounded_rect(c, LX, box_y, LCW, box_h, fill=C_NAVY, r=5)
-
-    # Draw content top-down inside the box
-    cur_y = box_y + box_h - NAV_INNER   # just inside top edge
+    # True visual centre in NAV_H zone
+    nav_center = nav_y + NAV_H / 2
+    first_sz   = items_h[0] if items_h else 0
+    last_sz    = items_h[-1] if items_h else 0
+    cur_y = nav_center + (content_h - 0.72 * first_sz - 0.80 * last_sz) / 2
 
     if prop_name:
         cur_y -= pname_sz
@@ -319,24 +321,24 @@ def generate(data: dict, out):
     cur_y -= addr_sz
     draw_bold(c, short, LX + LCW/2, cur_y, addr_sz, color=C_WHITE, align='center')
 
-    # ── Station strip (fixed height ST_H = 14mm) ──────────────────────────────
+    # ── Station strip — semi-transparent overlay on navy background ──────────
     rect(c, LX, BAND_BOT + PRICE_H, LCW, ST_H,
-         fill=colors.HexColor('#dce8f8'))
+         fill=colors.HexColor('#1a3a6e'))   # darker navy tint (overlay on navy)
+    hline(c, LX, LX + LCW, BAND_BOT + PRICE_H + ST_H, color=colors.HexColor('#2a5090'), lw=0.5)
     stations = data.get('stations', [])[:3]
-    # 3 lines fit: each takes (ST_FONT + line_gap). Distribute evenly in ST_H.
-    n_st     = max(len(stations), 1)
+    n_st      = max(len(stations), 1)
     st_line_h = ST_H / n_st
     for i, st in enumerate(stations):
         ln    = st.get('line', '')
         stn   = st.get('station', '').replace('駅', '')
         wk    = st.get('walk', '')
         line_t = truncate_text(f"{ln}　{stn}駅 徒歩{wk}分", LCW - 10, ST_FONT)
-        # Baseline: centered within its slice
         st_y  = BAND_BOT + PRICE_H + ST_H - (i + 0.5) * st_line_h - ST_FONT * 0.3
-        draw_text(c, line_t, LX + LCW/2, st_y, ST_FONT, color=C_NAVY, align='center')
+        draw_text(c, line_t, LX + LCW/2, st_y, ST_FONT, color=C_WHITE, align='center')
 
-    # ── Price strip (fixed height PRICE_H = 20mm) ────────────────────────────
-    rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=C_LBLUE)
+    # ── Price strip — accent overlay at bottom of navy box ───────────────────
+    rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=colors.HexColor('#0d2450'))  # deepest navy
+    hline(c, LX, LX + LCW, BAND_BOT + PRICE_H, color=colors.HexColor('#2a5090'), lw=0.5)
 
     price_raw = data.get('price', '')
     num_part  = price_raw.replace('万円', '').strip()
@@ -352,7 +354,7 @@ def generate(data: dict, out):
     draw_text(c, tax_lbl,
               price_x + txt_width(num_part, price_sz, bold=True) + 4,
               price_y + 2, tax_sz, color=C_ACCENT)
-    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - 8, 5.5, color=C_MUTED)
+    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - 8, 5.5, color=colors.HexColor('#8aaacf'))
 
     rebuild = data.get('rebuild', '')
     if rebuild:
