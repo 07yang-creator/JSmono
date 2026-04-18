@@ -162,12 +162,16 @@ def styled_rect(c, x, y, w, h, fill=None, stroke=None, lw=0.5,
                 corners=(True, True, True, True)):
     """Rectangle with optional per-corner round or cut (chamfer) treatment.
     corners = (bottom_left, bottom_right, top_left, top_right)
+    r is always clamped to min(w,h)/2 so arcs never overflow the element bounds.
     """
     if corner_style == 'square' or corner_r <= 0:
         rect(c, x, y, w, h, fill=fill, stroke=stroke, lw=lw)
         return
     bl, br, tl, tr = corners
-    r = corner_r
+    r = min(corner_r, w / 2, h / 2)   # clamp — prevents arc overflow on small elements
+    if r <= 0:
+        rect(c, x, y, w, h, fill=fill, stroke=stroke, lw=lw)
+        return
     c.saveState()
     if fill:   c.setFillColor(fill)
     if stroke: c.setStrokeColor(stroke); c.setLineWidth(lw)
