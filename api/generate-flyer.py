@@ -266,9 +266,9 @@ def generate(data: dict, out):
     MID_H    = MID_TOP - MID_BOT
 
     # ── Left column top-band zones — fixed heights for sections 2+3 ─────────
-    PRICE_H = 15 * mm               # price strip  (bottom) — compact
+    PRICE_H = 21 * mm               # price strip  (bottom) — ~6mm gained from nav
     ST_H    = 17 * mm               # station strip (middle) — fits 3 lines
-    NAV_H   = TOP_H - PRICE_H - ST_H # nav box      (top) — gets the rest
+    NAV_H   = TOP_H - PRICE_H - ST_H # nav box      (top) — ~15% shorter
 
     # Navy box bottom y-coordinate
     nav_y   = BAND_BOT + PRICE_H + ST_H
@@ -354,7 +354,7 @@ def generate(data: dict, out):
     num_part  = price_raw.replace('万円', '').strip()
     tax_lbl   = '万円（税込）' if '税込' in data.get('taxIncluded', '税込') else '万円（税別）'
     tax_sz    = ST_FONT
-    PRICE_PAD = 5                               # equal top/bottom padding inside strip
+    PRICE_PAD = 7                               # generous top/bottom padding inside strip
 
     price_sz  = autosize(num_part, LCW - txt_width(tax_lbl, tax_sz, True) - 14,
                          int((PRICE_H - PRICE_PAD * 2) * 0.85), min_sz=9, bold=True)
