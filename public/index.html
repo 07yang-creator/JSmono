@@ -465,6 +465,60 @@
     .page-title { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
     .page-sub { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
 
+    /* ── Style picker panel ──────────────────────────────────────── */
+    .style-panel {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 20px; margin-bottom: 22px;
+    }
+    .style-panel-title {
+      font-size: 13px; font-weight: 700; color: var(--primary);
+      margin-bottom: 14px; display: flex; align-items: center; gap: 7px;
+    }
+    .style-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+    .style-row:last-child { margin-bottom: 0; }
+    .style-label { font-size: 11px; font-weight: 600; color: var(--muted); min-width: 72px; }
+
+    /* Palette chips */
+    .palette-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .palette-chip {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      cursor: pointer; padding: 6px 8px; border-radius: 8px;
+      border: 2px solid transparent; transition: border-color .15s, background .15s;
+    }
+    .palette-chip:hover { background: #f0f4ff; }
+    .palette-chip.active { border-color: var(--primary); background: #eef3fc; }
+    .chip-swatch-row { display: flex; gap: 2px; }
+    .chip-primary { width: 22px; height: 22px; border-radius: 4px 0 0 4px; }
+    .chip-accent  { width: 10px; height: 22px; border-radius: 0 4px 4px 0; }
+    .chip-name { font-size: 9px; color: var(--muted); font-weight: 600; letter-spacing: .04em; }
+
+    /* Corner controls */
+    .ctrl-group { display: flex; gap: 5px; }
+    .ctrl-btn {
+      padding: 4px 12px; font-size: 11px; font-weight: 600; border-radius: 6px;
+      border: 1.5px solid var(--border); background: var(--bg);
+      cursor: pointer; transition: border-color .15s, background .15s, color .15s;
+      color: var(--text);
+    }
+    .ctrl-btn:hover { border-color: var(--primary-light); background: #f0f4ff; }
+    .ctrl-btn.active { border-color: var(--primary); background: var(--primary); color: #fff; }
+
+    /* Preset slots */
+    .preset-slots { display: flex; gap: 8px; }
+    .preset-slot {
+      display: flex; align-items: center; gap: 4px;
+      border: 1.5px dashed var(--border); border-radius: 7px;
+      padding: 4px 8px; font-size: 11px; min-width: 90px;
+    }
+    .preset-slot.filled { border-style: solid; border-color: var(--primary-light); background: #f5f8ff; }
+    .preset-name { flex: 1; font-size: 10px; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .preset-load { background: none; border: none; cursor: pointer; font-size: 11px; color: var(--primary); padding: 1px 4px; border-radius: 4px; }
+    .preset-load:hover { background: #dce8fa; }
+    .preset-save { background: none; border: none; cursor: pointer; font-size: 13px; padding: 1px 4px; }
+    .preset-del  { background: none; border: none; cursor: pointer; font-size: 10px; color: #aaa; padding: 1px 4px; }
+    .preset-del:hover { color: #dc2626; }
+    #cornerExtraRow { display: none; }
+
     /* ── PDF upload area ─────────────────────────────────────────── */
     .upload-section { margin-bottom: 28px; }
     .upload-section-title {
@@ -1133,6 +1187,54 @@
     <div class="page-title">📋 物件情報入力</div>
     <div class="page-sub">テンプレート <strong id="app-template-label">1 — スタンダード</strong>　|　PDFまたは手動入力で物件情報を入力してください</div>
 
+    <!-- ══ STYLE PICKER ══════════════════════════════════════════════════ -->
+    <div class="style-panel">
+      <div class="style-panel-title">🎨 デザインスタイル</div>
+
+      <!-- Row 1: Colour palette -->
+      <div class="style-row">
+        <span class="style-label">カラー</span>
+        <div class="palette-chips" id="paletteChips">
+          <!-- chips injected by JS -->
+        </div>
+      </div>
+
+      <!-- Row 2: Corner shape -->
+      <div class="style-row">
+        <span class="style-label">コーナー</span>
+        <div class="ctrl-group" id="cornerStyleBtns">
+          <button class="ctrl-btn active" data-val="square">□ スクエア</button>
+          <button class="ctrl-btn"        data-val="round" >◯ ラウンド</button>
+          <button class="ctrl-btn"        data-val="cut"   >◇ カット</button>
+        </div>
+      </div>
+
+      <!-- Row 3: Size + which corners (hidden when square) -->
+      <div class="style-row" id="cornerExtraRow">
+        <span class="style-label">サイズ</span>
+        <div class="ctrl-group" id="cornerSizeBtns">
+          <button class="ctrl-btn"        data-val="small" >S</button>
+          <button class="ctrl-btn active" data-val="medium">M</button>
+          <button class="ctrl-btn"        data-val="large" >L</button>
+        </div>
+        <span class="style-label" style="margin-left:12px">適用角</span>
+        <div class="ctrl-group" id="cornerSelBtns">
+          <button class="ctrl-btn active" data-val="all"  >全角</button>
+          <button class="ctrl-btn"        data-val="top"  >上のみ</button>
+          <button class="ctrl-btn"        data-val="outer">対角線</button>
+          <button class="ctrl-btn"        data-val="tl"   >左上のみ</button>
+        </div>
+      </div>
+
+      <!-- Row 4: Presets (save / load) -->
+      <div class="style-row">
+        <span class="style-label">プリセット</span>
+        <div class="preset-slots" id="presetSlots">
+          <!-- slots injected by JS -->
+        </div>
+      </div>
+    </div>
+
     <!-- PDF Upload Zone -->
     <div class="upload-section">
       <div class="upload-section-title">📄 STEP 1 — 既存の物件PDFを読み込む（任意・省略可）</div>
@@ -1788,6 +1890,7 @@ async function _applyAuthState() {
       );
 
       await _loadProfileFromAuth0();
+      _loadPresetsFromServer();
     } catch (e) {
       console.error('[Auth0] getToken failed:', e.message);
       // Token silently failed — treat as logged out
@@ -2193,6 +2296,153 @@ function updatePhotoReq() {
 }
 
 // ── Generate flyer ────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// STYLE PICKER
+// ══════════════════════════════════════════════════════════════════════════
+const PALETTES_UI = [
+  {id:'ocean',  label:'Ocean',  primary:'#1a4fa0', accent:'#e85d2f'},
+  {id:'forest', label:'Forest', primary:'#14532d', accent:'#b45309'},
+  {id:'wine',   label:'Wine',   primary:'#881337', accent:'#c2410c'},
+  {id:'slate',  label:'Slate',  primary:'#1e3a5f', accent:'#0369a1'},
+  {id:'amber',  label:'Amber',  primary:'#78350f', accent:'#b91c1c'},
+  {id:'coral',  label:'Coral',  primary:'#7c2d12', accent:'#1d4ed8'},
+  {id:'teal',   label:'Teal',   primary:'#134e4a', accent:'#c2410c'},
+  {id:'indigo', label:'Indigo', primary:'#312e81', accent:'#be123c'},
+];
+
+let _style = {
+  palette:     'ocean',
+  cornerStyle: 'square',
+  cornerSize:  'medium',
+  cornerSel:   'all',
+};
+
+// Render palette chips
+(function initPaletteChips() {
+  const wrap = document.getElementById('paletteChips');
+  PALETTES_UI.forEach(p => {
+    const chip = document.createElement('div');
+    chip.className = 'palette-chip' + (p.id === _style.palette ? ' active' : '');
+    chip.dataset.palette = p.id;
+    chip.innerHTML = `
+      <div class="chip-swatch-row">
+        <div class="chip-primary" style="background:${p.primary}"></div>
+        <div class="chip-accent"  style="background:${p.accent}"></div>
+      </div>
+      <span class="chip-name">${p.label}</span>`;
+    chip.addEventListener('click', () => {
+      _style.palette = p.id;
+      wrap.querySelectorAll('.palette-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+    wrap.appendChild(chip);
+  });
+})();
+
+// Generic ctrl-btn group handler
+function _initCtrlGroup(groupId, stateKey) {
+  const grp = document.getElementById(groupId);
+  grp.querySelectorAll('.ctrl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _style[stateKey] = btn.dataset.val;
+      grp.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (stateKey === 'cornerStyle') {
+        document.getElementById('cornerExtraRow').style.display =
+          _style.cornerStyle === 'square' ? 'none' : 'flex';
+      }
+    });
+  });
+}
+_initCtrlGroup('cornerStyleBtns', 'cornerStyle');
+_initCtrlGroup('cornerSizeBtns',  'cornerSize');
+_initCtrlGroup('cornerSelBtns',   'cornerSel');
+
+// ── Preset save / load (stored in Auth0 user_metadata) ───────────────────
+const MAX_PRESETS = 3;
+let _presets = [null, null, null];   // filled from user_metadata on login
+
+function _renderPresets() {
+  const wrap = document.getElementById('presetSlots');
+  wrap.innerHTML = '';
+  for (let i = 0; i < MAX_PRESETS; i++) {
+    const p = _presets[i];
+    const slot = document.createElement('div');
+    slot.className = 'preset-slot' + (p ? ' filled' : '');
+
+    const palLabel = p ? (PALETTES_UI.find(x => x.id === p.palette)?.label || p.palette) : '';
+    const cornerLabel = p ? ({square:'□',round:'◯',cut:'◇'}[p.cornerStyle] || '') : '';
+
+    slot.innerHTML = p
+      ? `<div class="chip-primary" style="background:${PALETTES_UI.find(x=>x.id===p.palette)?.primary||'#ccc'};width:12px;height:12px;border-radius:3px;flex-shrink:0"></div>
+         <span class="preset-name" title="${palLabel} ${cornerLabel}">${palLabel} ${cornerLabel}</span>
+         <button class="preset-load" title="読み込む" onclick="_loadPreset(${i})">↩</button>
+         <button class="preset-del"  title="削除"     onclick="_delPreset(${i})">✕</button>`
+      : `<span class="preset-name" style="color:#ccc">空</span>
+         <button class="preset-save" title="現在のスタイルを保存" onclick="_savePreset(${i})">💾</button>`;
+    wrap.appendChild(slot);
+  }
+}
+
+function _loadPreset(i) {
+  if (!_presets[i]) return;
+  Object.assign(_style, _presets[i]);
+  // Sync UI
+  ['paletteChips'].forEach(id => {
+    document.getElementById(id).querySelectorAll('.palette-chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.palette === _style.palette);
+    });
+  });
+  ['cornerStyleBtns','cornerSizeBtns','cornerSelBtns'].forEach((gid, gi) => {
+    const key = ['cornerStyle','cornerSize','cornerSel'][gi];
+    document.getElementById(gid).querySelectorAll('.ctrl-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.val === _style[key]);
+    });
+  });
+  document.getElementById('cornerExtraRow').style.display =
+    _style.cornerStyle === 'square' ? 'none' : 'flex';
+}
+
+function _savePreset(i) {
+  _presets[i] = {..._style};
+  _syncPresetsToServer();
+  _renderPresets();
+}
+
+function _delPreset(i) {
+  _presets[i] = null;
+  _syncPresetsToServer();
+  _renderPresets();
+}
+
+async function _syncPresetsToServer() {
+  try {
+    const tok = await _auth0Client.getTokenSilently();
+    await fetch('/api/user-profile', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'Authorization': `Bearer ${tok}`},
+      body: JSON.stringify({stylePresets: _presets}),
+    });
+  } catch(e) { /* not fatal */ }
+}
+
+async function _loadPresetsFromServer() {
+  try {
+    const tok = await _auth0Client.getTokenSilently();
+    const r = await fetch('/api/user-profile', {headers: {'Authorization': `Bearer ${tok}`}});
+    if (r.ok) {
+      const meta = await r.json();
+      if (Array.isArray(meta.stylePresets)) {
+        _presets = meta.stylePresets.slice(0, MAX_PRESETS);
+        while (_presets.length < MAX_PRESETS) _presets.push(null);
+      }
+    }
+  } catch(e) { /* not fatal */ }
+  _renderPresets();
+}
+
+_renderPresets();   // initial empty render; filled once user logs in
+
 function generateFlyer() {
   const raw = _collectAndValidate(); if (!raw) return;
   const filename = (raw.address || '物件').replace(/\s/g,'_') + '_チラシ.pdf';
@@ -2240,8 +2490,13 @@ function _collectAndValidate() {
       return null;
     }
   }
-  raw.stations = collectStations();
-  raw.nearby   = collectNearby();
+  raw.stations    = collectStations();
+  raw.nearby      = collectNearby();
+  // Inject style settings
+  raw.palette     = _style.palette;
+  raw.cornerStyle = _style.cornerStyle;
+  raw.cornerSize  = _style.cornerSize;
+  raw.cornerSel   = _style.cornerSel;
   return raw;
 }
 

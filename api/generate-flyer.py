@@ -113,6 +113,18 @@ def autosize(s, max_w, max_sz, min_sz=6, bold=False):
         if txt_width(s, sz, bold) <= max_w: return sz
     return min_sz
 
+# ── Colour palettes ──────────────────────────────────────────────────────────
+PALETTES = {
+    'ocean':  {'label':'Ocean',  'primary':'#1a4fa0','primary_dk':'#12357a','accent':'#e85d2f','light':'#eef3fb','medium':'#d8e4f5','secbg':'#dde8f8','div':'#c0cfe8','steel':'#adc4e8'},
+    'forest': {'label':'Forest', 'primary':'#14532d','primary_dk':'#0d3d20','accent':'#b45309','light':'#f0fdf4','medium':'#bbf7d0','secbg':'#dcfce7','div':'#86efac','steel':'#4ade80'},
+    'wine':   {'label':'Wine',   'primary':'#881337','primary_dk':'#60182a','accent':'#c2410c','light':'#fff1f2','medium':'#fecdd3','secbg':'#ffe4e6','div':'#fca5a5','steel':'#f87171'},
+    'slate':  {'label':'Slate',  'primary':'#1e3a5f','primary_dk':'#152c47','accent':'#0369a1','light':'#f0f9ff','medium':'#bae6fd','secbg':'#e0f2fe','div':'#7dd3fc','steel':'#38bdf8'},
+    'amber':  {'label':'Amber',  'primary':'#78350f','primary_dk':'#5a2808','accent':'#b91c1c','light':'#fffbeb','medium':'#fde68a','secbg':'#fef3c7','div':'#fcd34d','steel':'#fbbf24'},
+    'coral':  {'label':'Coral',  'primary':'#7c2d12','primary_dk':'#5c2108','accent':'#1d4ed8','light':'#fff7ed','medium':'#fed7aa','secbg':'#ffedd5','div':'#fdba74','steel':'#fb923c'},
+    'teal':   {'label':'Teal',   'primary':'#134e4a','primary_dk':'#0d3836','accent':'#c2410c','light':'#f0fdfa','medium':'#99f6e4','secbg':'#ccfbf1','div':'#5eead4','steel':'#2dd4bf'},
+    'indigo': {'label':'Indigo', 'primary':'#312e81','primary_dk':'#231f69','accent':'#be123c','light':'#eef2ff','medium':'#c7d2fe','secbg':'#e0e7ff','div':'#a5b4fc','steel':'#818cf8'},
+}
+
 # ── Colours ───────────────────────────────────────────────────────────────────
 C_NAVY   = colors.HexColor('#1a4fa0')
 C_NAVYDK = colors.HexColor('#12357a')
@@ -143,6 +155,45 @@ def rounded_rect(c, x, y, w, h, fill=None, stroke=None, lw=0.5, r=4):
     if fill:   c.setFillColor(fill)
     if stroke: c.setStrokeColor(stroke); c.setLineWidth(lw)
     c.roundRect(x, y, w, h, r, fill=1 if fill else 0, stroke=1 if stroke else 0)
+    c.restoreState()
+
+def styled_rect(c, x, y, w, h, fill=None, stroke=None, lw=0.5,
+                corner_style='square', corner_r=6,
+                corners=(True, True, True, True)):
+    """Rectangle with optional per-corner round or cut (chamfer) treatment.
+    corners = (bottom_left, bottom_right, top_left, top_right)
+    """
+    if corner_style == 'square' or corner_r <= 0:
+        rect(c, x, y, w, h, fill=fill, stroke=stroke, lw=lw)
+        return
+    bl, br, tl, tr = corners
+    r = corner_r
+    c.saveState()
+    if fill:   c.setFillColor(fill)
+    if stroke: c.setStrokeColor(stroke); c.setLineWidth(lw)
+    p = c.beginPath()
+    if corner_style == 'round':
+        p.moveTo(x + (r if bl else 0), y)
+        p.lineTo(x + w - (r if br else 0), y)
+        if br: p.arcTo(x+w-2*r, y,       x+w,   y+2*r,   270, 90)
+        p.lineTo(x + w, y + h - (r if tr else 0))
+        if tr: p.arcTo(x+w-2*r, y+h-2*r, x+w,   y+h,       0, 90)
+        p.lineTo(x + (r if tl else 0), y + h)
+        if tl: p.arcTo(x,       y+h-2*r, x+2*r, y+h,      90, 90)
+        p.lineTo(x, y + (r if bl else 0))
+        if bl: p.arcTo(x,       y,        x+2*r, y+2*r,   180, 90)
+    elif corner_style == 'cut':
+        p.moveTo(x + (r if bl else 0), y)
+        p.lineTo(x + w - (r if br else 0), y)
+        if br: p.lineTo(x+w, y+r)
+        p.lineTo(x + w, y + h - (r if tr else 0))
+        if tr: p.lineTo(x+w-r, y+h)
+        p.lineTo(x + (r if tl else 0), y + h)
+        if tl: p.lineTo(x, y+h-r)
+        p.lineTo(x, y + (r if bl else 0))
+        if bl: p.lineTo(x+r, y)
+    p.close()
+    c.drawPath(p, fill=1 if fill else 0, stroke=1 if stroke else 0)
     c.restoreState()
 
 def vline(c, x, y1, y2, color=C_DIV, lw=0.4):
@@ -229,6 +280,32 @@ def generate(data: dict, out):
     c = canvas.Canvas(out, pagesize=PAGE)
     W, H = PAGE                      # ≈ 841.89 × 595.28 pts
 
+    # ── Style: palette + corner config ────────────────────────────────────────
+    _pal = PALETTES.get(data.get('palette', 'ocean'), PALETTES['ocean'])
+    # Shadow module-level colours with palette values for this document
+    C_NAVY    = colors.HexColor(_pal['primary'])
+    C_NAVYDK  = colors.HexColor(_pal['primary_dk'])
+    C_ACCENT  = colors.HexColor(_pal['accent'])
+    C_LBLUE   = colors.HexColor(_pal['light'])
+    C_MBLUE   = colors.HexColor(_pal['medium'])
+    C_SECBG   = colors.HexColor(_pal['secbg'])
+    C_DIV     = colors.HexColor(_pal['div'])
+    C_STEELBL = colors.HexColor(_pal['steel'])
+
+    _cs  = data.get('cornerStyle', 'square')          # 'square' | 'round' | 'cut'
+    _cr  = {'small': 4, 'medium': 8, 'large': 14}.get(data.get('cornerSize', 'medium'), 8)
+    _csel = data.get('cornerSel', 'all')
+    # Corner masks (bl, br, tl, tr) per element
+    _MASKS = {
+        'all':   {'nav': (True, False, True, False), 'border': (True, True, True, True)},
+        'top':   {'nav': (False,False, True, False), 'border': (False,False, True, True)},
+        'outer': {'nav': (False,False, True, False), 'border': (True, False,False, True)},
+        'tl':    {'nav': (False,False, True, False), 'border': (False,False, True, False)},
+    }
+    _cm = _MASKS.get(_csel, _MASKS['all'])
+    _nav_mask    = _cm['nav']
+    _border_mask = _cm['border']
+
     # ══════════════════════════════════════════════════════════════════════════
     # FIXED GEOMETRY — all constants, computed once.  Nothing resizes at runtime.
     # ══════════════════════════════════════════════════════════════════════════
@@ -288,7 +365,8 @@ def generate(data: dict, out):
     NAV_GAP    = 4
     pill_pad_x, pill_pad_y = 8, 4
 
-    rounded_rect(c, LX, BAND_BOT, LCW, TOP_H, fill=C_NAVY, r=0)   # full-height, square
+    styled_rect(c, LX, BAND_BOT, LCW, TOP_H, fill=C_NAVY,
+                corner_style=_cs, corner_r=_cr, corners=_nav_mask)
 
     # ── Section 1: NAV_H zone ────────────────────────────────────────────────
     # Elements (name, pill, address) stay tightly together as ONE group.
@@ -526,6 +604,11 @@ def generate(data: dict, out):
         c.setFillColor(C_WHITE)
         _draw_rotated_text(c, promo, -ptw/2, -rsz/2, rsz)
         c.restoreState()
+
+    # ── Outer content border (styled corners) ────────────────────────────────
+    styled_rect(c, MX, CBOT, IW, CONTENT_H,
+                fill=None, stroke=C_DIV, lw=0.8,
+                corner_style=_cs, corner_r=_cr, corners=_border_mask)
 
     # ── Grid dividers (Variant A only) ────────────────────────────────────────
     vline(c, RX, CBOT, CTOP, color=C_DIV, lw=0.8)
