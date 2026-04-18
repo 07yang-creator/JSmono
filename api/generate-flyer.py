@@ -265,10 +265,11 @@ def generate(data: dict, out):
     MID_TOP  = BAND_BOT
     MID_H    = MID_TOP - MID_BOT
 
-    # ── Left column top-band zones (all FIXED, sum = TOP_H) ──────────────────
-    PRICE_H = 20 * mm                # price strip  (bottom of left top-band)
-    ST_H    = 14 * mm                # station strip (middle)
-    NAV_H   = TOP_H - PRICE_H - ST_H # navy box     (top, remainder)
+    # ── Left column top-band zones — equal thirds of TOP_H ───────────────────
+    SEC_H   = TOP_H / 3              # each section gets one third
+    PRICE_H = SEC_H                  # price strip  (bottom)
+    ST_H    = SEC_H                  # station strip (middle)
+    NAV_H   = TOP_H - PRICE_H - ST_H # nav box      (top) = SEC_H
 
     # Navy box bottom y-coordinate
     nav_y   = BAND_BOT + PRICE_H + ST_H
