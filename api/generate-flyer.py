@@ -293,14 +293,18 @@ def generate(data: dict, out):
     # ── Section 1: NAV_H zone ────────────────────────────────────────────────
     # Elements (name, pill, address) stay tightly together as ONE group.
     # Group is centred in NAV_H with equal space above and below.
-    INNER_GAP = 5      # tight gap between elements inside the group
+    INNER_GAP = 5      # gap between pill and address
+    LINE_GAP  = 12     # breathing room for the amber divider line (6pt above + 6pt below)
 
     pname_sz = autosize(prop_name, LCW - 8, 20, min_sz=7, bold=True) if prop_name else 0
     pill_bh  = PILL_SZ + pill_pad_y * 2
     addr_sz  = autosize(short, LCW - 8, 14, min_sz=6, bold=True)
 
-    group_items = ([pname_sz] if prop_name else []) + [pill_bh, addr_sz]
-    group_h     = sum(group_items) + INNER_GAP * (len(group_items) - 1)
+    # Group height: name→line uses LINE_GAP, pill→addr uses INNER_GAP
+    if prop_name:
+        group_h = pname_sz + LINE_GAP + pill_bh + INNER_GAP + addr_sz
+    else:
+        group_h = pill_bh + INNER_GAP + addr_sz
 
     # Equal space top and bottom of group inside NAV_H
     side_pad = max(6, (NAV_H - group_h) / 2)
@@ -312,8 +316,8 @@ def generate(data: dict, out):
         cur_y -= pname_sz
         draw_bold(c, prop_name, LX + LCW/2, cur_y, pname_sz,
                   color=C_WHITE, align='center')
-        cur_y -= INNER_GAP
-        hline(c, LX + 8, LX + LCW - 8, cur_y + INNER_GAP/2, color=C_AMBER, lw=0.8)
+        cur_y -= LINE_GAP
+        hline(c, LX + 8, LX + LCW - 8, cur_y + LINE_GAP/2, color=C_AMBER, lw=0.8)
 
     bw     = txt_width(prop_type, PILL_SZ) + pill_pad_x * 2
     cur_y -= pill_bh
