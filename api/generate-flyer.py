@@ -423,15 +423,13 @@ def generate(data: dict, out):
 
             nearby = data.get('nearby', [])
 
-            # G — 借地条件 / 現況
-            if lease or grent or status or handover:
+            # G — 借地条件 (現況/引渡 already shown in left column — omit here)
+            if lease or grent:
                 grows = []
                 if grent:
                     grows.append((f'地代　{grent}', ''))
                 if lease:
                     grows.append((truncate_text(lease, INNER_W * 0.80, 8), ''))
-                if status or handover:
-                    grows.append((f'現況：{status}　　引渡：{handover}', ''))
                 if grows:
                     poster_secs.append({'title': '借地条件', 'rows': grows})
 
