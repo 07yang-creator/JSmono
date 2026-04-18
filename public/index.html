@@ -1108,9 +1108,10 @@
       </div>
     </div>
     <div class="user-area">
-      <div class="avatar">田</div>
-      <span>田中エージェント</span>
-      <button class="btn-logout" onclick="handleLogout()">ログアウト</button>
+      <img id="app-avatar-img" class="auth-avatar-img" src="" alt="" style="display:none;" onerror="this.style.display='none';document.getElementById('app-avatar-fallback').style.display='flex';">
+      <div id="app-avatar-fallback" class="auth-avatar-fallback" style="display:flex;">?</div>
+      <span id="app-user-name">—</span>
+      <button class="btn-logout" onclick="authLogout()">ログアウト</button>
     </div>
   </header>
 
@@ -1736,19 +1737,35 @@ async function _applyAuthState() {
       // Name
       const displayName = user.name || user.email || '';
       document.getElementById('auth-user-name').textContent = displayName;
+      const appName = document.getElementById('app-user-name');
+      if (appName) appName.textContent = displayName;
 
-      // Avatar — use profile picture if available, else initials fallback
-      const avatarImg      = document.getElementById('auth-avatar');
-      const avatarFallback = document.getElementById('auth-avatar-fallback');
-      if (user.picture) {
-        avatarImg.src = user.picture;
-        avatarImg.style.display = 'block';
-        if (avatarFallback) avatarFallback.style.display = 'none';
-      } else if (avatarFallback) {
-        avatarImg.style.display = 'none';
-        avatarFallback.textContent = (displayName[0] || '?').toUpperCase();
-        avatarFallback.style.display = 'flex';
+      // Avatar helper — applies picture or initial fallback to a pair of elements
+      function _setAvatar(imgEl, fallbackEl, picture, name) {
+        if (!imgEl || !fallbackEl) return;
+        const initial = (name[0] || '?').toUpperCase();
+        fallbackEl.textContent = initial;
+        if (picture) {
+          imgEl.src = picture;
+          imgEl.style.display = 'block';
+          fallbackEl.style.display = 'none';
+        } else {
+          imgEl.style.display = 'none';
+          fallbackEl.style.display = 'flex';
+        }
       }
+      // Landing-page header avatar
+      _setAvatar(
+        document.getElementById('auth-avatar'),
+        document.getElementById('auth-avatar-fallback'),
+        user.picture, displayName
+      );
+      // App-page header avatar
+      _setAvatar(
+        document.getElementById('app-avatar-img'),
+        document.getElementById('app-avatar-fallback'),
+        user.picture, displayName
+      );
 
       await _loadProfileFromAuth0();
     } catch (e) {
