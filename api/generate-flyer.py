@@ -119,10 +119,10 @@ PALETTES = {
     'forest': {'label':'Forest', 'primary':'#14532d','primary_dk':'#0d3d20','accent':'#b45309','light':'#f0fdf4','medium':'#bbf7d0','secbg':'#dcfce7','div':'#86efac','steel':'#4ade80'},
     'wine':   {'label':'Wine',   'primary':'#881337','primary_dk':'#60182a','accent':'#c2410c','light':'#fff1f2','medium':'#fecdd3','secbg':'#ffe4e6','div':'#fca5a5','steel':'#f87171'},
     'slate':  {'label':'Slate',  'primary':'#1e3a5f','primary_dk':'#152c47','accent':'#0369a1','light':'#f0f9ff','medium':'#bae6fd','secbg':'#e0f2fe','div':'#7dd3fc','steel':'#38bdf8'},
-    'amber':  {'label':'Amber',  'primary':'#78350f','primary_dk':'#5a2808','accent':'#b91c1c','light':'#fffbeb','medium':'#fde68a','secbg':'#fef3c7','div':'#fcd34d','steel':'#fbbf24'},
-    'coral':  {'label':'Coral',  'primary':'#7c2d12','primary_dk':'#5c2108','accent':'#1d4ed8','light':'#fff7ed','medium':'#fed7aa','secbg':'#ffedd5','div':'#fdba74','steel':'#fb923c'},
-    'teal':   {'label':'Teal',   'primary':'#134e4a','primary_dk':'#0d3836','accent':'#c2410c','light':'#f0fdfa','medium':'#99f6e4','secbg':'#ccfbf1','div':'#5eead4','steel':'#2dd4bf'},
-    'indigo': {'label':'Indigo', 'primary':'#312e81','primary_dk':'#231f69','accent':'#be123c','light':'#eef2ff','medium':'#c7d2fe','secbg':'#e0e7ff','div':'#a5b4fc','steel':'#818cf8'},
+    'blush':  {'label':'Blush',  'primary':'#fce4ec','primary_dk':'#f8bbd0','text_on_primary':'#880e4f','accent':'#ad1457','light':'#fff0f3','medium':'#ffb3c6','secbg':'#fce4ec','div':'#f48fb1','steel':'#d81b60'},
+    'mint':   {'label':'Mint',   'primary':'#e8f5e9','primary_dk':'#c8e6c9','text_on_primary':'#1b5e20','accent':'#2e7d32','light':'#f1f8f2','medium':'#a5d6a7','secbg':'#e8f5e9','div':'#81c784','steel':'#388e3c'},
+    'peach':  {'label':'Peach',  'primary':'#fff3e0','primary_dk':'#ffe0b2','text_on_primary':'#bf360c','accent':'#e64a19','light':'#fff8f0','medium':'#ffcc80','secbg':'#fff3e0','div':'#ffb74d','steel':'#f57c00'},
+    'lilac':  {'label':'Lilac',  'primary':'#ede7f6','primary_dk':'#d1c4e9','text_on_primary':'#4a148c','accent':'#6a1b9a','light':'#f3effe','medium':'#b39ddb','secbg':'#ede7f6','div':'#9575cd','steel':'#7b1fa2'},
 }
 
 # ── Colours ───────────────────────────────────────────────────────────────────
@@ -295,6 +295,12 @@ def generate(data: dict, out):
     C_SECBG   = colors.HexColor(_pal['secbg'])
     C_DIV     = colors.HexColor(_pal['div'])
     C_STEELBL = colors.HexColor(_pal['steel'])
+    _light_theme  = 'text_on_primary' in _pal          # palette uses dark-on-light
+    C_TEXT_ON_PRI = colors.HexColor(_pal.get('text_on_primary', '#ffffff'))
+    # Adaptive footer info text colours (visible on both dark and light footer bg)
+    _c_info_main = C_STEELBL if not _light_theme else C_TEXT_ON_PRI
+    _c_info_dim  = colors.HexColor('#8aa8cc') if not _light_theme else C_TEXT_ON_PRI
+    _c_info_dept = colors.HexColor('#aabbd4') if not _light_theme else C_TEXT_ON_PRI
 
     _cs  = data.get('cornerStyle', 'square')          # 'square' | 'round' | 'cut'
     _cr  = {'small': 4, 'medium': 8, 'large': 14}.get(data.get('cornerSize', 'medium'), 8)
@@ -397,7 +403,7 @@ def generate(data: dict, out):
     if prop_name:
         cur_y -= pname_sz
         draw_bold(c, prop_name, LX + LCW/2, cur_y, pname_sz,
-                  color=C_WHITE, align='center')
+                  color=C_TEXT_ON_PRI, align='center')
         cur_y -= LINE_GAP
         hline(c, LX + 8, LX + LCW - 8, cur_y + LINE_GAP/2, color=C_AMBER, lw=0.8)
 
@@ -410,7 +416,7 @@ def generate(data: dict, out):
     cur_y -= INNER_GAP
 
     cur_y -= addr_sz
-    draw_bold(c, short, LX + LCW/2, cur_y, addr_sz, color=C_WHITE, align='center')
+    draw_bold(c, short, LX + LCW/2, cur_y, addr_sz, color=C_TEXT_ON_PRI, align='center')
 
     # ── Section 2: Station strip — white bg, dark text, tight spacing ───────
     rect(c, LX, BAND_BOT + PRICE_H, LCW, ST_H, fill=C_WHITE)
@@ -719,7 +725,7 @@ def generate(data: dict, out):
             if ly - LBAR < MID_BOT: break
             ly -= LBAR
             rect(c, LX, ly, LCW, LBAR, fill=C_NAVY)
-            draw_bold(c, entry[1], LX+4, ly + LBAR*0.25, FSZ+0.5, color=C_WHITE)
+            draw_bold(c, entry[1], LX+4, ly + LBAR*0.25, FSZ+0.5, color=C_TEXT_ON_PRI)
 
         elif entry[0] == 'row':
             _, lbl, val, alt = entry
@@ -760,7 +766,7 @@ def generate(data: dict, out):
     # ══════════════════════════════════════════════════════════════════════════
     F_PAD   = 5
     FY_TOP  = FOOTER_Y + FOOTER_H
-    DIVC    = colors.HexColor('#2a4a8a')
+    DIVC    = C_TEXT_ON_PRI if _light_theme else colors.HexColor('#2a4a8a')
 
     # Fixed section widths (sum = IW)
     F_LOGO_W = FOOTER_H              # square logo
@@ -818,10 +824,10 @@ def generate(data: dict, out):
     # Left-align: anchor text at left edge of section plus padding
     name_lx = F_NAME_X + F_PAD
     if have_b:
-        draw_bold(c, brand, name_lx, ny, brand_sz, color=C_WHITE)
+        draw_bold(c, brand, name_lx, ny, brand_sz, color=C_TEXT_ON_PRI)
         ny -= brand_sz + N_GAP
     if have_c:
-        draw_bold(c, co, name_lx, ny, co_sz, color=C_WHITE)
+        draw_bold(c, co, name_lx, ny, co_sz, color=C_TEXT_ON_PRI)
 
     vline(c, F_INFO_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
@@ -837,15 +843,15 @@ def generate(data: dict, out):
     assoc     = data.get('association', '')
     # Build rows as (text, colour, size) — collect first, draw after centering
     info_rows = []
-    if dept:      info_rows.append((dept,    colors.HexColor('#aabbd4'), ISZ))
-    if addr_co:   info_rows.append((addr_co, C_STEELBL,                  ISZ))
+    if dept:      info_rows.append((dept,    _c_info_dept, ISZ))
+    if addr_co:   info_rows.append((addr_co, _c_info_main, ISZ))
     if tel and fax:
-        info_rows.append((f'TEL：{tel}  FAX：{fax}', C_STEELBL, ISZ))
-    elif tel:     info_rows.append((f'TEL：{tel}',   C_STEELBL, ISZ))
-    elif fax:     info_rows.append((f'FAX：{fax}',   C_STEELBL, ISZ))
-    if em:        info_rows.append((f'✉ {em}',        C_STEELBL, ISZ))
-    if licenseNo: info_rows.append((licenseNo, colors.HexColor('#8aa8cc'), ISZ-1))
-    if assoc:     info_rows.append((assoc,     colors.HexColor('#8aa8cc'), ISZ-1.5))
+        info_rows.append((f'TEL：{tel}  FAX：{fax}', _c_info_main, ISZ))
+    elif tel:     info_rows.append((f'TEL：{tel}',   _c_info_main, ISZ))
+    elif fax:     info_rows.append((f'FAX：{fax}',   _c_info_main, ISZ))
+    if em:        info_rows.append((f'✉ {em}',        _c_info_main, ISZ))
+    if licenseNo: info_rows.append((licenseNo, _c_info_dim,  ISZ-1))
+    if assoc:     info_rows.append((assoc,     _c_info_dim,  ISZ-1.5))
     # Total block height → centre in footer
     if info_rows:
         total_h = sum(sz for _, _, sz in info_rows) + IGAP * (len(info_rows) - 1)
@@ -895,10 +901,10 @@ def generate(data: dict, out):
         cy2 = sub_center
 
     if have_ag:
-        draw_bold(c, f'【担当】{ag}', F_CONT_X+F_PAD, cy2, asz, color=C_WHITE)
+        draw_bold(c, f'【担当】{ag}', F_CONT_X+F_PAD, cy2, asz, color=C_TEXT_ON_PRI)
         cy2 -= asz + ROW_GAP
     if have_tel:
-        draw_bold(c, f'TEL：{tel_str}', F_CONT_X+F_PAD, cy2, tsz, color=C_WHITE)
+        draw_bold(c, f'TEL：{tel_str}', F_CONT_X+F_PAD, cy2, tsz, color=C_TEXT_ON_PRI)
 
     vline(c, F_YELL_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
