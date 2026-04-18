@@ -671,8 +671,9 @@ def generate(data: dict, out):
 
     vline(c, F_INFO_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
-    # ── c) Company info ───────────────────────────────────────────────────────
+    # ── c) Company info — vertically centred ─────────────────────────────────
     ISZ       = 7.0
+    IGAP      = 2.5
     addr_co   = data.get('companyAddress', '')
     tel       = data.get('tel', '')
     fax       = data.get('fax', '')
@@ -680,25 +681,25 @@ def generate(data: dict, out):
     dept      = data.get('department', '')
     licenseNo = data.get('licenseNo', '')
     assoc     = data.get('association', '')
-    iy = FY_TOP - F_PAD - int(ISZ)    # start baseline so cap stays within footer top
-    def irow(txt, col, sz=ISZ):
-        nonlocal iy
-        if not txt or iy - sz < FOOTER_Y: return
-        draw_text(c, truncate_text(txt, F_INFO_W-F_PAD*2, sz),
-                  F_INFO_X+F_PAD, iy, sz, color=col)
-        iy -= sz + 2.5
-    irow(dept,    colors.HexColor('#aabbd4'))
-    irow(addr_co, C_STEELBL)
-    # TEL + FAX on one line to save vertical space
+    # Build rows as (text, colour, size) — collect first, draw after centering
+    info_rows = []
+    if dept:      info_rows.append((dept,    colors.HexColor('#aabbd4'), ISZ))
+    if addr_co:   info_rows.append((addr_co, C_STEELBL,                  ISZ))
     if tel and fax:
-        irow(f'TEL：{tel}  FAX：{fax}', C_STEELBL)
-    elif tel:
-        irow(f'TEL：{tel}', C_STEELBL)
-    elif fax:
-        irow(f'FAX：{fax}', C_STEELBL)
-    irow(f'✉ {em}' if em else '', C_STEELBL)
-    irow(licenseNo, colors.HexColor('#8aa8cc'), sz=ISZ-1)
-    irow(assoc,     colors.HexColor('#8aa8cc'), sz=ISZ-1.5)
+        info_rows.append((f'TEL：{tel}  FAX：{fax}', C_STEELBL, ISZ))
+    elif tel:     info_rows.append((f'TEL：{tel}',   C_STEELBL, ISZ))
+    elif fax:     info_rows.append((f'FAX：{fax}',   C_STEELBL, ISZ))
+    if em:        info_rows.append((f'✉ {em}',        C_STEELBL, ISZ))
+    if licenseNo: info_rows.append((licenseNo, colors.HexColor('#8aa8cc'), ISZ-1))
+    if assoc:     info_rows.append((assoc,     colors.HexColor('#8aa8cc'), ISZ-1.5))
+    # Total block height → centre in footer
+    if info_rows:
+        total_h = sum(sz for _, _, sz in info_rows) + IGAP * (len(info_rows) - 1)
+        iy = FOOTER_Y + FOOTER_H / 2 + total_h / 2   # top baseline of first row
+        for txt, col, sz in info_rows:
+            draw_text(c, truncate_text(txt, F_INFO_W - F_PAD * 2, sz),
+                      F_INFO_X + F_PAD, iy, sz, color=col)
+            iy -= sz + IGAP
 
     vline(c, F_CONT_X, FOOTER_Y, FY_TOP, color=DIVC, lw=0.6)
 
@@ -728,10 +729,8 @@ def generate(data: dict, out):
     elif have_tel:             block_h = tsz
     else:                      block_h = 0
 
-    # Vertically centre block in the space below the strip
-    below_top = strip_y                          # top of space below strip
-    below_ctr = FOOTER_Y + (below_top - FOOTER_Y) / 2
-    cy2 = below_ctr + block_h / 2               # top baseline of first row
+    # Vertically centre agent/tel block in full footer height
+    cy2 = FOOTER_Y + FOOTER_H / 2 + block_h / 2  # top baseline of first row
 
     if have_ag:
         draw_bold(c, f'【担当】{ag}', F_CONT_X+F_PAD, cy2, asz, color=C_WHITE)
