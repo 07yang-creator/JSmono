@@ -380,6 +380,16 @@ def generate(data: dict, out):
     # Footer bottom corners match the border bottom corners (bl, br only)
     _footer_mask = (_border_mask[0], _border_mask[1], False, False)
 
+    # ── Light-palette contrast helpers ────────────────────────────────────────
+    # For light palettes C_NAVY is a pale hue → unusable as text on white.
+    # These aliases always resolve to a legible dark colour regardless of palette.
+    _c_on_white   = C_TEXT_ON_PRI if _light_theme else C_NAVY
+    # Section bar fill / label cell background — use the accent-dark tone for light
+    _c_secbar_fill = C_TEXT_ON_PRI if _light_theme else C_NAVY
+    _c_seclbl_bg   = C_MBLUE       if _light_theme else C_SECBG  # label cell background
+    # Yellow area text: C_NAVYDK is also pale for light palettes
+    _c_yell_text   = C_TEXT_ON_PRI if _light_theme else C_NAVYDK
+
     # ══════════════════════════════════════════════════════════════════════════
     # FIXED GEOMETRY — all constants, computed once.  Nothing resizes at runtime.
     # ══════════════════════════════════════════════════════════════════════════
@@ -501,7 +511,7 @@ def generate(data: dict, out):
         line_t = truncate_text(f"{ln}　{stn}駅 徒歩{wk}分", LCW - 10, ST_FONT)
         # Baseline centred in each line slice
         st_y   = block_top - (i + 0.5) * st_line_h - ST_FONT * 0.26
-        draw_text(c, line_t, LX + LCW/2, st_y, ST_FONT, color=C_NAVY, align='center')
+        draw_text(c, line_t, LX + LCW/2, st_y, ST_FONT, color=_c_on_white, align='center')
 
     # ── Section 3: Price strip — white bg, dark label, orange price number ──
     rect(c, LX, BAND_BOT, LCW, PRICE_H, fill=C_WHITE)
@@ -523,7 +533,7 @@ def generate(data: dict, out):
     draw_text(c, tax_lbl,
               price_x + txt_width(num_part, price_sz, bold=True) + 4,
               price_y + 2, tax_sz, color=C_ACCENT)
-    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - PRICE_PAD - 1, 5.5, color=C_NAVY)
+    draw_text(c, '販売価格', LX + 5, BAND_BOT + PRICE_H - PRICE_PAD - 1, 5.5, color=_c_on_white)
 
     rebuild = data.get('rebuild', '')
     if rebuild:
@@ -631,10 +641,10 @@ def generate(data: dict, out):
                     # Section title + underline
                     cy -= title_sz + 2
                     draw_bold(c, sec['title'],
-                              RX1 + BOX_PAD, cy, title_sz, color=C_NAVY)
+                              RX1 + BOX_PAD, cy, title_sz, color=_c_on_white)
                     cy -= 3
                     hline(c, RX1 + BOX_PAD, RX1 + HALF - BOX_PAD, cy + 1.5,
-                          color=C_STEELBL, lw=0.8)
+                          color=C_ACCENT if _light_theme else C_STEELBL, lw=0.8)
                     cy -= max(7, title_slot - title_sz - 5)  # generous gap below underline
 
                     # Rows
@@ -846,8 +856,8 @@ def generate(data: dict, out):
         if entry[0] == 'sec':
             if ly - LBAR < MID_BOT: break
             ly -= LBAR
-            rect(c, LX, ly, LCW, LBAR, fill=C_NAVY)
-            draw_bold(c, entry[1], LX+4, ly + LBAR*0.25, FSZ+0.5, color=C_TEXT_ON_PRI)
+            rect(c, LX, ly, LCW, LBAR, fill=_c_secbar_fill)
+            draw_bold(c, entry[1], LX+4, ly + LBAR*0.25, FSZ+0.5, color=C_WHITE)
 
         elif entry[0] == 'row':
             _, lbl, val, alt = entry
@@ -856,8 +866,8 @@ def generate(data: dict, out):
             bg = C_LBLUE if alt else C_WHITE
             if lbl:
                 # Normal two-cell row: label | value
-                rect(c, LX,       ly, LLBW, LRH, fill=C_SECBG, stroke=C_DIV, lw=0.3)
-                draw_text(c, lbl, LX+2, ly + LRH*0.22, FSZ, color=C_NAVY)
+                rect(c, LX,       ly, LLBW, LRH, fill=_c_seclbl_bg, stroke=C_DIV, lw=0.3)
+                draw_text(c, lbl, LX+2, ly + LRH*0.22, FSZ, color=_c_on_white)
                 rect(c, LX+LLBW,  ly, LVBW, LRH, fill=bg,     stroke=C_DIV, lw=0.3)
                 draw_text(c, truncate_text(val, LVBW-5, FSZ),
                           LX+LLBW+3, ly + LRH*0.22, FSZ, color=C_BLACK)
@@ -1061,7 +1071,7 @@ def generate(data: dict, out):
         line_gap = max(2, best_ssz // 6)
         sy = FY_TOP - F_PAD - best_ssz          # top-line baseline
         for line in slogan_lines:
-            draw_bold(c, line, F_YELL_X + F_PAD, sy, best_ssz, color=C_NAVYDK)
+            draw_bold(c, line, F_YELL_X + F_PAD, sy, best_ssz, color=_c_yell_text)
             sy -= best_ssz + line_gap
 
     # 取引態様 / 手数料 — fixed ISZ size (matches company info column),
@@ -1080,7 +1090,7 @@ def generate(data: dict, out):
         # Horizontally: centre in yellow area
         bw_txt = txt_width(bot_line, BSZ, bold=True)
         bot_x  = F_YELL_X + (F_YELL_W - bw_txt) / 2
-        draw_bold(c, bot_line, bot_x, bot_y, BSZ, color=C_NAVYDK)
+        draw_bold(c, bot_line, bot_x, bot_y, BSZ, color=_c_yell_text)
 
     c.save()
 
