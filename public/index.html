@@ -1961,7 +1961,6 @@
           <button class="btn-auth-login-sm" onclick="authLogin()">ログイン</button>
         </div>
         <div class="actions">
-          <span id="dl-badge" class="dl-badge" style="margin-right:4px;">⬇ 残り ? 回</span>
           <button type="button" class="btn-save" onclick="saveDraft()">💾 下書き保存</button>
           <button type="button" class="btn-preview" onclick="previewFlyer()">👁 プレビュー &amp; ダウンロード</button>
         </div>
@@ -1976,6 +1975,7 @@
       <div class="preview-header">
         <h3>👁 チラシプレビュー</h3>
         <div class="preview-header-right">
+          <span id="dl-badge" class="dl-badge">⬇ 残り ? 回</span>
           <button class="btn-preview-dl" onclick="downloadFromPreview()">⬇ ダウンロード</button>
           <button class="btn-preview-close" onclick="closePreview()" title="閉じる">✕</button>
         </div>
@@ -2379,29 +2379,38 @@ function _doDirectDownload() {
 
 // ── Unlock modal ──────────────────────────────────────────────
 function _openUnlockModal() {
-  const modal = document.getElementById('unlockModal');
-  const input = document.getElementById('unlock-input');
-  const msg   = document.getElementById('unlock-msg');
-  const title = document.getElementById('unlock-title');
+  const modal       = document.getElementById('unlockModal');
+  const input       = document.getElementById('unlock-input');
+  const msg         = document.getElementById('unlock-msg');
+  const title       = document.getElementById('unlock-title');
+  const regHint     = document.getElementById('unlock-register-hint');
+  const lockboxEl   = modal.querySelector('.lockbox');
 
-  // Choose message based on state
-  if (_isUnlocked()) {
-    title.innerHTML = 'ダウンロード上限に達しました<small>登録すると無制限でご利用いただけます</small>';
+  const afterUnlock = _isUnlocked();  // free 3 gone AND unlock code already used
+
+  if (afterUnlock) {
+    // Unlock code already used up — show register prompt, hide lock box
+    title.innerHTML = 'ダウンロード上限に達しました<small>ログインすると無制限でご利用いただけます</small>';
+    lockboxEl.style.display = 'none';
+    regHint.style.display   = 'block';
   } else {
+    // Still on free quota — show lock box, hide register hint
     title.innerHTML = 'ダウンロード上限（' + _DL_FREE_LIMIT + '回）に達しました<small>解除コードを入力すると、さらに' + _DL_UNLOCK_ADD + '回ダウンロードできます</small>';
+    lockboxEl.style.display = '';
+    regHint.style.display   = 'none';
+    // Reset dials and input
+    input.value = '';
+    input.className = 'lockbox-code-input';
+    msg.textContent = '';
+    msg.className = 'lockbox-msg';
+    ['ld0','ld1','ld2','ld3'].forEach(id => {
+      const d = document.getElementById(id);
+      d.querySelector('.lockbox-dial-char').textContent = '—';
+      d.classList.remove('active');
+    });
+    setTimeout(() => input.focus(), 100);
   }
-  // Reset dials and input
-  input.value = '';
-  input.className = 'lockbox-code-input';
-  msg.textContent = '';
-  msg.className = 'lockbox-msg';
-  ['ld0','ld1','ld2','ld3'].forEach(id => {
-    const d = document.getElementById(id);
-    d.querySelector('.lockbox-dial-char').textContent = '—';
-    d.classList.remove('active');
-  });
   modal.classList.add('visible');
-  setTimeout(() => input.focus(), 100);
 }
 
 function _closeUnlock() {
@@ -2457,10 +2466,7 @@ function _submitUnlock() {
   }
 }
 
-// Initialise badge on page load
-document.addEventListener('DOMContentLoaded', _updateDlBadge);
-// Also update after app page becomes visible
-const _origStartApp = typeof startApp !== 'undefined' ? startApp : null;
+// Badge is in preview modal — updated each time modal opens
 
 // ── Banner style ──────────────────────────────────────────────
 let _bannerStyle = 'ribbon';
@@ -2502,7 +2508,6 @@ function startApp() {
   document.getElementById('app-page').style.display = 'block';
   window.scrollTo(0, 0);
   updatePhotoReq();
-  _updateDlBadge();
 }
 
 function goBack() {
@@ -2964,6 +2969,7 @@ function previewFlyer() {
     _previewBlobUrl = URL.createObjectURL(blob);
     document.getElementById('previewFrame').src = _previewBlobUrl;
     document.getElementById('previewModal').classList.add('visible');
+    _updateDlBadge();
     document.body.style.overflow = 'hidden';
   });
 }
