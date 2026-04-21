@@ -1094,60 +1094,6 @@
         </div>
       </div>
 
-      <!-- 4. Special sale overlay -->
-      <div>
-        <div class="lp-section-title">④ 特売情報オーバーレイ（任意）</div>
-        <div class="promo-row">
-          <label class="toggle-switch">
-            <input type="checkbox" id="promo-toggle" onchange="togglePromo(this)">
-            <span class="toggle-track"></span>
-            <span class="toggle-knob"></span>
-          </label>
-          <div>
-            <div class="promo-label">チラシ右上に特別告知バナーを重ねる</div>
-            <div class="promo-sub">価格改定・即時引渡・限定公開など、強調したいキーワードを入力</div>
-          </div>
-        </div>
-        <div class="promo-input-wrap" id="promo-input-wrap">
-          <div style="position:relative;">
-            <input
-              type="text"
-              id="promo-text"
-              class="promo-input"
-              maxlength="8"
-              placeholder="例：価格改定！ / 即引渡可！"
-              oninput="updatePromoPreview(this.value)"
-              style="padding-right:48px;"
-            >
-            <span id="promo-char-count" style="
-              position:absolute; right:10px; top:50%; transform:translateY(-50%);
-              font-size:11px; font-weight:700; color:var(--muted); pointer-events:none;
-            ">0/8</span>
-          </div>
-          <div class="promo-preview">
-            <span style="color:#999;">プレビュー：</span>
-            <span class="promo-stamp" id="promo-stamp-preview">価格改定！</span>
-            <span style="font-size:11px; color:var(--muted);">最大8文字 — チラシ右上にバナーを配置</span>
-          </div>
-          <!-- Banner style picker -->
-          <div style="margin-top:10px; font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.05em;">バナースタイル</div>
-          <div class="banner-style-row">
-            <div class="banner-opt active" onclick="_setBannerStyle(this,'ribbon')">
-              <div class="banner-opt-icon"><div class="bico-ribbon"></div></div>
-              リボン
-            </div>
-            <div class="banner-opt" onclick="_setBannerStyle(this,'stamp')">
-              <div class="banner-opt-icon"><div class="bico-stamp"></div></div>
-              スタンプ
-            </div>
-            <div class="banner-opt" onclick="_setBannerStyle(this,'flag')">
-              <div class="banner-opt-icon"><div class="bico-flag"></div></div>
-              フラッグ
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div><!-- /lp-card -->
 
     <!-- Coming soon features -->
@@ -1200,9 +1146,6 @@
   <div class="app-back-bar">
     <button class="app-back-btn" onclick="goBack()">← 設定に戻る</button>
     <span id="app-variant-label" class="app-variant-badge">標準（写真2枚+地図+周辺環境）</span>
-    <span id="app-promo-label" class="app-promo-badge" style="display:none">
-      ✦ 特売バナー: <span id="app-promo-text-label"></span>
-    </span>
   </div>
 
   <!-- Header -->
@@ -1332,8 +1275,6 @@
       <!-- Hidden fields from landing page -->
       <input type="hidden" name="templateId" id="f-templateId" value="1">
       <input type="hidden" name="templateVariant" id="f-templateVariant" value="A">
-      <input type="hidden" name="specialPromo" id="f-specialPromo" value="">
-      <input type="hidden" name="bannerStyle" id="f-bannerStyle" value="ribbon">
 
       <div class="form-grid">
 
@@ -1818,6 +1759,64 @@
 
       </div><!-- /form-grid -->
 
+      <!-- ── 特売情報オーバーレイ ── -->
+      <div class="form-section" style="margin-bottom:20px;">
+        <div class="section-header">
+          <span class="section-icon">🏷</span>
+          <span class="section-title">特売情報バナー（任意）</span>
+        </div>
+        <div style="padding:16px 18px;">
+          <div class="promo-row">
+            <label class="toggle-switch">
+              <input type="checkbox" id="promo-toggle" onchange="togglePromo(this)">
+              <span class="toggle-track"></span>
+              <span class="toggle-knob"></span>
+            </label>
+            <div>
+              <div class="promo-label">チラシ右上に特別告知バナーを重ねる</div>
+              <div class="promo-sub">価格改定・即時引渡・限定公開など、強調したいキーワードを入力</div>
+            </div>
+          </div>
+          <div class="promo-input-wrap" id="promo-input-wrap">
+            <div style="position:relative; margin-top:4px;">
+              <input
+                type="text"
+                id="promo-text"
+                class="promo-input"
+                maxlength="8"
+                placeholder="例：価格改定！ / 即引渡可！"
+                oninput="updatePromoPreview(this.value)"
+                style="padding-right:48px;"
+              >
+              <span id="promo-char-count" style="
+                position:absolute; right:10px; top:50%; transform:translateY(-50%);
+                font-size:11px; font-weight:700; color:var(--muted); pointer-events:none;
+              ">0/8</span>
+            </div>
+            <div class="promo-preview">
+              <span style="color:#999;">プレビュー：</span>
+              <span class="promo-stamp" id="promo-stamp-preview">価格改定！</span>
+              <span style="font-size:11px; color:var(--muted);">最大8文字 — チラシ右上にバナーを配置</span>
+            </div>
+            <div style="margin-top:10px; font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.05em;">バナースタイル</div>
+            <div class="banner-style-row">
+              <div class="banner-opt active" onclick="_setBannerStyle(this,'ribbon')">
+                <div class="banner-opt-icon"><div class="bico-ribbon"></div></div>
+                リボン
+              </div>
+              <div class="banner-opt" onclick="_setBannerStyle(this,'stamp')">
+                <div class="banner-opt-icon"><div class="bico-stamp"></div></div>
+                スタンプ
+              </div>
+              <div class="banner-opt" onclick="_setBannerStyle(this,'flag')">
+                <div class="banner-opt-icon"><div class="bico-flag"></div></div>
+                フラッグ
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Submit Bar -->
       <div class="submit-bar">
         <div class="hints">
@@ -2167,25 +2166,15 @@ function updatePromoPreview(text) {
 
 function startApp() {
   const buildingName = document.getElementById('lp-building-name').value.trim();
-  const promoEnabled = document.getElementById('promo-toggle').checked;
-  const promoText    = document.getElementById('promo-text').value.trim();
 
   document.getElementById('f-templateId').value      = _selectedTemplate;
   document.getElementById('f-templateVariant').value = _selectedVariant;
-  document.getElementById('f-specialPromo').value    = promoEnabled ? promoText : '';
-  document.getElementById('f-bannerStyle').value     = _bannerStyle;
   if (buildingName) document.getElementById('f-propertyName').value = buildingName;
 
   const variantLabels = { A: '標準（写真2枚+地図+周辺環境）', B: '写真重視（写真4枚・周辺環境なし）' };
   document.getElementById('app-variant-label').textContent =
     'Template ' + _selectedTemplate + ' — ' + variantLabels[_selectedVariant];
 
-  if (promoEnabled && promoText) {
-    document.getElementById('app-promo-label').style.display = '';
-    document.getElementById('app-promo-text-label').textContent = promoText;
-  } else {
-    document.getElementById('app-promo-label').style.display = 'none';
-  }
   document.getElementById('nearby-section').style.display = _selectedVariant === 'B' ? 'none' : '';
 
   document.getElementById('landing-page').style.display = 'none';
@@ -2613,6 +2602,11 @@ function _collectAndValidate() {
   raw.cornerSize  = _style.cornerSize;
   raw.cornerSel   = _style.cornerSel;
   raw.navFont     = _style.navFont;
+  // Inject promo (now lives on page 2 form)
+  const promoOn   = document.getElementById('promo-toggle')?.checked;
+  const promoTxt  = document.getElementById('promo-text')?.value.trim() || '';
+  raw.specialPromo = promoOn ? promoTxt : '';
+  raw.bannerStyle  = _bannerStyle;
   return raw;
 }
 
