@@ -917,6 +917,139 @@
     .progress-steps .step { padding: 4px 0; color: var(--muted); display: flex; align-items: center; gap: 8px; }
     .progress-steps .step.done { color: var(--success); }
     .progress-steps .step.active { color: var(--primary); font-weight: 600; }
+    /* ── Download lock system ───────────────────────────────────── */
+    .dl-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: 20px; padding: 3px 10px;
+    }
+    .dl-badge.warning { color: #c2410c; border-color: #fca5a5; background: #fff5f2; }
+    .dl-badge.locked  { color: #7c3aed; border-color: #c4b5fd; background: #f5f3ff; }
+
+    /* ── Unlock modal overlay ── */
+    #unlockModal {
+      display: none; position: fixed; inset: 0; z-index: 600;
+      background: rgba(5,15,40,0.78); align-items: center; justify-content: center;
+    }
+    #unlockModal.visible { display: flex; }
+
+    /* Lock box outer casing — black rounded rectangle */
+    .lockbox-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 20px;
+    }
+    .lockbox-title {
+      color: #fff; font-size: 15px; font-weight: 700; text-align: center;
+      line-height: 1.5;
+    }
+    .lockbox-title small {
+      display: block; font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.6);
+      margin-top: 4px;
+    }
+    .lockbox {
+      width: 240px;
+      background: #1a1a1a;
+      border-radius: 22px;
+      padding: 18px 16px 20px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
+      position: relative;
+    }
+    /* Mounting screws decoration */
+    .lockbox::before, .lockbox::after {
+      content: '';
+      position: absolute;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #555, #222);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+    }
+    .lockbox::before { top: 10px; left: 10px; }
+    .lockbox::after  { top: 10px; right: 10px; }
+
+    /* Orange inner panel */
+    .lockbox-panel {
+      background: linear-gradient(160deg, #f06a20 0%, #e85d2f 60%, #cc4a1f 100%);
+      border-radius: 12px;
+      padding: 14px 12px 16px;
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    /* 4 decorative dials row */
+    .lockbox-dials {
+      display: flex; gap: 6px; justify-content: center; margin-bottom: 14px;
+    }
+    .lockbox-dial {
+      width: 42px; height: 42px;
+      background: linear-gradient(160deg, #d0d0d0, #a0a0a0);
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; position: relative; overflow: hidden;
+    }
+    .lockbox-dial::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 40%;
+      background: rgba(255,255,255,0.18); border-radius: 6px 6px 0 0;
+    }
+    .lockbox-dial-char {
+      font-size: 18px; font-weight: 900; color: #2a2a2a;
+      font-family: 'Courier New', monospace; letter-spacing: -1px;
+      position: relative; z-index: 1;
+    }
+    .lockbox-dial.active .lockbox-dial-char { color: var(--primary); }
+
+    /* Input row */
+    .lockbox-input-row {
+      display: flex; gap: 6px; align-items: center;
+    }
+    .lockbox-code-input {
+      flex: 1; padding: 10px 12px;
+      background: #1a1a1a; border: 2px solid #444;
+      border-radius: 8px; color: #fff;
+      font-size: 22px; font-weight: 900; letter-spacing: 8px;
+      text-align: center; font-family: 'Courier New', monospace;
+      outline: none; transition: border-color 0.2s;
+    }
+    .lockbox-code-input:focus { border-color: #e85d2f; }
+    .lockbox-code-input.error  { border-color: #ef4444; animation: shake 0.3s; }
+    .lockbox-code-input.ok     { border-color: #22c55e; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%      { transform: translateX(-5px); }
+      75%      { transform: translateX(5px); }
+    }
+    .lockbox-submit {
+      padding: 10px 14px; background: #1a1a1a; border: 2px solid #555;
+      border-radius: 8px; color: #fff; font-size: 18px; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s; line-height: 1;
+    }
+    .lockbox-submit:hover { border-color: #e85d2f; background: #2a1a10; }
+
+    .lockbox-msg {
+      margin-top: 10px; font-size: 11px; text-align: center; min-height: 16px;
+      color: rgba(255,255,255,0.7);
+    }
+    .lockbox-msg.error { color: #fca5a5; }
+    .lockbox-msg.ok    { color: #86efac; }
+
+    /* Bottom actions */
+    .lockbox-actions {
+      display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%;
+    }
+    .lockbox-cancel {
+      font-size: 12px; color: rgba(255,255,255,0.5); cursor: pointer;
+      text-decoration: underline; background: none; border: none;
+    }
+    .lockbox-cancel:hover { color: rgba(255,255,255,0.8); }
+    .lockbox-register {
+      font-size: 12px; color: rgba(255,255,255,0.7); text-align: center;
+      background: rgba(255,255,255,0.08); border-radius: 8px;
+      padding: 10px 14px; line-height: 1.6; width: 100%;
+    }
+    .lockbox-register a {
+      color: var(--gold); font-weight: 700; text-decoration: none;
+    }
+    .lockbox-register a:hover { text-decoration: underline; }
+
     /* ── Auth UI ─────────────────────────────────────────────────── */
     .btn-auth-login {
       background: var(--gold); border: none; color: #0e2a5a;
@@ -1828,8 +1961,10 @@
           <button class="btn-auth-login-sm" onclick="authLogin()">ログイン</button>
         </div>
         <div class="actions">
+          <span id="dl-badge" class="dl-badge" style="margin-right:4px;">⬇ 残り ? 回</span>
           <button type="button" class="btn-save" onclick="saveDraft()">💾 下書き保存</button>
-          <button type="button" class="btn-preview" onclick="previewFlyer()">👁 プレビュー &amp; ダウンロード</button>
+          <button type="button" class="btn-preview" onclick="previewFlyer()">👁 プレビュー</button>
+          <button type="button" class="btn-preview" onclick="requestDownload(null)" style="background:#1a4fa0;">⬇ ダウンロード</button>
         </div>
       </div>
 
@@ -1847,6 +1982,54 @@
         </div>
       </div>
       <iframe id="previewFrame" src="" title="チラシプレビュー"></iframe>
+    </div>
+  </div>
+
+  <!-- ── Unlock Code Modal ── -->
+  <div id="unlockModal" onclick="if(event.target===this)_closeUnlock()">
+    <div class="lockbox-wrap">
+      <div class="lockbox-title" id="unlock-title">
+        ダウンロード上限に達しました
+        <small>解除コードを入力すると、さらに10回ダウンロードできます</small>
+      </div>
+
+      <!-- Combination lock box visual -->
+      <div class="lockbox">
+        <div class="lockbox-panel">
+          <!-- Decorative dials -->
+          <div class="lockbox-dials">
+            <div class="lockbox-dial" id="ld0"><span class="lockbox-dial-char">—</span></div>
+            <div class="lockbox-dial" id="ld1"><span class="lockbox-dial-char">—</span></div>
+            <div class="lockbox-dial" id="ld2"><span class="lockbox-dial-char">—</span></div>
+            <div class="lockbox-dial" id="ld3"><span class="lockbox-dial-char">—</span></div>
+          </div>
+          <!-- Input -->
+          <div class="lockbox-input-row">
+            <input
+              type="tel"
+              id="unlock-input"
+              class="lockbox-code-input"
+              maxlength="4"
+              placeholder="••••"
+              autocomplete="off"
+              oninput="_onUnlockInput(this)"
+              onkeydown="if(event.key==='Enter')_submitUnlock()"
+            >
+            <button class="lockbox-submit" onclick="_submitUnlock()" title="解除">🔓</button>
+          </div>
+          <div class="lockbox-msg" id="unlock-msg"></div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="lockbox-actions">
+        <div class="lockbox-register" id="unlock-register-hint">
+          さらに多くダウンロードするには
+          <a href="#" onclick="authLogin();_closeUnlock();return false;">無料アカウント登録</a>
+          してください。<br>登録者は無制限でご利用いただけます。
+        </div>
+        <button class="lockbox-cancel" onclick="_closeUnlock()">キャンセル</button>
+      </div>
     </div>
   </div>
 
@@ -2142,6 +2325,145 @@ function selectVariant(v) {
   updatePhotoReq();
 }
 
+// ═══════════════════════════════════════════════════════════════
+// DOWNLOAD LOCK SYSTEM
+// ═══════════════════════════════════════════════════════════════
+const _DL_COUNT_KEY  = 'jjc_dl_count';   // number of downloads used
+const _DL_EXTRA_KEY  = 'jjc_dl_extra';   // extra downloads unlocked (0 or 10)
+const _DL_FREE_LIMIT = 3;                 // free quota
+const _DL_UNLOCK_ADD = 10;               // downloads added by unlock code
+const _UNLOCK_CODE   = '0228';           // default unlock code
+
+function _getDlCount()  { return parseInt(localStorage.getItem(_DL_COUNT_KEY) || '0', 10); }
+function _getDlExtra()  { return parseInt(localStorage.getItem(_DL_EXTRA_KEY) || '0', 10); }
+function _getDlLimit()  { return _DL_FREE_LIMIT + _getDlExtra(); }
+function _getDlLeft()   { return Math.max(0, _getDlLimit() - _getDlCount()); }
+function _isUnlocked()  { return _getDlExtra() >= _DL_UNLOCK_ADD; }
+
+function _incrementDl() {
+  localStorage.setItem(_DL_COUNT_KEY, _getDlCount() + 1);
+  _updateDlBadge();
+}
+
+function _updateDlBadge() {
+  const badge = document.getElementById('dl-badge');
+  if (!badge) return;
+  const left = _getDlLeft();
+  badge.textContent = '⬇ 残り ' + left + ' 回';
+  badge.className = 'dl-badge' + (left === 0 ? ' locked' : left <= 1 ? ' warning' : '');
+}
+
+// Called when user tries to download
+let _pendingDownload = null;   // callback to run after unlock
+function requestDownload(doDownload) {
+  if (_getDlLeft() > 0) {
+    _incrementDl();
+    if (doDownload) doDownload();
+    else _doDirectDownload();
+  } else {
+    _pendingDownload = doDownload || _doDirectDownload;
+    _openUnlockModal();
+  }
+}
+
+function _doDirectDownload() {
+  // Trigger actual generate+download (called from submit bar button)
+  const raw = _collectAndValidate(); if (!raw) return;
+  const addr = (raw.address || raw.propertyName || '物件').trim();
+  const filename = addr.replace(/[\s\/\\:*?"<>|]/g, '_') + '_チラシ.pdf';
+  _runGenerate(raw, blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+  });
+}
+
+// ── Unlock modal ──────────────────────────────────────────────
+function _openUnlockModal() {
+  const modal = document.getElementById('unlockModal');
+  const input = document.getElementById('unlock-input');
+  const msg   = document.getElementById('unlock-msg');
+  const title = document.getElementById('unlock-title');
+
+  // Choose message based on state
+  if (_isUnlocked()) {
+    title.innerHTML = 'ダウンロード上限に達しました<small>登録すると無制限でご利用いただけます</small>';
+  } else {
+    title.innerHTML = 'ダウンロード上限（' + _DL_FREE_LIMIT + '回）に達しました<small>解除コードを入力すると、さらに' + _DL_UNLOCK_ADD + '回ダウンロードできます</small>';
+  }
+  // Reset dials and input
+  input.value = '';
+  input.className = 'lockbox-code-input';
+  msg.textContent = '';
+  msg.className = 'lockbox-msg';
+  ['ld0','ld1','ld2','ld3'].forEach(id => {
+    const d = document.getElementById(id);
+    d.querySelector('.lockbox-dial-char').textContent = '—';
+    d.classList.remove('active');
+  });
+  modal.classList.add('visible');
+  setTimeout(() => input.focus(), 100);
+}
+
+function _closeUnlock() {
+  document.getElementById('unlockModal').classList.remove('visible');
+  _pendingDownload = null;
+}
+
+function _onUnlockInput(input) {
+  const val = input.value.replace(/\D/g, '').slice(0, 4);
+  input.value = val;
+  input.className = 'lockbox-code-input';
+  document.getElementById('unlock-msg').textContent = '';
+  // Update decorative dials
+  ['ld0','ld1','ld2','ld3'].forEach((id, i) => {
+    const d = document.getElementById(id);
+    const ch = val[i];
+    d.querySelector('.lockbox-dial-char').textContent = ch ? ch : '—';
+    d.classList.toggle('active', !!ch);
+  });
+}
+
+function _submitUnlock() {
+  const input = document.getElementById('unlock-input');
+  const msg   = document.getElementById('unlock-msg');
+  const code  = input.value.trim();
+
+  if (code.length < 4) {
+    msg.textContent = '4桁のコードを入力してください';
+    msg.className = 'lockbox-msg error';
+    return;
+  }
+
+  if (code === _UNLOCK_CODE) {
+    // Correct — unlock 10 more downloads
+    localStorage.setItem(_DL_EXTRA_KEY, _DL_UNLOCK_ADD);
+    input.className = 'lockbox-code-input ok';
+    msg.textContent = '✓ 解除成功！さらに' + _DL_UNLOCK_ADD + '回ダウンロードできます';
+    msg.className = 'lockbox-msg ok';
+    _updateDlBadge();
+    setTimeout(() => {
+      _closeUnlock();
+      if (_pendingDownload) {
+        _incrementDl();
+        _pendingDownload();
+        _pendingDownload = null;
+      }
+    }, 900);
+  } else {
+    input.className = 'lockbox-code-input error';
+    msg.textContent = '✗ コードが違います。もう一度お試しください';
+    msg.className = 'lockbox-msg error';
+    setTimeout(() => { input.className = 'lockbox-code-input'; }, 600);
+  }
+}
+
+// Initialise badge on page load
+document.addEventListener('DOMContentLoaded', _updateDlBadge);
+// Also update after app page becomes visible
+const _origStartApp = typeof startApp !== 'undefined' ? startApp : null;
+
+// ── Banner style ──────────────────────────────────────────────
 let _bannerStyle = 'ribbon';
 
 function _setBannerStyle(el, style) {
@@ -2181,6 +2503,7 @@ function startApp() {
   document.getElementById('app-page').style.display = 'block';
   window.scrollTo(0, 0);
   updatePhotoReq();
+  _updateDlBadge();
 }
 
 function goBack() {
@@ -2546,15 +2869,9 @@ async function _loadPresetsFromServer() {
 
 _renderPresets();   // initial empty render; filled once user logs in
 
+// generateFlyer() is now internal — public entry via requestDownload()
 function generateFlyer() {
-  const raw = _collectAndValidate(); if (!raw) return;
-  const addr = (raw.address || raw.propertyName || '物件').trim();
-  const filename = addr.replace(/[\s\/\\:*?"<>|]/g, '_') + '_チラシ.pdf';
-  _runGenerate(raw, blob => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-  });
+  requestDownload(null);
 }
 
 function resetSteps() {
@@ -2659,8 +2976,10 @@ function closePreview() {
 
 function downloadFromPreview() {
   if (!_previewBlobUrl) return;
-  const a = document.createElement('a');
-  a.href = _previewBlobUrl; a.download = _previewFilename; a.click();
+  requestDownload(() => {
+    const a = document.createElement('a');
+    a.href = _previewBlobUrl; a.download = _previewFilename; a.click();
+  });
 }
 
 // Close preview on Escape key
