@@ -1956,10 +1956,6 @@
           <span style="color: var(--accent);">*</span> 必須項目を入力してください<br>
           所在地と販売価格は必須です。その他は任意項目です。
         </div>
-        <div id="auth-gate-notice" class="auth-gate-notice">
-          🔒 チラシを生成・プレビューするにはログインが必要です
-          <button class="btn-auth-login-sm" onclick="authLogin()">ログイン</button>
-        </div>
         <div class="actions">
           <button type="button" class="btn-save" onclick="saveDraft()">💾 下書き保存</button>
           <button type="button" class="btn-preview" onclick="previewFlyer()">👁 プレビュー &amp; ダウンロード</button>
@@ -2111,13 +2107,7 @@ async function _applyAuthState() {
   // Header
   document.getElementById('btn-login').style.display  = isAuth ? 'none' : '';
   document.getElementById('auth-user').style.display  = isAuth ? 'flex' : 'none';
-  // Submit bar gate
-  const gate = document.getElementById('auth-gate-notice');
-  if (gate) gate.style.display = isAuth ? 'none' : 'flex';
-  // Generate / Preview buttons
-  ['btn-generate','btn-preview'].forEach(cls => {
-    document.querySelectorAll('.' + cls).forEach(b => b.disabled = !isAuth);
-  });
+  // Preview/download always available — quota enforced by download lock system
 
   if (isAuth) {
     try {
