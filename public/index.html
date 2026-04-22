@@ -2887,6 +2887,12 @@ function resetSteps() {
 }
 
 // ── Preview ───────────────────────────────────────────────────────────────────
+// TODO (known leak): _previewBlobUrl is revoked on the *next* preview generation,
+// meaning the current blob stays alive in memory until the user previews again or
+// closes the tab. On every re-preview the old URL is released but the iframe keeps
+// a reference until its src changes, so there is a brief double-allocation window.
+// Fix: revoke in closePreview() only after the iframe has navigated away (use
+// iframe 'load' event on about:blank) and track the in-flight blob separately.
 let _previewBlobUrl = null;
 let _previewFilename = 'チラシ.pdf';
 
