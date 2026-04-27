@@ -342,6 +342,12 @@ def generate(data: dict, out):
     c = canvas.Canvas(out, pagesize=PAGE)
     W, H = PAGE                      # ≈ 841.89 × 595.28 pts
 
+    # ── Template dispatch — T1 (default) vs T2 ───────────────────────────────
+    if str(data.get('templateId', '1')) == '2':
+        _generate_t2(c, W, H, data)
+        c.save()
+        return
+
     # ── Style: palette + corner config ────────────────────────────────────────
     _pal = PALETTES.get(data.get('palette', 'ocean'), PALETTES['ocean'])
     # Shadow module-level colours with palette values for this document
@@ -1093,6 +1099,565 @@ def generate(data: dict, out):
         draw_bold(c, bot_line, bot_x, bot_y, BSZ, color=_c_yell_text)
 
     c.save()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEMPLATE 2 — 株式会社成宏商事 sample style  (sub-variants 2A and 2B)
+# ══════════════════════════════════════════════════════════════════════════════
+def _draw_starburst(c, cx, cy, r_outer, r_inner, n_points=12,
+                    fill=None, stroke=None, lw=0.6, rot=0.0):
+    """Filled n-pointed starburst centred at (cx, cy)."""
+    p = c.beginPath()
+    for i in range(n_points * 2):
+        ang = math.pi * i / n_points - math.pi / 2 + rot
+        r = r_outer if i % 2 == 0 else r_inner
+        x = cx + r * math.cos(ang)
+        y = cy + r * math.sin(ang)
+        if i == 0: p.moveTo(x, y)
+        else:      p.lineTo(x, y)
+    p.close()
+    c.saveState()
+    if fill is not None:   c.setFillColor(fill)
+    if stroke is not None: c.setStrokeColor(stroke); c.setLineWidth(lw)
+    c.drawPath(p, fill=1 if fill is not None else 0,
+                  stroke=1 if stroke is not None else 0)
+    c.restoreState()
+
+
+def _generate_t2(c, W, H, data: dict):
+    """Template 2 — sample-accurate flyer (株式会社成宏商事 reference style).
+
+    Layout: white header (title / price / transit) — green+cream double-line
+    frame around photo collage + plain detail rows — single disclaimer line —
+    simple white footer (company name + info columns + ■取引態様 ■手数料 markers).
+
+    Sub-variants:
+      2A — 4-line transit list in a cream tile + yellow N線 starburst,
+           K3 circular building-emblem overlay on K1, K4 map tile,
+           BLUE price colour. (e.g. 日神パレス新三河島 sample)
+      2B — Single green double-stroked station tag, optional yellow
+           yield-callout ellipse on K1, GREEN price colour.
+           (e.g. バロンハイツ大塚 sample)
+    """
+    # ── Fixed sample palette (does not vary with `palette` form field) ──────
+    C_GREEN_DK   = colors.HexColor('#1a8a3a')   # frame outer / 2B price / labels
+    C_GREEN_LT   = colors.HexColor('#37a558')
+    C_CREAM_LT   = colors.HexColor('#fdf6e3')   # transit tile fill
+    C_CREAM_BD   = colors.HexColor('#e8c989')   # frame inner stripe / row hairline
+    C_RED_DK     = colors.HexColor('#c8102e')   # 売 pill / 稀有 burst
+    C_YELLOW     = colors.HexColor('#ffd900')   # N線 burst / 新 badge
+    C_YELLOW_DK  = colors.HexColor('#c89800')
+    C_BLUE_PRICE = colors.HexColor('#1e63a8')   # 2A price colour
+    C_BROWN_TXT  = colors.HexColor('#3a2a10')   # text on cream
+    C_GREY_TXT   = colors.HexColor('#5a5a5a')
+    C_TINT_BEIGE = colors.HexColor('#faf3df')   # alt-row tint
+
+    _nav_font = data.get('navFont', 'droid')
+    if _nav_font == 'noto' and not _noto_available:
+        _nav_font = 'droid'
+
+    _cs   = data.get('cornerStyle', 'square')
+    _cr   = {'small': 4, 'medium': 8, 'large': 14}.get(data.get('cornerSize', 'medium'), 8)
+    _csel = data.get('cornerSel', 'all')
+    _MASKS = {
+        'all':   (True,  True,  True,  True ),
+        'top':   (False, False, True,  True ),
+        'outer': (True,  False, False, True ),
+        'br':    (False, True,  False, False),
+    }
+    _border_mask = _MASKS.get(_csel, _MASKS['all'])
+
+    variant = (data.get('templateVariant', 'A') or 'A').upper()
+    price_color = C_BLUE_PRICE if variant == 'A' else C_GREEN_DK
+
+    # ── Geometry ──────────────────────────────────────────────────────────────
+    MX = 10 * mm
+    MY = 7  * mm
+    IW = W - 2 * MX
+
+    HEADER_H = 28 * mm
+    FOOTER_H = 22 * mm
+    DISC_H   = 5  * mm
+
+    HEADER_TOP = H - MY
+    HEADER_BOT = HEADER_TOP - HEADER_H
+    FOOTER_BOT = MY
+    FOOTER_TOP = MY + FOOTER_H
+    DISC_BOT   = FOOTER_TOP
+    DISC_TOP   = DISC_BOT + DISC_H
+    FRAME_TOP  = HEADER_BOT
+    FRAME_BOT  = DISC_TOP
+    FRAME_H    = FRAME_TOP - FRAME_BOT
+
+    # ══════════════════════════════════════════════════════════════════════
+    # HEADER STRIP  (white bg, 3 zones: title | price | transit)
+    # ══════════════════════════════════════════════════════════════════════
+    HD_PAD     = 4
+    HD_TITLE_W = IW * 0.36
+    HD_PRICE_W = IW * 0.34
+    HD_TRANS_W = IW - HD_TITLE_W - HD_PRICE_W
+    HD_TITLE_X = MX
+    HD_PRICE_X = MX + HD_TITLE_W
+    HD_TRANS_X = HD_PRICE_X + HD_PRICE_W
+    HD_LX      = HD_TITLE_X + HD_PAD
+
+    prop_type = (data.get('propertyType', '') or '').strip()
+    prop_name = (data.get('propertyName', '') or '').strip()
+    prop_hl   = (data.get('propertyHighlight', '') or '').strip()
+
+    # ── (1) Title zone — LEFT ───────────────────────────────────────────────
+    title_avail_w = HD_TITLE_W - HD_PAD * 2
+    pill_sz       = 9
+    pill_pad_x, pill_pad_y = 7, 3
+    pill_h        = pill_sz + pill_pad_y * 2
+    pill_top_y    = HEADER_TOP - 6
+    pill_y        = pill_top_y - pill_h
+    if prop_type:
+        bw = txt_width(prop_type, pill_sz, bold=True, nav_font=_nav_font) + pill_pad_x * 2
+        rounded_rect(c, HD_LX, pill_y, bw, pill_h, fill=C_RED_DK, r=2)
+        draw_bold(c, prop_type, HD_LX + pill_pad_x, pill_y + pill_pad_y,
+                  pill_sz, color=C_WHITE, nav_font=_nav_font)
+        name_top = pill_y - 2
+    else:
+        name_top = HEADER_TOP - 4
+
+    name_sz = autosize(prop_name, title_avail_w, 24, min_sz=10,
+                       bold=True, nav_font=_nav_font) if prop_name else 0
+    name_y  = max(HEADER_BOT + 12, name_top - name_sz)
+    if prop_name:
+        draw_bold(c, prop_name, HD_LX, name_y, name_sz,
+                  color=C_BLACK, nav_font=_nav_font)
+
+    if prop_hl:
+        hl_sz = autosize(prop_hl, title_avail_w, 10, min_sz=7, nav_font=_nav_font)
+        hl_y  = max(HEADER_BOT + 3, name_y - hl_sz - 4)
+        draw_text(c, prop_hl, HD_LX, hl_y, hl_sz,
+                  color=C_GREY_TXT, nav_font=_nav_font)
+
+    # ── (2) Price zone — CENTRE ────────────────────────────────────────────
+    price_num     = (data.get('priceNum', '') or '').strip()
+    price_tax     = (data.get('priceTax', '税込み') or '税込み').strip()
+    price_inner_x = HD_PRICE_X + HD_PAD
+    price_inner_w = HD_PRICE_W - HD_PAD * 2
+
+    # 稀有 starburst (top-left of price zone)
+    rare_inset = 0
+    if data.get('rareBadgeOn'):
+        rare_text = (data.get('rareBadgeText', '稀有') or '稀有').strip() or '稀有'
+        sb_r  = 13
+        sb_cx = price_inner_x + sb_r + 1
+        sb_cy = HEADER_TOP - sb_r - 4
+        _draw_starburst(c, sb_cx, sb_cy, r_outer=sb_r, r_inner=sb_r * 0.55,
+                        n_points=12, fill=C_RED_DK)
+        rb_chars = len(rare_text)
+        rb_sz = 9 if rb_chars <= 2 else (7 if rb_chars <= 3 else 6)
+        if rb_chars >= 4:
+            half = rb_chars // 2
+            l1, l2 = rare_text[:half], rare_text[half:]
+            draw_bold(c, l1, sb_cx, sb_cy + 1, rb_sz,
+                      color=C_WHITE, align='center', nav_font=_nav_font)
+            draw_bold(c, l2, sb_cx, sb_cy - rb_sz - 1, rb_sz,
+                      color=C_WHITE, align='center', nav_font=_nav_font)
+        else:
+            draw_bold(c, rare_text, sb_cx, sb_cy - rb_sz * 0.32, rb_sz,
+                      color=C_WHITE, align='center', nav_font=_nav_font)
+        rare_inset = sb_r * 2 + 4
+
+    # 新 yellow badge (top-right of price zone) — optional
+    new_inset = 0
+    if data.get('newPriceBadge'):
+        nb_sz = 13
+        nb_w  = txt_width('新', nb_sz, bold=True, nav_font=_nav_font) + 12
+        nb_h  = nb_sz + 8
+        nb_x  = HD_PRICE_X + HD_PRICE_W - HD_PAD - nb_w
+        nb_y  = HEADER_TOP - 6 - nb_h
+        rounded_rect(c, nb_x, nb_y, nb_w, nb_h, fill=C_YELLOW,
+                     stroke=C_RED_DK, lw=0.8, r=3)
+        draw_bold(c, '新', nb_x + nb_w/2, nb_y + 4, nb_sz,
+                  color=C_RED_DK, align='center', nav_font=_nav_font)
+        new_inset = nb_w + 4
+
+    # 価格 + number + 万円 — auto-fit
+    pblk_x = price_inner_x + rare_inset
+    pblk_w = price_inner_w - rare_inset - new_inset
+    if price_num:
+        pn_sz, pl_sz, yen_sz = 14, 9, 9
+        for cand in range(40, 14, -1):
+            psz_lbl = max(10, int(cand * 0.42))
+            psz_yen = max(11, int(cand * 0.46))
+            w_test = (txt_width('価格', psz_lbl, bold=True, nav_font=_nav_font) + 4 +
+                      txt_width(price_num, cand, bold=True, nav_font=_nav_font) + 1 +
+                      txt_width('万円', psz_yen, bold=True, nav_font=_nav_font))
+            if w_test <= pblk_w:
+                pn_sz, pl_sz, yen_sz = cand, psz_lbl, psz_yen
+                break
+        price_y = HEADER_BOT + (HEADER_H - pn_sz) / 2 + 2
+        # 価格 (small label)
+        draw_bold(c, '価格', pblk_x, price_y + (pn_sz - pl_sz) * 0.55,
+                  pl_sz, color=price_color, nav_font=_nav_font)
+        cur_x = pblk_x + txt_width('価格', pl_sz, bold=True, nav_font=_nav_font) + 4
+        # number (huge)
+        draw_bold(c, price_num, cur_x, price_y, pn_sz,
+                  color=price_color, nav_font=_nav_font)
+        cur_x += txt_width(price_num, pn_sz, bold=True, nav_font=_nav_font) + 1
+        # 万円
+        draw_bold(c, '万円', cur_x, price_y + (pn_sz - yen_sz) * 0.5,
+                  yen_sz, color=price_color, nav_font=_nav_font)
+        # （税込み）below price
+        if price_tax:
+            tax_sz = 9
+            tax_y  = price_y - tax_sz - 2
+            if tax_y > HEADER_BOT + 2:
+                draw_text(c, f'（{price_tax}）', pblk_x, tax_y, tax_sz,
+                          color=C_GREY_TXT, nav_font=_nav_font)
+
+    # ── (3) Transit zone — RIGHT ───────────────────────────────────────────
+    layout_type = (data.get('layoutType', '') or '').strip()
+    stations    = data.get('stations', []) or []
+    tr_inner_x  = HD_TRANS_X + HD_PAD
+    tr_avail_w  = HD_TRANS_W - HD_PAD * 2
+
+    # 2DK / 3LDK at top-left of transit zone
+    if layout_type:
+        lt_sz = autosize(layout_type, tr_avail_w * 0.55, 26, min_sz=12,
+                         bold=True, nav_font=_nav_font)
+        lt_y  = HEADER_TOP - 6 - lt_sz
+        draw_bold(c, layout_type, tr_inner_x, lt_y, lt_sz,
+                  color=C_BLACK, nav_font=_nav_font)
+    else:
+        lt_sz = 0
+        lt_y  = HEADER_TOP - 6
+
+    if variant == 'B' and stations:
+        st  = stations[0]
+        ln  = (st.get('line', '') or '').strip()
+        stn = (st.get('station', '') or '').replace('駅', '').strip()
+        wk  = (st.get('walk', '') or '').strip()
+        if ln:
+            draw_bold(c, ln, tr_inner_x, lt_y - 13, 9.5,
+                      color=C_GREEN_DK, nav_font=_nav_font)
+            tag_top = lt_y - 16
+        else:
+            tag_top = lt_y - 4
+        tag_text = f'{stn}駅 徒歩{wk}分' if (stn and wk) else (f'{stn}駅' if stn else '')
+        if tag_text:
+            tag_sz = autosize(tag_text, tr_avail_w - 12, 13, min_sz=8,
+                              bold=True, nav_font=_nav_font)
+            tw = txt_width(tag_text, tag_sz, bold=True, nav_font=_nav_font) + 14
+            th = tag_sz + 8
+            ty = max(tag_top - th, HEADER_BOT + 3)
+            tx = tr_inner_x
+            c.saveState()
+            c.setFillColor(C_GREEN_DK); c.setStrokeColor(C_GREEN_DK); c.setLineWidth(0.4)
+            c.roundRect(tx, ty, tw, th, th/2, fill=1, stroke=1)
+            c.setStrokeColor(C_WHITE); c.setLineWidth(0.8)
+            c.roundRect(tx + 1.6, ty + 1.6, tw - 3.2, th - 3.2,
+                        max(1, (th - 3.2)/2), fill=0, stroke=1)
+            c.restoreState()
+            draw_bold(c, tag_text, tx + tw/2, ty + 4, tag_sz,
+                      color=C_WHITE, align='center', nav_font=_nav_font)
+    elif variant == 'A':
+        lines = stations[:4]
+        n = len(lines)
+        if n > 0:
+            cream_top = lt_y - 4
+            cream_bot = HEADER_BOT + 3
+            cream_h   = max(cream_top - cream_bot, 18)
+            cream_top = cream_bot + cream_h
+            rounded_rect(c, tr_inner_x, cream_bot, tr_avail_w, cream_h,
+                         fill=C_CREAM_LT, stroke=C_CREAM_BD, lw=0.8, r=2)
+            # Yellow N線 burst — corner sticker, anchored inside the cream
+            # tile.  First transit line is indented past it so they don't
+            # collide.
+            burst_r = 10
+            burst_cx = tr_inner_x + burst_r + 1
+            burst_cy = cream_top - burst_r - 1
+            burst_text = f'{n}線'
+            _draw_starburst(c, burst_cx, burst_cy,
+                            r_outer=burst_r, r_inner=burst_r * 0.55,
+                            n_points=10, fill=C_YELLOW,
+                            stroke=C_YELLOW_DK, lw=0.6)
+            burst_sz = 8 if len(burst_text) <= 2 else 6
+            draw_bold(c, burst_text, burst_cx, burst_cy - burst_sz * 0.34,
+                      burst_sz, color=C_RED_DK, align='center',
+                      nav_font=_nav_font)
+            slot_h  = (cream_h - 4) / max(n, 1)
+            line_sz = max(7, min(int(slot_h * 0.52), 9))
+            burst_right = burst_cx + burst_r + 4
+            for i, t in enumerate(lines):
+                ln  = (t.get('line', '') or '').strip()
+                stn = (t.get('station', '') or '').replace('駅', '').strip()
+                wk  = (t.get('walk', '') or '').strip()
+                txt = f'■ {ln}　{stn}駅 徒歩{wk}分' if (ln or stn) else ''
+                if not txt: continue
+                ly = cream_top - 3 - (i + 0.7) * slot_h
+                # Indent the FIRST line past the corner burst so they
+                # don't collide.
+                lx     = (burst_right if i == 0 else tr_inner_x + 6)
+                avail  = tr_avail_w - (lx - tr_inner_x) - 8
+                draw_text(c, truncate_text(txt, avail, line_sz),
+                          lx, ly, line_sz,
+                          color=C_BROWN_TXT, nav_font=_nav_font)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # FRAME — green outer + cream inner double-line border
+    # ══════════════════════════════════════════════════════════════════════
+    styled_rect(c, MX, FRAME_BOT, IW, FRAME_H, fill=None,
+                stroke=C_GREEN_DK, lw=2.6,
+                corner_style=_cs, corner_r=_cr, corners=_border_mask)
+    INSET = 1.6 * mm
+    styled_rect(c, MX + INSET, FRAME_BOT + INSET,
+                IW - INSET*2, FRAME_H - INSET*2,
+                fill=None, stroke=C_CREAM_BD, lw=1.0,
+                corner_style=_cs, corner_r=max(1, _cr - 2),
+                corners=_border_mask)
+
+    INNER_PAD = INSET + 1.4 * mm
+    IN_X = MX + INNER_PAD
+    IN_Y = FRAME_BOT + INNER_PAD
+    IN_W = IW - INNER_PAD * 2
+    IN_H = FRAME_H - INNER_PAD * 2
+
+    SPLIT_GAP = 3 * mm
+    PHOTO_W   = IN_W * 0.62 - SPLIT_GAP / 2
+    DETAIL_W  = IN_W * 0.38 - SPLIT_GAP / 2
+    PHOTO_X   = IN_X
+    DETAIL_X  = IN_X + PHOTO_W + SPLIT_GAP
+
+    # ══════════════════════════════════════════════════════════════════════
+    # PHOTO AREA  (left of frame) — variant-specific
+    # ══════════════════════════════════════════════════════════════════════
+    PG = 3
+    if variant == 'A':
+        # 2A: K1 main + K4 map (top), K2 floor plan (mid), K5/6/7 thumbs (bot)
+        TOP_H = PHOTO_W * 0.42
+        BOT_H = PHOTO_W * 0.18
+        MID_H = IN_H - TOP_H - BOT_H - PG * 2
+        if MID_H < 30:
+            TOP_H = (IN_H - BOT_H - PG * 2) * 0.6
+            MID_H = IN_H - TOP_H - BOT_H - PG * 2
+        K1_W = PHOTO_W * 0.62
+        K4_W = PHOTO_W - K1_W - PG
+        K1_X = PHOTO_X
+        K1_Y = IN_Y + IN_H - TOP_H
+        draw_photo(c, K1_X, K1_Y, K1_W, TOP_H,
+                   data.get('k1Image', ''), '外観メイン', '（K1）',
+                   cs=_cs, cr=_cr)
+        K4_X = K1_X + K1_W + PG
+        draw_photo(c, K4_X, K1_Y, K4_W, TOP_H,
+                   data.get('k4Image', ''), '地図', '（K4）',
+                   cs=_cs, cr=_cr)
+        K2_X = PHOTO_X
+        K2_Y = K1_Y - PG - MID_H
+        draw_photo(c, K2_X, K2_Y, PHOTO_W, MID_H,
+                   data.get('k2Image', ''), '間取り図', '（K2）',
+                   cs=_cs, cr=_cr)
+        TH_KEYS   = ['k5Image', 'k6Image', 'k7Image']
+        TH_LABELS = [('内観1', 'K5'), ('内観2', 'K6'), ('内観3', 'K7')]
+        TH_N = len(TH_KEYS)
+        TW = (PHOTO_W - PG * (TH_N - 1)) / TH_N
+        TY = IN_Y
+        for i, (key, (lab, sub)) in enumerate(zip(TH_KEYS, TH_LABELS)):
+            tx = PHOTO_X + i * (TW + PG)
+            draw_photo(c, tx, TY, TW, BOT_H,
+                       data.get(key, ''), lab, f'（{sub}）',
+                       cs=_cs, cr=_cr)
+        # K3 — circular building-emblem overlay (top-right of K1)
+        k3_b64 = data.get('k3Image', '')
+        if k3_b64:
+            ov_r  = min(K1_W, TOP_H) * 0.16
+            ov_cx = K1_X + K1_W - ov_r - 6
+            ov_cy = K1_Y + TOP_H - ov_r - 6
+            c.saveState()
+            c.setFillColor(C_CREAM_LT)
+            c.circle(ov_cx, ov_cy, ov_r + 2.5, fill=1, stroke=0)
+            c.restoreState()
+            c.saveState()
+            cp = c.beginPath(); cp.circle(ov_cx, ov_cy, ov_r); c.clipPath(cp, stroke=0)
+            try:
+                raw = k3_b64.split(',', 1)[-1] if ',' in k3_b64 else k3_b64
+                img = ImageReader(io.BytesIO(base64.b64decode(raw)))
+                iw, ih = img.getSize()
+                box   = ov_r * 2
+                scale = max(box / iw, box / ih) if iw and ih else 1
+                dw, dh = iw * scale, ih * scale
+                c.drawImage(img, ov_cx - dw/2, ov_cy - dh/2, dw, dh,
+                            preserveAspectRatio=True, mask='auto')
+            except Exception: pass
+            c.restoreState()
+            c.saveState()
+            c.setStrokeColor(C_GREEN_DK); c.setLineWidth(1.4)
+            c.circle(ov_cx, ov_cy, ov_r, fill=0, stroke=1)
+            c.restoreState()
+    else:
+        # 2B: K1 + K2 (top), K3-K7 (bottom); optional yellow yield-callout on K1
+        TOP_H = IN_H * 0.58
+        BOT_H = IN_H - TOP_H - PG
+        K1_W  = PHOTO_W * 0.62
+        K2_W  = PHOTO_W - K1_W - PG
+        K1_X  = PHOTO_X
+        K1_Y  = IN_Y + BOT_H + PG
+        draw_photo(c, K1_X, K1_Y, K1_W, TOP_H,
+                   data.get('k1Image', ''), '外観メイン', '（K1）',
+                   cs=_cs, cr=_cr)
+        K2_X = K1_X + K1_W + PG
+        draw_photo(c, K2_X, K1_Y, K2_W, TOP_H,
+                   data.get('k2Image', ''), '間取り図', '（K2）',
+                   cs=_cs, cr=_cr)
+        TH_KEYS   = ['k3Image', 'k4Image', 'k5Image', 'k6Image', 'k7Image']
+        TH_LABELS = [('外観', 'K3'), ('共用部', 'K4'),
+                     ('内観1', 'K5'), ('内観2', 'K6'), ('内観3', 'K7')]
+        TH_N = len(TH_KEYS)
+        TW = (PHOTO_W - PG * (TH_N - 1)) / TH_N
+        TY = IN_Y
+        for i, (key, (lab, sub)) in enumerate(zip(TH_KEYS, TH_LABELS)):
+            tx = PHOTO_X + i * (TW + PG)
+            draw_photo(c, tx, TY, TW, BOT_H,
+                       data.get(key, ''), lab, f'（{sub}）',
+                       cs=_cs, cr=_cr)
+        callout = (data.get('yieldCallout', '') or '').strip()
+        if callout:
+            cw  = min(K1_W * 0.50, 130)
+            ch_ = 28
+            cox = K1_X + K1_W - cw - 8
+            coy = K1_Y + TOP_H - ch_ - 8
+            c.saveState()
+            c.setFillColor(colors.HexColor('#00000022'))
+            c.ellipse(cox + 2, coy - 2, cox + cw + 2, coy - 2 + ch_, fill=1, stroke=0)
+            c.restoreState()
+            c.saveState()
+            c.setFillColor(C_YELLOW); c.setStrokeColor(C_RED_DK); c.setLineWidth(1.2)
+            c.ellipse(cox, coy, cox + cw, coy + ch_, fill=1, stroke=1)
+            c.restoreState()
+            csz = autosize(callout, cw - 14, 11, min_sz=6, bold=True, nav_font=_nav_font)
+            draw_bold(c, callout, cox + cw/2, coy + ch_/2 - csz * 0.32, csz,
+                      color=C_RED_DK, align='center', nav_font=_nav_font)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # DETAIL ROWS  (right of frame) — plain text rows, alt-row tint, no nav bar
+    # ══════════════════════════════════════════════════════════════════════
+    detail_rows_in = data.get('detailRows', []) or []
+    detail_rows = [r for r in detail_rows_in
+                   if isinstance(r, dict) and (r.get('value') or '').strip()][:20]
+
+    DT_X, DT_Y, DT_W, DT_H = DETAIL_X, IN_Y, DETAIL_W, IN_H
+    if detail_rows:
+        n = len(detail_rows)
+        row_slot = DT_H / n
+        ROW_FONT = max(7, min(int(row_slot * 0.45), 9))
+        LBL_W    = DT_W * 0.38
+        hline(c, DT_X, DT_X + DT_W, DT_Y + DT_H, color=C_CREAM_BD, lw=0.4)
+        for i, row in enumerate(detail_rows):
+            lbl = (row.get('label', '') or '').strip()
+            val = (row.get('value', '') or '').strip()
+            ry  = DT_Y + DT_H - (i + 1) * row_slot
+            if i % 2 == 1:
+                rect(c, DT_X, ry, DT_W, row_slot, fill=C_TINT_BEIGE)
+            hline(c, DT_X, DT_X + DT_W, ry, color=C_CREAM_BD, lw=0.3)
+            tb = ry + row_slot/2 - ROW_FONT * 0.32
+            draw_text(c, truncate_text(lbl, LBL_W - 4, ROW_FONT, bold=True),
+                      DT_X + 4, tb, ROW_FONT,
+                      color=C_GREEN_DK, bold=True, nav_font=_nav_font)
+            draw_text(c, truncate_text(val, DT_W - LBL_W - 4, ROW_FONT),
+                      DT_X + LBL_W, tb, ROW_FONT,
+                      color=C_BLACK, nav_font=_nav_font)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # DISCLAIMER  (single line below frame)
+    # ══════════════════════════════════════════════════════════════════════
+    draw_text(c, '※ 店頭用資料としてご利用下さい。',
+              MX + 2, DISC_BOT + 1.4, 8,
+              color=C_GREY_TXT, nav_font=_nav_font)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # FOOTER  (white, simple — company name + info columns + ■markers)
+    # ══════════════════════════════════════════════════════════════════════
+    F_PAD = 4
+    hline(c, MX, MX + IW, FOOTER_TOP, color=C_GREY_TXT, lw=0.4)
+
+    logo_b64  = data.get('logoImage', '')
+    brand     = (data.get('brandName', '') or '').strip()
+    co        = (data.get('companyName', '') or '').strip()
+    licenseNo = (data.get('licenseNo', '') or '').strip()
+    addr_co   = (data.get('companyAddress', '') or '').strip()
+    tel       = (data.get('tel', '') or '').strip()
+    fax       = (data.get('fax', '') or '').strip()
+    em        = (data.get('email', '') or '').strip()
+    ag        = (data.get('agentName', '') or '').strip()
+    ag_tel    = (data.get('agentTel', '') or '').strip()
+    ttype     = (data.get('transactionType', '') or '').strip()
+    fee       = (data.get('fee', '') or '').strip()
+
+    cur_x = MX + F_PAD
+    if logo_b64:
+        try:
+            raw = logo_b64.split(',', 1)[-1] if ',' in logo_b64 else logo_b64
+            li  = ImageReader(io.BytesIO(base64.b64decode(raw)))
+            lw2, lh2 = li.getSize()
+            target_h = FOOTER_H * 0.78
+            target_w = target_h * (lw2 / lh2) if lh2 else target_h
+            target_w = min(target_w, FOOTER_H)
+            c.drawImage(li, cur_x, FOOTER_BOT + (FOOTER_H - target_h)/2,
+                        target_w, target_h, preserveAspectRatio=True, mask='auto')
+            cur_x += target_w + 6
+        except Exception:
+            pass
+
+    main_name  = co or brand
+    name_avail = IW * 0.32
+    if main_name:
+        nm_sz = autosize(main_name, name_avail, 22, min_sz=11, bold=True,
+                         nav_font=_nav_font)
+        nm_y  = FOOTER_BOT + FOOTER_H/2 - nm_sz * 0.32
+        draw_bold(c, main_name, cur_x, nm_y, nm_sz,
+                  color=C_BLACK, nav_font=_nav_font)
+        cur_x += txt_width(main_name, nm_sz, bold=True, nav_font=_nav_font) + 8
+
+    info_x    = cur_x
+    markers_w = 145
+    info_w    = MX + IW - info_x - F_PAD - markers_w - 4
+
+    info_rows = []
+    if licenseNo: info_rows.append(licenseNo)
+    if addr_co:   info_rows.append(addr_co)
+    line_tf = ''
+    if tel and fax: line_tf = f'TEL：{tel}　FAX：{fax}'
+    elif tel:       line_tf = f'TEL：{tel}'
+    elif fax:       line_tf = f'FAX：{fax}'
+    if line_tf:     info_rows.append(line_tf)
+    if em:          info_rows.append(f'E-mail：{em}')
+    if ag:
+        line_ag = f'担当：{ag}'
+        if ag_tel: line_ag += f'　携帯：{ag_tel}'
+        info_rows.append(line_ag)
+
+    if info_rows:
+        ISZ  = 8
+        IGAP = 2.4
+        n_rows = len(info_rows)
+        max_h  = FOOTER_H - 4
+        while ISZ > 6 and (n_rows * ISZ + (n_rows - 1) * IGAP) > max_h:
+            ISZ -= 0.5
+        total_h = n_rows * ISZ + (n_rows - 1) * IGAP
+        iy = FOOTER_BOT + (FOOTER_H + total_h) / 2 - ISZ
+        for txt in info_rows:
+            draw_text(c, truncate_text(txt, info_w, ISZ),
+                      info_x, iy, ISZ, color=C_BLACK, nav_font=_nav_font)
+            iy -= ISZ + IGAP
+
+    mk_lines = []
+    if ttype: mk_lines.append(f'■ 取引態様：{ttype}')
+    if fee:   mk_lines.append(f'■ 手数料：{fee}')
+    if mk_lines:
+        MSZ  = 8
+        MGAP = 3
+        mk_x = MX + IW - F_PAD - markers_w
+        total_h = len(mk_lines) * MSZ + (len(mk_lines) - 1) * MGAP
+        my2 = FOOTER_BOT + (FOOTER_H + total_h) / 2 - MSZ
+        for txt in mk_lines:
+            draw_text(c, truncate_text(txt, markers_w, MSZ),
+                      mk_x, my2, MSZ, color=C_BLACK, nav_font=_nav_font)
+            my2 -= MSZ + MGAP
 
 
 # ── Vercel handler ────────────────────────────────────────────────────────────
