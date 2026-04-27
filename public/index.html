@@ -4,6 +4,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Justsalemono — 不動産チラシ自動生成 by JJconnect.online</title>
+  <!-- pdf.js: client-side text extraction so we don't send multi-MB PDFs to the API -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    // Extract full text from a PDF File. Groups items by y to preserve line order.
+    async function extractPdfText(file) {
+      if (!window.pdfjsLib) throw new Error('PDF解析エンジン読み込み失敗');
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      let out = '';
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const lines = {};
+        tc.items.forEach(it => {
+          const y = Math.round(it.transform[5]);
+          (lines[y] = lines[y] || []).push({ x: it.transform[4], str: it.str });
+        });
+        Object.keys(lines).map(Number).sort((a, b) => b - a).forEach(y => {
+          out += lines[y].sort((a, b) => a.x - b.x).map(o => o.str).join('') + '\n';
+        });
+        out += '\n';
+      }
+      return out;
+    }
+  </script>
   <style>
     :root {
       --primary:       #1a4fa0;
@@ -2931,33 +2960,33 @@ zone.addEventListener('drop', e => {
   }
 });
 
-function parsePDF(file) {
+async function parsePDF(file) {
   const zone   = document.getElementById('uploadZone');
   const status = document.getElementById('pdfParseStatus');
-
-  // Show loading state
   zone.classList.add('parsing');
   if (status) { status.textContent = '📄 PDFを解析中…'; status.style.display = 'block'; status.className = 'pdf-status loading'; }
-
-  const fd = new FormData();
-  fd.append('file', file);
-  fetch('/api/parse-pdf', { method: 'POST', body: fd })
-    .then(r => {
-      if (!r.ok) return r.text().then(t => { throw new Error(`サーバーエラー ${r.status}: ${t}`); });
-      return r.json();
-    })
-    .then(data => {
-      autofillForm(data);
-      const count = Object.keys(data).filter(k => data[k] && k !== 'stations' && k !== 'nearby').length;
-      if (status) { status.textContent = `✅ ${count}項目を自動入力しました。内容を確認してください。`; status.className = 'pdf-status success'; }
-    })
-    .catch(err => {
-      console.error('PDF parse error:', err);
-      if (status) { status.textContent = `⚠️ 読み取りエラー: ${err.message}`; status.className = 'pdf-status error'; }
-    })
-    .finally(() => {
-      zone.classList.remove('parsing');
+  try {
+    const text = await extractPdfText(file);
+    if (!text || !text.trim()) throw new Error('PDFからテキストを抽出できませんでした（スキャンPDFはOCR非対応）');
+    const r = await fetch('/api/parse-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
     });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(`サーバーエラー ${r.status}: ${t}`);
+    }
+    const data = await r.json();
+    autofillForm(data);
+    const count = Object.keys(data).filter(k => data[k] && k !== 'stations' && k !== 'nearby').length;
+    if (status) { status.textContent = `✅ ${count}項目を自動入力しました。内容を確認してください。`; status.className = 'pdf-status success'; }
+  } catch (err) {
+    console.error('PDF parse error:', err);
+    if (status) { status.textContent = `⚠️ 読み取りエラー: ${err.message}`; status.className = 'pdf-status error'; }
+  } finally {
+    zone.classList.remove('parsing');
+  }
 }
 
 function autofillForm(data) {
@@ -3739,7 +3768,7 @@ function handleFileSelectT2(e) {
   });
 })();
 
-function parsePDFT2(file) {
+async function parsePDFT2(file) {
   const zone   = document.getElementById('uploadZoneT2');
   const status = document.getElementById('pdfParseStatusT2');
   zone.classList.add('parsing');
@@ -3748,25 +3777,33 @@ function parsePDFT2(file) {
     status.style.display = 'block';
     status.className = 'pdf-status loading';
   }
-  const fd = new FormData();
-  fd.append('file', file);
-  fetch('/api/parse-pdf', { method: 'POST', body: fd })
-    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error('サーバー ' + r.status + ': ' + t); }))
-    .then(data => {
-      const count = autofillFormT2(data);
-      if (status) {
-        status.textContent = '✅ ' + count + '項目を自動入力しました。内容を確認してください。';
-        status.className = 'pdf-status success';
-      }
-    })
-    .catch(err => {
-      console.error('PDF parse error (T2):', err);
-      if (status) {
-        status.textContent = '⚠️ 読み取りエラー: ' + err.message;
-        status.className = 'pdf-status error';
-      }
-    })
-    .finally(() => zone.classList.remove('parsing'));
+  try {
+    const text = await extractPdfText(file);
+    if (!text || !text.trim()) throw new Error('PDFからテキストを抽出できませんでした（スキャンPDFはOCR非対応）');
+    const r = await fetch('/api/parse-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error('サーバー ' + r.status + ': ' + t);
+    }
+    const data = await r.json();
+    const count = autofillFormT2(data);
+    if (status) {
+      status.textContent = '✅ ' + count + '項目を自動入力しました。内容を確認してください。';
+      status.className = 'pdf-status success';
+    }
+  } catch (err) {
+    console.error('PDF parse error (T2):', err);
+    if (status) {
+      status.textContent = '⚠️ 読み取りエラー: ' + err.message;
+      status.className = 'pdf-status error';
+    }
+  } finally {
+    zone.classList.remove('parsing');
+  }
 }
 
 // Maps a parse-pdf result into the T2 form. Returns count of fields filled.

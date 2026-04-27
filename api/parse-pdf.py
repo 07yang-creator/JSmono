@@ -53,10 +53,16 @@ def extract_text(pdf_path: str) -> str:
 
 
 def parse_property(pdf_path: str) -> dict:
+    """Wrapper: extract text from a PDF file then parse it."""
+    return parse_property_from_text(extract_text(pdf_path))
+
+
+def parse_property_from_text(text: str) -> dict:
     """
     Main parser. Returns a dict with keys matching the HTML form fields.
+    Accepts pre-extracted text (e.g. extracted client-side via pdf.js so
+    we don't have to send a multi-MB PDF through Vercel's 4.5 MB limit).
     """
-    text = extract_text(pdf_path)
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     result = {}
 
@@ -345,10 +351,32 @@ class handler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get('content-length', 0))
             body = self.rfile.read(content_length)
 
-            # Parse multipart/form-data
+            # ── Path A: client extracted PDF text in-browser (preferred) ──
+            #   Avoids Vercel's 4.5 MB function payload limit because we
+            #   only send a few KB of text rather than the raw PDF.
+            ctype_main, _ = cgi.parse_header(content_type)
+            if ctype_main == 'application/json':
+                try:
+                    payload = json.loads(body.decode('utf-8'))
+                except Exception:
+                    return self._send(400, b'Invalid JSON body')
+                text = (payload or {}).get('text', '')
+                if not text or not text.strip():
+                    return self._send(400, b'No text field in JSON body')
+                result = parse_property_from_text(text)
+                body_out = json.dumps(result, ensure_ascii=False).encode('utf-8')
+                self.send_response(200)
+                self._cors()
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Content-Length', str(len(body_out)))
+                self.end_headers()
+                self.wfile.write(body_out)
+                return
+
+            # ── Path B (legacy): multipart upload of the raw PDF ──
             ctype, pdict = cgi.parse_header(content_type)
             if ctype != 'multipart/form-data':
-                return self._send(400, b'Expected multipart/form-data')
+                return self._send(400, b'Expected multipart/form-data or application/json')
 
             pdict['boundary'] = bytes(pdict['boundary'], 'utf-8')
             pdict['CONTENT-LENGTH'] = content_length
