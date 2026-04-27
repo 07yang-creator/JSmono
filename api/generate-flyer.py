@@ -147,32 +147,32 @@ def autosize(s, max_w, max_sz, min_sz=6, bold=False, nav_font='droid'):
 
 # ── Colour palettes ──────────────────────────────────────────────────────────
 PALETTES = {
-    'ocean':  {'label':'Ocean',  'primary':'#1a4fa0','primary_dk':'#12357a','accent':'#e85d2f','light':'#eef3fb','medium':'#d8e4f5','secbg':'#dde8f8','div':'#c0cfe8','steel':'#adc4e8'},
-    'forest': {'label':'Forest', 'primary':'#14532d','primary_dk':'#0d3d20','accent':'#b45309','light':'#f0fdf4','medium':'#bbf7d0','secbg':'#dcfce7','div':'#86efac','steel':'#4ade80'},
-    'wine':   {'label':'Wine',   'primary':'#881337','primary_dk':'#60182a','accent':'#c2410c','light':'#fff1f2','medium':'#fecdd3','secbg':'#ffe4e6','div':'#fca5a5','steel':'#f87171'},
-    'slate':  {'label':'Slate',  'primary':'#1e3a5f','primary_dk':'#152c47','accent':'#0369a1','light':'#f0f9ff','medium':'#bae6fd','secbg':'#e0f2fe','div':'#7dd3fc','steel':'#38bdf8'},
-    'blush':  {'label':'Blush',  'primary':'#fce4ec','primary_dk':'#f8bbd0','text_on_primary':'#880e4f','accent':'#ad1457','light':'#fff0f3','medium':'#ffb3c6','secbg':'#fce4ec','div':'#f48fb1','steel':'#d81b60'},
-    'mint':   {'label':'Mint',   'primary':'#e8f5e9','primary_dk':'#c8e6c9','text_on_primary':'#1b5e20','accent':'#2e7d32','light':'#f1f8f2','medium':'#a5d6a7','secbg':'#e8f5e9','div':'#81c784','steel':'#388e3c'},
-    'peach':  {'label':'Peach',  'primary':'#fff3e0','primary_dk':'#ffe0b2','text_on_primary':'#bf360c','accent':'#e64a19','light':'#fff8f0','medium':'#ffcc80','secbg':'#fff3e0','div':'#ffb74d','steel':'#f57c00'},
-    'lilac':  {'label':'Lilac',  'primary':'#ede7f6','primary_dk':'#d1c4e9','text_on_primary':'#4a148c','accent':'#6a1b9a','light':'#f3effe','medium':'#b39ddb','secbg':'#ede7f6','div':'#9575cd','steel':'#7b1fa2'},
+    'ocean':  {'label':'Ocean',  'primary':'#2b528f','primary_dk':'#1f396d','accent':'#d16946','light':'#f0f3f9','medium':'#dce5f1','secbg':'#e0e9f5','div':'#c5d0e3','steel':'#b4c6e1'},
+    'forest': {'label':'Forest', 'primary':'#1c4b2f','primary_dk':'#133721','accent':'#9f561e','light':'#f2fbf5','medium':'#c2f0d2','secbg':'#e0f8e8','div':'#93e2b0','steel':'#5dcb85'},
+    'wine':   {'label':'Wine',   'primary':'#79223d','primary_dk':'#57212e','accent':'#ab4b23','light':'#fdf3f3','medium':'#f8d3d8','secbg':'#fce7e9','div':'#f1b0b0','steel':'#e78282'},
+    'slate':  {'label':'Slate',  'primary':'#263b57','primary_dk':'#1b2d41','accent':'#17638d','light':'#f2f9fd','medium':'#c2e3f5','secbg':'#e4f1fa','div':'#8dcdec','steel':'#50b4e0'},
+    'blush':  {'label':'Blush',  'primary':'#f9e7ed','primary_dk':'#f0c3d2','text_on_primary':'#791d4e','accent':'#9a2759','light':'#fdf2f4','medium':'#f6bccb','secbg':'#f9e7ed','div':'#e79cb5','steel':'#c03366'},
+    'mint':   {'label':'Mint',   'primary':'#eaf3ea','primary_dk':'#cce2cd','text_on_primary':'#235627','accent':'#38733b','light':'#f2f7f3','medium':'#abd0ad','secbg':'#eaf3ea','div':'#8abe8c','steel':'#438346'},
+    'peach':  {'label':'Peach',  'primary':'#fbf2e4','primary_dk':'#f5debc','text_on_primary':'#a94222','accent':'#cc5733','light':'#fdf8f2','medium':'#efc990','secbg':'#fbf2e4','div':'#e9b363','steel':'#d67c1f'},
+    'lilac':  {'label':'Lilac',  'primary':'#ede9f4','primary_dk':'#d2c9e4','text_on_primary':'#4b237d','accent':'#662b8a','light':'#f4f1fc','medium':'#b5a5d3','secbg':'#ede9f4','div':'#9880c2','steel':'#742f92'},
 }
 
 # ── Colours ───────────────────────────────────────────────────────────────────
-C_NAVY   = colors.HexColor('#1a4fa0')
-C_NAVYDK = colors.HexColor('#12357a')
-C_ACCENT = colors.HexColor('#e85d2f')
+C_NAVY   = colors.HexColor('#2b528f')
+C_NAVYDK = colors.HexColor('#1f396d')
+C_ACCENT = colors.HexColor('#d16946')
 C_WHITE  = colors.white
-C_BLACK  = colors.HexColor('#1c2333')
-C_MUTED  = colors.HexColor('#5a6480')
-C_LBLUE  = colors.HexColor('#eef3fb')
-C_MBLUE  = colors.HexColor('#d8e4f5')
-C_SECBG  = colors.HexColor('#dde8f8')
-C_DIV    = colors.HexColor('#c0cfe8')
-C_STEELBL= colors.HexColor('#adc4e8')
-C_RED    = colors.HexColor('#dc2626')
-C_AMBER  = colors.HexColor('#f9d87a')
-C_REDBG  = colors.HexColor('#fef2f2')
-C_REDBDR = colors.HexColor('#f87171')
+C_BLACK  = colors.HexColor('#1f2430')
+C_MUTED  = colors.HexColor('#5f667b')
+C_LBLUE  = colors.HexColor('#f0f3f9')
+C_MBLUE  = colors.HexColor('#dce5f1')
+C_SECBG  = colors.HexColor('#e0e9f5')
+C_DIV    = colors.HexColor('#c5d0e3')
+C_STEELBL= colors.HexColor('#b4c6e1')
+C_RED    = colors.HexColor('#c53d3d')
+C_AMBER  = colors.HexColor('#e9d08a')
+C_REDBG  = colors.HexColor('#fdf3f3')
+C_REDBDR = colors.HexColor('#e78282')
 
 # ── Drawing primitives ────────────────────────────────────────────────────────
 def rect(c, x, y, w, h, fill=None, stroke=None, lw=0.5):
@@ -265,12 +265,12 @@ def _photo_clip_path(c, x, y, w, h, cs='square', cr=6):
     return p
 
 def photo_placeholder(c, x, y, w, h, label, sublabel='', cs='square', cr=6):
-    styled_rect(c, x, y, w, h, fill=colors.HexColor('#c8d4e8'), stroke=None,
+    styled_rect(c, x, y, w, h, fill=colors.HexColor('#ccd5e4'), stroke=None,
                 corner_style=cs, corner_r=cr)
     cx = x + w / 2
-    draw_text(c, label,    cx, y + h/2 + 6,  12, color=colors.HexColor('#7a8faa'), align='center')
+    draw_text(c, label,    cx, y + h/2 + 6,  12, color=colors.HexColor('#8090a4'), align='center')
     if sublabel:
-        draw_text(c, sublabel, cx, y + h/2 - 9, 7.5, color=colors.HexColor('#7a8faa'), align='center')
+        draw_text(c, sublabel, cx, y + h/2 - 9, 7.5, color=colors.HexColor('#8090a4'), align='center')
 
 def draw_photo(c, x, y, w, h, b64_data, label, sublabel='', cs='square', cr=6):
     if b64_data:
@@ -363,8 +363,8 @@ def generate(data: dict, out):
     C_TEXT_ON_PRI = colors.HexColor(_pal.get('text_on_primary', '#ffffff'))
     # Adaptive footer info text colours (visible on both dark and light footer bg)
     _c_info_main = C_STEELBL if not _light_theme else C_TEXT_ON_PRI
-    _c_info_dim  = colors.HexColor('#8aa8cc') if not _light_theme else C_TEXT_ON_PRI
-    _c_info_dept = colors.HexColor('#aabbd4') if not _light_theme else C_TEXT_ON_PRI
+    _c_info_dim  = colors.HexColor('#92a9c4') if not _light_theme else C_TEXT_ON_PRI
+    _c_info_dept = colors.HexColor('#afbccf') if not _light_theme else C_TEXT_ON_PRI
 
     _nav_font = data.get('navFont', 'droid')   # 'droid' | 'noto'
     if _nav_font == 'noto' and not _noto_available:
@@ -904,7 +904,7 @@ def generate(data: dict, out):
     # ══════════════════════════════════════════════════════════════════════════
     F_PAD   = 5
     FY_TOP  = FOOTER_Y + FOOTER_H
-    DIVC    = C_TEXT_ON_PRI if _light_theme else colors.HexColor('#2a4a8a')
+    DIVC    = C_TEXT_ON_PRI if _light_theme else colors.HexColor('#364e7e')
 
     # Fixed section widths (sum = IW)
     F_LOGO_W = FOOTER_H              # square logo
@@ -1046,7 +1046,7 @@ def generate(data: dict, out):
     # Right corner of footer matches border_mask tr corner
     _yell_mask = (False, _border_mask[1], False, False)
     styled_rect(c, F_YELL_X, FOOTER_Y, F_YELL_W, FOOTER_H,
-                fill=colors.HexColor('#f5c800'),
+                fill=colors.HexColor('#d6b51f'),
                 corner_style=_cs, corner_r=_cr, corners=_yell_mask)
 
     slogan = data.get('catchcopy', data.get('companySlogan', ''))
@@ -1140,17 +1140,17 @@ def _generate_t2(c, W, H, data: dict):
            (e.g. バロンハイツ大塚 sample)
     """
     # ── Fixed sample palette (does not vary with `palette` form field) ──────
-    C_GREEN_DK   = colors.HexColor('#1a8a3a')   # frame outer / 2B price / labels
-    C_GREEN_LT   = colors.HexColor('#37a558')
-    C_CREAM_LT   = colors.HexColor('#fdf6e3')   # transit tile fill
-    C_CREAM_BD   = colors.HexColor('#e8c989')   # frame inner stripe / row hairline
-    C_RED_DK     = colors.HexColor('#c8102e')   # 売 pill / 稀有 burst
-    C_YELLOW     = colors.HexColor('#ffd900')   # N線 burst / 新 badge
-    C_YELLOW_DK  = colors.HexColor('#c89800')
-    C_BLUE_PRICE = colors.HexColor('#1e63a8')   # 2A price colour
-    C_BROWN_TXT  = colors.HexColor('#3a2a10')   # text on cream
+    C_GREEN_DK   = colors.HexColor('#287c40')   # frame outer / 2B price / labels
+    C_GREEN_LT   = colors.HexColor('#45975e')
+    C_CREAM_LT   = colors.HexColor('#faf4e6')   # transit tile fill
+    C_CREAM_BD   = colors.HexColor('#dcc595')   # frame inner stripe / row hairline
+    C_RED_DK     = colors.HexColor('#b1273d')   # 売 pill / 稀有 burst
+    C_YELLOW     = colors.HexColor('#dfc320')   # N線 burst / 新 badge
+    C_YELLOW_DK  = colors.HexColor('#af8b19')
+    C_BLUE_PRICE = colors.HexColor('#2f6397')   # 2A price colour
+    C_BROWN_TXT  = colors.HexColor('#352915')   # text on cream
     C_GREY_TXT   = colors.HexColor('#5a5a5a')
-    C_TINT_BEIGE = colors.HexColor('#faf3df')   # alt-row tint
+    C_TINT_BEIGE = colors.HexColor('#f7f1e2')   # alt-row tint
 
     _nav_font = data.get('navFont', 'droid')
     if _nav_font == 'noto' and not _noto_available:

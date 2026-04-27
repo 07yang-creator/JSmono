@@ -2099,6 +2099,50 @@
     <div class="page-title">📋 物件情報入力（テンプレート2）</div>
     <div class="page-sub">テンプレート <strong>2 — 物件概要重視</strong> | デザインスタイル（カラー / コーナー）はテンプレ1の設定を継承します。</div>
 
+    <!-- PDF Upload Zone (T2) ─ same module as T1 -->
+    <div class="upload-section">
+      <div class="upload-section-title">📄 STEP 1 — 既存の物件PDFを読み込む（任意・省略可）</div>
+
+      <div class="upload-how">
+        <div class="upload-how-box">
+          <h4>✅ 使えるPDFの種類</h4>
+          <ul>
+            <li>レインズの物件詳細シート</li>
+            <li>他社・自社の既存チラシ</li>
+            <li>デベロッパーの物件資料</li>
+            <li>テキスト選択できるPDF全般</li>
+          </ul>
+        </div>
+        <div class="upload-how-box">
+          <h4>📥 自動で読み取る項目</h4>
+          <ul>
+            <li>物件種別・建物名・販売価格</li>
+            <li>最寄り駅・徒歩分</li>
+            <li>所在地・面積・築年月 等</li>
+            <li>会社情報（会社名・TEL・免許番号 等）</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="upload-note">
+        <strong>⚠ ご注意：</strong>
+        スキャンした画像PDFは文字を読み取れません。テキストが選択できるPDFのみ対応しています。<br>
+        読み取り後は必ず内容を確認し、不足・誤りがあれば手動で修正してください。
+      </div>
+
+      <div class="upload-zone" id="uploadZoneT2" onclick="document.getElementById('pdfInputT2').click()">
+        <div class="upload-icon">📂</div>
+        <h3>物件PDFをここにドラッグ＆ドロップ</h3>
+        <p>テンプレート2のフォームが自動入力されます — 内容確認・修正後にチラシを生成してください</p>
+        <label class="btn-upload">📂 PDFを選択してアップロード</label>
+        <input type="file" id="pdfInputT2" accept=".pdf" onchange="handleFileSelectT2(event)">
+        <div class="file-selected" id="fileSelectedT2">📄 <span id="fileNameT2"></span></div>
+      </div>
+      <div id="pdfParseStatusT2" class="pdf-status" style="display:none;"></div>
+    </div>
+
+    <div class="divider">STEP 2 — 物件情報を入力・確認する</div>
+
     <form id="propertyFormT2">
       <!-- Hidden -->
       <input type="hidden" name="templateId" value="2">
@@ -3670,6 +3714,171 @@ async function loadProfileIntoT2() {
   });
   obs.observe(t2, { attributes: true, attributeFilter: ['style'] });
 })();
+
+// ── PDF auto-input module for T2 (mirrors T1) ──────────────────
+function handleFileSelectT2(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('fileNameT2').textContent = file.name;
+  document.getElementById('fileSelectedT2').style.display = 'block';
+  parsePDFT2(file);
+}
+(function wireT2PdfDropZone() {
+  const zone = document.getElementById('uploadZoneT2');
+  if (!zone) return;
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') {
+      document.getElementById('fileNameT2').textContent = file.name;
+      document.getElementById('fileSelectedT2').style.display = 'block';
+      parsePDFT2(file);
+    }
+  });
+})();
+
+function parsePDFT2(file) {
+  const zone   = document.getElementById('uploadZoneT2');
+  const status = document.getElementById('pdfParseStatusT2');
+  zone.classList.add('parsing');
+  if (status) {
+    status.textContent = '📄 PDFを解析中…';
+    status.style.display = 'block';
+    status.className = 'pdf-status loading';
+  }
+  const fd = new FormData();
+  fd.append('file', file);
+  fetch('/api/parse-pdf', { method: 'POST', body: fd })
+    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error('サーバー ' + r.status + ': ' + t); }))
+    .then(data => {
+      const count = autofillFormT2(data);
+      if (status) {
+        status.textContent = '✅ ' + count + '項目を自動入力しました。内容を確認してください。';
+        status.className = 'pdf-status success';
+      }
+    })
+    .catch(err => {
+      console.error('PDF parse error (T2):', err);
+      if (status) {
+        status.textContent = '⚠️ 読み取りエラー: ' + err.message;
+        status.className = 'pdf-status error';
+      }
+    })
+    .finally(() => zone.classList.remove('parsing'));
+}
+
+// Maps a parse-pdf result into the T2 form. Returns count of fields filled.
+function autofillFormT2(data) {
+  let filled = 0;
+  const setVal = (id, v) => {
+    if (v === undefined || v === null || v === '') return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = v;
+    filled++;
+  };
+
+  // ── Header fields ──────────────────────────────────────────
+  setVal('f2-propertyType', data.propertyType);
+  setVal('f2-propertyName', data.propertyName);
+  // price like "4,500万円" → strip non-digits for priceNum
+  if (data.price) {
+    const num = String(data.price).replace(/[^\d]/g, '');
+    if (num) setVal('f2-priceNum', num);
+  }
+
+  // ── Stations (variant aware) ───────────────────────────────
+  const variant = (document.getElementById('f2-templateVariant') || {}).value || 'A';
+  const stations = Array.isArray(data.stations) ? data.stations : [];
+  if (variant === 'A') {
+    // Replace existing rows with parsed ones (cap 4)
+    const wrap = document.getElementById('t2-stations-container');
+    if (wrap) {
+      wrap.innerHTML = '';
+      _t2StationCount = 0;
+      const rows = stations.slice(0, 4);
+      if (rows.length) {
+        rows.forEach(s => addStationT2(s.line || '', s.station || '', s.walk || ''));
+        filled += rows.length;
+      }
+      // Pad to 4 empty rows for editing convenience
+      while (document.getElementById('t2-stations-container').children.length < 4) {
+        addStationT2();
+      }
+    }
+  } else {
+    // 2B: first station → pill fields
+    if (stations.length) {
+      setVal('f2-line',    stations[0].line || '');
+      setVal('f2-station', stations[0].station || '');
+      setVal('f2-walk',    String(stations[0].walk || '').replace(/[^\d]/g, ''));
+    }
+  }
+
+  // ── Detail rows: map parse keys → T2 detail keys ───────────
+  // Build a "transit" string from first station for the addr/transit detail rows
+  const transitStr = stations.length
+    ? [stations[0].line, stations[0].station, stations[0].walk ? '徒歩' + stations[0].walk + '分' : '']
+        .filter(Boolean).join(' ')
+    : '';
+
+  const detailMap = {
+    addr:                 data.address,
+    transit:              transitStr,
+    regArea:              data.landArea,
+    exclArea:             data.landArea,           // condo/exclusive area fallback
+    landRight:            data.landRight,
+    bcrFar:               (data.bcr && data.far) ? (data.bcr + ' / ' + data.far) : (data.bcr || data.far),
+    siteArea:             data.totalFloorArea,
+    bldgName:             data.propertyName,
+    structure:            data.structure,
+    completion:           data.builtYear,
+    builtYear:            data.builtYear,
+    useZone:              data.useZone,
+    status:               data.currentStatus,
+    handover:             data.handover,
+    handoverDate:         data.handover,
+    facilities:           [data.electric, data.gas, data.water].filter(Boolean).join('、'),
+    remarks:              data.remarks,
+    transactionTypeRow:   data.transactionType,
+    school:               [data.elemSchool, data.juniorSchool].filter(Boolean).join(' / '),
+  };
+  for (const [key, val] of Object.entries(detailMap)) {
+    if (!val) continue;
+    const inp = document.getElementById('f2-detail-' + key);
+    if (!inp) continue;
+    inp.value = val;
+    // Auto-check the row so it appears in the rendered flyer
+    const cb = document.querySelector('.t2-detail-cb[data-key="' + key + '"]');
+    if (cb && !cb.checked) {
+      cb.checked = true;
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    filled++;
+  }
+
+  // ── Company / agent block ──────────────────────────────────
+  const co = {
+    companyName:     data.companyName,
+    brandName:       data.brandName,
+    companyAddress:  data.companyAddress,
+    licenseNo:       data.licenseNo,
+    agentName:       data.agentName,
+    tel:             data.tel,
+    fax:             data.fax,
+    email:           data.email,
+    transactionType: data.transactionType,
+    fee:             data.fee,
+    catchcopy:       data.catchcopy,
+  };
+  for (const [k, v] of Object.entries(co)) {
+    setVal('f2-' + k, v);
+  }
+
+  return filled;
+}
 
 // ── Collect + validate T2 form data ───────────────────────────
 // Helpers: mark/clear invalid fields & manage the inline banner
