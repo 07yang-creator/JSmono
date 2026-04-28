@@ -878,6 +878,17 @@
     .photo-req.ok { background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32; }
     .photo-req strong { font-size: 13px; display: block; margin-bottom: 3px; }
 
+    /* ── Photo tips (auto-crop + size guidance) ─────────────────────── */
+    .photo-tips {
+      border-radius: 7px; padding: 10px 14px; font-size: 12px;
+      margin-bottom: 12px; line-height: 1.6;
+      background: #eef3fb; border: 1px solid #c7d6ee; color: #2c3f64;
+    }
+    .photo-tips strong { display: block; font-size: 12.5px; margin-bottom: 5px; color: #1c2c4a; }
+    .photo-tips ul { margin: 0; padding-left: 18px; }
+    .photo-tips li { margin: 3px 0; }
+    .photo-tips .tip-zh { display: block; font-size: 11px; color: #5a6a85; margin-top: 1px; }
+
     /* ── Section header checkbox (use-profile) ─────────────────────── */
     .section-header { position: relative; }
     .use-profile-cb {
@@ -1863,6 +1874,25 @@
           <div class="section-body">
             <p class="photo-note">各スロットをクリックして画像を選択してください。✕ で削除できます。</p>
 
+            <!-- Photo upload tips (auto-crop schema + size limits) -->
+            <div class="photo-tips">
+              <strong>💡 写真アップロードのポイント / 上传照片须知</strong>
+              <ul>
+                <li>
+                  <b>自動トリミング：</b>外観・内観の写真はスロットの形に合わせて自動でフィットします（はみ出し部分は中心からカット）。間取り図・地図は<b>切り取らず</b>に余白付きで全体表示されます。
+                  <span class="tip-zh">自动裁切：外观/内观照片自动充满框（边缘居中裁切）；户型图与地图<b>不会被裁切</b>，按原比例完整显示。</span>
+                </li>
+                <li>
+                  <b>サイズ上限：</b>1枚あたり <b>12MB</b> まで。アップロード後、自動的に長辺 1800px・JPEG 品質 85% へ縮小されます（ロゴは 1024px / 90%）。
+                  <span class="tip-zh">单张上限 12MB；上传后自动压缩至长边 1800px、JPEG 85%（Logo 为 1024px / 90%）。</span>
+                </li>
+                <li>
+                  <b>推奨サイズ：</b>長辺 <b>1500〜2000px</b>・<b>JPEG</b>・各 <b>200〜600KB</b> 程度を目安にすると、アップロード・プレビューがスムーズです。これ以上の高解像度は印刷品質に寄与しません。
+                  <span class="tip-zh">建议长边 1500–2000px、JPEG、约 200–600KB 最为流畅；更高分辨率对印刷品质无明显提升。</span>
+                </li>
+              </ul>
+            </div>
+
             <!-- Photo requirement notice (Variant A only) -->
             <div id="photo-req-notice" class="photo-req">
               <strong>📷 写真の要件（標準レイアウト）</strong>
@@ -2267,8 +2297,27 @@
       <div class="section-card full-width">
         <div class="section-header">📷 写真アップロード（7枚・固定サイズ）</div>
         <div class="section-body">
-          <div style="margin-bottom:12px;padding:8px 12px;background:#fef9e7;border-left:3px solid #f9b44a;font-size:12px;color:#7d6330">
-            写真スロットのサイズと縦横比は固定です。アップロード前に画像をトリミングしてください。
+          <div style="margin-bottom:10px;padding:8px 12px;background:#fef9e7;border-left:3px solid #f9b44a;font-size:12px;color:#7d6330">
+            写真スロットのサイズと縦横比は固定です。意図した構図で出したい場合は、アップロード前に画像をトリミングしてください。
+          </div>
+
+          <!-- Photo upload tips (auto-crop schema + size limits) -->
+          <div class="photo-tips">
+            <strong>💡 写真アップロードのポイント / 上传照片须知</strong>
+            <ul>
+              <li>
+                <b>自動トリミング：</b>外観メイン（K1）・内観（K5–K7）など外観系は自動でスロットいっぱいにフィットされます（はみ出し部分は中心からカット）。間取り図（K2）・地図タイル（K4）は<b>切り取らず</b>に余白付きで全体表示されます。
+                <span class="tip-zh">自动裁切：外观主图（K1）与内观（K5–K7）等照片自动填满框（边缘居中裁切）；户型图（K2）与地图（K4）<b>不会被裁切</b>，按原比例完整显示。</span>
+              </li>
+              <li>
+                <b>サイズ上限：</b>1枚あたり <b>12MB</b> まで。アップロード後、自動的に長辺 1800px・JPEG 品質 85% へ縮小されます（ロゴは 1024px / 90%）。
+                <span class="tip-zh">单张上限 12MB；上传后自动压缩至长边 1800px、JPEG 85%（Logo 为 1024px / 90%）。</span>
+              </li>
+              <li>
+                <b>推奨サイズ：</b>長辺 <b>1500〜2000px</b>・<b>JPEG</b>・各 <b>200〜600KB</b> 程度を目安にすると、アップロード・プレビューがスムーズです。これ以上の高解像度は印刷品質に寄与しません。
+                <span class="tip-zh">建议长边 1500–2000px、JPEG、约 200–600KB 最为流畅；更高分辨率对印刷品质无明显提升。</span>
+              </li>
+            </ul>
           </div>
           <div class="photo-grid" id="t2-photo-grid">
             <div class="photo-slot" id="t2-slot-k1Image" data-t2slot="1">
