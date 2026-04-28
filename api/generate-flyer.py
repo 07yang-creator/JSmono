@@ -37,6 +37,37 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
 from http.server import BaseHTTPRequestHandler
+try:
+    from PIL import Image, ImageOps
+    _PIL_OK = True
+except Exception:
+    _PIL_OK = False
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHOTO_FIT_SCHEMA — single source of truth for how each photo slot is fitted
+# into its frame. 'cover'   = scale to fill the rect, center-crop the overflow
+#                            (best for exterior / interior / scenery photos).
+#                'contain' = scale to fit inside the rect with letterbox bg
+#                            (used for floor plans, maps, diagrams — anything
+#                            where cropping would destroy information).
+# Defaults to 'cover' when a slot is not listed.
+# ─────────────────────────────────────────────────────────────────────────────
+PHOTO_FIT_SCHEMA = {
+    # Template 1, Variant A (Q1/Q2 quad split)
+    ('1', 'A', 'k2'): 'contain',  # Q2-bottom: floor plan
+    ('1', 'A', 'k5'): 'contain',  # Q2-top:    map
+    # Template 1, Variant B (flex grid 2x2 — K1/K2/K3 exteriors, K4 = floor plan / map)
+    ('1', 'B', 'k4'): 'contain',  # 間取り / 地図 — floor plan or map slot
+    # Template 2, Variant A (sample-accurate layout)
+    ('2', 'A', 'k2'): 'contain',  # floor plan (largest tile, middle row)
+    ('2', 'A', 'k4'): 'contain',  # map tile (top-right)
+    # Template 2, Variant B
+    ('2', 'B', 'k2'): 'contain',  # floor plan (top-right)
+}
+def fit_mode(template_id, variant, slot_key):
+    """Look up the per-slot fit mode. Falls back to 'cover'."""
+    s = (slot_key or '').lower().replace('image', '')
+    return PHOTO_FIT_SCHEMA.get((str(template_id), str(variant or 'A'), s), 'cover')
 
 # ── Font ──────────────────────────────────────────────────────────────────────
 _FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'fonts')
@@ -272,17 +303,61 @@ def photo_placeholder(c, x, y, w, h, label, sublabel='', cs='square', cr=6):
     if sublabel:
         draw_text(c, sublabel, cx, y + h/2 - 9, 7.5, color=colors.HexColor('#8090a4'), align='center')
 
-def draw_photo(c, x, y, w, h, b64_data, label, sublabel='', cs='square', cr=6):
+def _orient_image_bytes(raw_bytes):
+    """Apply EXIF orientation (handles iPhone portrait shots that arrive
+    with an Orientation tag set). Returns oriented bytes; falls back to
+    the original on any error or when Pillow is unavailable."""
+    if not _PIL_OK or not raw_bytes:
+        return raw_bytes
+    try:
+        with Image.open(io.BytesIO(raw_bytes)) as im:
+            ex = im.getexif() if hasattr(im, 'getexif') else None
+            orient = ex.get(274) if ex else 1   # 274 = Orientation tag
+            if not orient or orient == 1:
+                return raw_bytes                # already upright
+            fixed = ImageOps.exif_transpose(im)
+            fmt = (im.format or 'JPEG').upper()
+            if fmt not in ('JPEG', 'PNG'):
+                fmt = 'JPEG'
+            if fmt == 'JPEG' and fixed.mode in ('RGBA', 'P', 'LA'):
+                fixed = fixed.convert('RGB')
+            buf = io.BytesIO()
+            save_kwargs = {'format': fmt}
+            if fmt == 'JPEG':
+                save_kwargs['quality'] = 92
+            fixed.save(buf, **save_kwargs)
+            return buf.getvalue()
+    except Exception:
+        return raw_bytes
+
+def draw_photo(c, x, y, w, h, b64_data, label, sublabel='', cs='square', cr=6, mode='cover'):
+    """Render a base64-encoded image into the (x,y,w,h) rect.
+
+    mode='cover'   → scale the image to FILL the rect, center-crop the
+                     overflow via the slot's clip path (default — best
+                     for exterior / interior / generic photos).
+    mode='contain' → scale the image to FIT inside the rect, letterbox
+                     the leftover space (used for floor plans / maps /
+                     diagrams where cropping would destroy info).
+    """
     if b64_data:
         try:
             raw = b64_data.split(',', 1)[-1] if ',' in b64_data else b64_data
-            img = ImageReader(io.BytesIO(base64.b64decode(raw)))
+            decoded = _orient_image_bytes(base64.b64decode(raw))
+            img = ImageReader(io.BytesIO(decoded))
             iw, ih = img.getSize()
-            scale = min(w / iw, h / ih)
-            dw, dh = iw * scale, ih * scale
+            if not iw or not ih:
+                raise ValueError('zero-size image')
             c.saveState()
             cp = _photo_clip_path(c, x, y, w, h, cs, cr)
             c.clipPath(cp, stroke=0)
+            if mode == 'cover':
+                # Fill the rect; clip path handles overflow.
+                scale = max(w / iw, h / ih)
+            else:
+                # Letterbox inside the rect.
+                scale = min(w / iw, h / ih)
+            dw, dh = iw * scale, ih * scale
             c.drawImage(img, x + (w-dw)/2, y + (h-dh)/2, dw, dh,
                         preserveAspectRatio=True, mask='auto')
             c.restoreState(); return
@@ -299,34 +374,39 @@ def _img_ar(b64_data, default=4/3):
         except Exception: pass
     return default
 
-def draw_flex_grid(c, images, x, y, w, h, cs='square', cr=6):
-    """Aspect-ratio-aware photo grid with white gaps (shadow/mat effect)."""
+def draw_flex_grid(c, images, x, y, w, h, cs='square', cr=6, modes=None):
+    """Aspect-ratio-aware photo grid with white gaps (shadow/mat effect).
+
+    `modes`, if given, is a list aligned 1:1 with `images` containing per-cell
+    fit modes ('cover' or 'contain'). Cells without a mode default to 'cover'.
+    """
     GAP = 3
     n = len(images)
     if n == 0: return
     ars = [_img_ar(b) for b, _, _ in images]
+    def _m(i): return (modes[i] if (modes and i < len(modes) and modes[i]) else 'cover')
 
-    def row(imgs, ars_r, rx, ry, rw, rh):
+    def row(imgs, ars_r, rx, ry, rw, rh, base=0):
         ni = len(imgs); usable = rw - GAP * (ni - 1)
         total = sum(ars_r) or 1; cur_x = rx
         for i, (img_t, ar) in enumerate(zip(imgs, ars_r)):
             cw = usable * ar / total
             if i == ni - 1: cw = rx + rw - cur_x
-            draw_photo(c, cur_x, ry, cw, rh, *img_t, cs=cs, cr=cr)
+            draw_photo(c, cur_x, ry, cw, rh, *img_t, cs=cs, cr=cr, mode=_m(base + i))
             cur_x += cw
             if i < ni - 1:
                 rect(c, cur_x, ry, GAP, rh, fill=C_WHITE); cur_x += GAP
 
     if n == 1:
-        draw_photo(c, x, y, w, h, *images[0], cs=cs, cr=cr)
+        draw_photo(c, x, y, w, h, *images[0], cs=cs, cr=cr, mode=_m(0))
     elif n == 2:
-        row(images, ars, x, y, w, h)
+        row(images, ars, x, y, w, h, base=0)
     elif n == 3:
         rh0 = w / ars[0]; rh1 = w / ((ars[1]+ars[2])/2); tot = rh0+rh1 or 1
         h0 = max(h*.35, min(h*.65, h*rh0/tot)); h1 = h - h0 - GAP
-        draw_photo(c, x, y+h1+GAP, w, h0, *images[0], cs=cs, cr=cr)
+        draw_photo(c, x, y+h1+GAP, w, h0, *images[0], cs=cs, cr=cr, mode=_m(0))
         rect(c, x, y+h1, w, GAP, fill=C_WHITE)
-        row(images[1:], ars[1:], x, y, w, h1)
+        row(images[1:], ars[1:], x, y, w, h1, base=1)
     else:
         at = (ars[0]+ars[1])/2; ab = (ars[2]+ars[3])/2
         tot = w/at + w/ab or 1
@@ -552,17 +632,20 @@ def generate(data: dict, out):
     # ══════════════════════════════════════════════════════════════════════════
     # RIGHT PHOTO AREA
     # ══════════════════════════════════════════════════════════════════════════
+    # White background for entire right photo area; no stroke (grid removed).
+    # Drawn FIRST so subsequent photos / flex_grid render on top of it.
+    PPAD = 4                            # gap around each photo → 8pt between adjacent photos
+    rect(c, RX, MID_BOT, RW, CONTENT_H, fill=C_WHITE)
+
     if variant == 'B':
         draw_flex_grid(c, [
             (data.get('k1Image',''), '外　観',      '（K1）'),
             (data.get('k2Image',''), '外観写真２',  '（K2）'),
             (data.get('k3Image',''), '外観写真３',  '（K3）'),
             (data.get('k4Image',''), '間取り / 地図','（K4）'),
-        ], RX, MID_BOT, RW, CONTENT_H, cs=_cs, cr=_cr)
-
-    # White background for entire right photo area; no stroke (grid removed)
-    PPAD = 4                            # gap around each photo → 8pt between adjacent photos
-    rect(c, RX, MID_BOT, RW, CONTENT_H, fill=C_WHITE)
+        ], RX, MID_BOT, RW, CONTENT_H, cs=_cs, cr=_cr,
+           modes=[fit_mode('1','B','k1'), fit_mode('1','B','k2'),
+                  fit_mode('1','B','k3'), fit_mode('1','B','k4')])
 
     lease    = data.get('leasePeriod', '')
     grent    = data.get('groundRent', '')
@@ -572,17 +655,20 @@ def generate(data: dict, out):
     if variant != 'B':
         # Q1-top: K1 exterior photo (inset by PPAD for white breathing gap)
         draw_photo(c, RX1 + PPAD, BAND_BOT + PPAD, HALF - PPAD * 2, TOP_H - PPAD * 2,
-                   data.get('k1Image',''), '外　観', '（写真をここに挿入）', cs=_cs, cr=_cr)
+                   data.get('k1Image',''), '外　観', '（写真をここに挿入）',
+                   cs=_cs, cr=_cr, mode=fit_mode('1','A','k1'))
         # Q2-top: K5 map (inset by PPAD)
         draw_photo(c, RX2 + PPAD, BAND_BOT + PPAD, HALF - PPAD * 2, TOP_H - PPAD * 2,
-                   data.get('k5Image',''), '地　図', '（地図を挿入）', cs=_cs, cr=_cr)
+                   data.get('k5Image',''), '地　図', '（地図を挿入）',
+                   cs=_cs, cr=_cr, mode=fit_mode('1','A','k5'))
 
     if variant != 'B':
         k3_img = data.get('k3Image', '').strip()
         if k3_img:
             # Q1-bottom: K3 内観写真 replaces the H/I info box when uploaded
             draw_photo(c, RX1 + PPAD, MID_BOT + PPAD, HALF - PPAD * 2, MID_H - PPAD * 2,
-                       k3_img, '内　観', '（内観写真）', cs=_cs, cr=_cr)
+                       k3_img, '内　観', '（内観写真）',
+                       cs=_cs, cr=_cr, mode=fit_mode('1','A','k3'))
         else:
             # Q1-bottom: poster-style info panel
             rect(c, RX1, MID_BOT, HALF, MID_H, fill=C_WHITE, stroke=C_DIV, lw=0.5)
@@ -897,7 +983,8 @@ def generate(data: dict, out):
     # Q2-bottom: K2 floor plan (Variant A) — inset by PPAD
     if variant != 'B':
         draw_photo(c, RX2 + PPAD, MID_BOT + PPAD, HALF - PPAD * 2, MID_H - PPAD * 2,
-                   data.get('k2Image',''), '間取り図', '（間取り図を挿入）', cs=_cs, cr=_cr)
+                   data.get('k2Image',''), '間取り図', '（間取り図を挿入）',
+                   cs=_cs, cr=_cr, mode=fit_mode('1','A','k2'))
 
     # ══════════════════════════════════════════════════════════════════════════
     # FOOTER — FIXED 34mm, IW width, left→right: Logo|Name|Info|Contact|Yellow
@@ -1442,16 +1529,16 @@ def _generate_t2(c, W, H, data: dict):
         K1_Y = IN_Y + IN_H - TOP_H
         draw_photo(c, K1_X, K1_Y, K1_W, TOP_H,
                    data.get('k1Image', ''), '外観メイン', '（K1）',
-                   cs=_cs, cr=_cr)
+                   cs=_cs, cr=_cr, mode=fit_mode('2','A','k1'))
         K4_X = K1_X + K1_W + PG
         draw_photo(c, K4_X, K1_Y, K4_W, TOP_H,
                    data.get('k4Image', ''), '地図', '（K4）',
-                   cs=_cs, cr=_cr)
+                   cs=_cs, cr=_cr, mode=fit_mode('2','A','k4'))
         K2_X = PHOTO_X
         K2_Y = K1_Y - PG - MID_H
         draw_photo(c, K2_X, K2_Y, PHOTO_W, MID_H,
                    data.get('k2Image', ''), '間取り図', '（K2）',
-                   cs=_cs, cr=_cr)
+                   cs=_cs, cr=_cr, mode=fit_mode('2','A','k2'))
         TH_KEYS   = ['k5Image', 'k6Image', 'k7Image']
         TH_LABELS = [('内観1', 'K5'), ('内観2', 'K6'), ('内観3', 'K7')]
         TH_N = len(TH_KEYS)
@@ -1459,9 +1546,10 @@ def _generate_t2(c, W, H, data: dict):
         TY = IN_Y
         for i, (key, (lab, sub)) in enumerate(zip(TH_KEYS, TH_LABELS)):
             tx = PHOTO_X + i * (TW + PG)
+            slot = key.replace('Image', '').lower()  # 'k5'/'k6'/'k7'
             draw_photo(c, tx, TY, TW, BOT_H,
                        data.get(key, ''), lab, f'（{sub}）',
-                       cs=_cs, cr=_cr)
+                       cs=_cs, cr=_cr, mode=fit_mode('2','A',slot))
         # K3 — circular building-emblem overlay (top-right of K1)
         k3_b64 = data.get('k3Image', '')
         if k3_b64:
@@ -1476,7 +1564,8 @@ def _generate_t2(c, W, H, data: dict):
             cp = c.beginPath(); cp.circle(ov_cx, ov_cy, ov_r); c.clipPath(cp, stroke=0)
             try:
                 raw = k3_b64.split(',', 1)[-1] if ',' in k3_b64 else k3_b64
-                img = ImageReader(io.BytesIO(base64.b64decode(raw)))
+                decoded = _orient_image_bytes(base64.b64decode(raw))
+                img = ImageReader(io.BytesIO(decoded))
                 iw, ih = img.getSize()
                 box   = ov_r * 2
                 scale = max(box / iw, box / ih) if iw and ih else 1
@@ -1499,11 +1588,11 @@ def _generate_t2(c, W, H, data: dict):
         K1_Y  = IN_Y + BOT_H + PG
         draw_photo(c, K1_X, K1_Y, K1_W, TOP_H,
                    data.get('k1Image', ''), '外観メイン', '（K1）',
-                   cs=_cs, cr=_cr)
+                   cs=_cs, cr=_cr, mode=fit_mode('2','B','k1'))
         K2_X = K1_X + K1_W + PG
         draw_photo(c, K2_X, K1_Y, K2_W, TOP_H,
                    data.get('k2Image', ''), '間取り図', '（K2）',
-                   cs=_cs, cr=_cr)
+                   cs=_cs, cr=_cr, mode=fit_mode('2','B','k2'))
         TH_KEYS   = ['k3Image', 'k4Image', 'k5Image', 'k6Image', 'k7Image']
         TH_LABELS = [('外観', 'K3'), ('共用部', 'K4'),
                      ('内観1', 'K5'), ('内観2', 'K6'), ('内観3', 'K7')]
@@ -1512,9 +1601,10 @@ def _generate_t2(c, W, H, data: dict):
         TY = IN_Y
         for i, (key, (lab, sub)) in enumerate(zip(TH_KEYS, TH_LABELS)):
             tx = PHOTO_X + i * (TW + PG)
+            slot = key.replace('Image', '').lower()
             draw_photo(c, tx, TY, TW, BOT_H,
                        data.get(key, ''), lab, f'（{sub}）',
-                       cs=_cs, cr=_cr)
+                       cs=_cs, cr=_cr, mode=fit_mode('2','B',slot))
         callout = (data.get('yieldCallout', '') or '').strip()
         if callout:
             cw  = min(K1_W * 0.50, 130)
