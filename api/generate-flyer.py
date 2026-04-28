@@ -411,9 +411,9 @@ def draw_flex_grid(c, images, x, y, w, h, cs='square', cr=6, modes=None):
         at = (ars[0]+ars[1])/2; ab = (ars[2]+ars[3])/2
         tot = w/at + w/ab or 1
         ht = max(h*.35, min(h*.65, h*(w/at)/tot)); hb = h - ht - GAP
-        row(images[:2], ars[:2], x, y+hb+GAP, w, ht)
+        row(images[:2], ars[:2], x, y+hb+GAP, w, ht, base=0)
         rect(c, x, y+hb, w, GAP, fill=C_WHITE)
-        row(images[2:], ars[2:], x, y, w, hb)
+        row(images[2:], ars[2:], x, y, w, hb, base=2)
 
 
 # ── Generator ─────────────────────────────────────────────────────────────────

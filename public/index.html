@@ -3331,11 +3331,23 @@ function _runGenerate(raw, onSuccess) {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify(raw)
       })
-      .then(r => r.blob())
+      .then(async r => {
+        if (!r.ok) {
+          // Surface the real server error instead of feeding garbage to the iframe
+          const txt = await r.text().catch(() => '');
+          throw new Error('サーバー ' + r.status + (txt ? ': ' + txt.slice(0, 300) : ''));
+        }
+        const ct = r.headers.get('content-type') || '';
+        if (ct && !ct.includes('pdf') && !ct.includes('octet-stream')) {
+          const txt = await r.text().catch(() => '');
+          throw new Error('PDF以外のレスポンス (' + ct + '): ' + txt.slice(0, 300));
+        }
+        return r.blob();
+      })
       .then(blob => { overlay.classList.remove('visible'); resetSteps(); onSuccess(blob); })
-      .catch(() => {
+      .catch(err => {
         overlay.classList.remove('visible'); resetSteps();
-        alert('チラシの生成中にエラーが発生しました。');
+        alert('チラシの生成中にエラーが発生しました。\n' + (err && err.message ? err.message : err));
       });
     }
   }, 700);
@@ -3373,6 +3385,44 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closePreview();
 });
 
+// ── Image downscale helper ──────────────────────────────────────────────────
+// Vercel serverless body limit is 4.5MB. Five 3MB iPhone photos easily overshoot,
+// so we downscale on the client before encoding to base64.  Returns a data:URL.
+//   maxEdge=1800px, JPEG quality=0.85 → typical 200–500 KB per photo, well below limits.
+async function shrinkImageToDataUrl(file, maxEdge = 1800, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    // Skip resize for tiny PNG/SVG logos and anything already small enough
+    if (file.size < 350 * 1024) {
+      const r = new FileReader();
+      r.onload  = e => resolve(e.target.result);
+      r.onerror = () => reject(new Error('読み込み失敗'));
+      r.readAsDataURL(file);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const longest = Math.max(img.naturalWidth, img.naturalHeight);
+        const scale   = longest > maxEdge ? maxEdge / longest : 1;
+        const w = Math.round(img.naturalWidth  * scale);
+        const h = Math.round(img.naturalHeight * scale);
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); // for transparent PNG → white bg in JPEG
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        // PNG passthrough for transparency-sensitive logos? Keep JPEG for everything;
+        // logos are fine on white. Caller can override via a wrapper.
+        resolve(cv.toDataURL('image/jpeg', quality));
+      } catch (err) { URL.revokeObjectURL(url); reject(err); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('画像を読み込めませんでした')); };
+    img.src = url;
+  });
+}
+
 // ── Photo upload slots (K1/K2/K5/K3/K4) ─────────────────────────────────────
 (function initPhotoSlots() {
   // [slotId, fieldName, triggersPhotoReqCheck]
@@ -3393,22 +3443,25 @@ document.addEventListener('keydown', e => {
 
     slot.addEventListener('click', e => { if (e.target !== clearBtn) fileInput.click(); });
 
-    fileInput.addEventListener('change', () => {
+    fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
-      if (file.size > 3 * 1024 * 1024) {
-        alert('ファイルが大きすぎます（3MB以下にしてください）。');
+      // Hard cap at 12MB raw (after that, even the canvas decode is risky on mobile)
+      if (file.size > 12 * 1024 * 1024) {
+        alert('ファイルが大きすぎます（12MB以下にしてください）。');
         fileInput.value = ''; return;
       }
-      const reader = new FileReader();
-      reader.onload = ev => {
-        hidden.value = ev.target.result;
-        preview.src  = ev.target.result;
+      try {
+        const dataUrl = await shrinkImageToDataUrl(file);
+        hidden.value = dataUrl;
+        preview.src  = dataUrl;
         preview.style.display = 'block';
         slot.classList.add('has-image');
         if (trigReq) updatePhotoReq();
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        alert('画像の処理に失敗しました：' + (err && err.message ? err.message : err));
+        fileInput.value = '';
+      }
     });
 
     clearBtn.addEventListener('click', e => {
@@ -3431,18 +3484,21 @@ document.addEventListener('keydown', e => {
 
   slot.addEventListener('click', e => { if (e.target !== clearBtn) fileInput.click(); });
 
-  fileInput.addEventListener('change', () => {
+  fileInput.addEventListener('change', async () => {
     const file = fileInput.files[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) { alert('3MB以下にしてください'); fileInput.value = ''; return; }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      hidden.value = ev.target.result;
-      preview.src  = ev.target.result;
+    if (file.size > 12 * 1024 * 1024) { alert('12MB以下にしてください'); fileInput.value = ''; return; }
+    try {
+      // Logo: keep larger so small icons stay sharp; 1024px is plenty for footer.
+      const dataUrl = await shrinkImageToDataUrl(file, 1024, 0.9);
+      hidden.value = dataUrl;
+      preview.src  = dataUrl;
       preview.style.display = 'block';
       slot.classList.add('has-image');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      alert('画像の処理に失敗しました：' + (err && err.message ? err.message : err));
+      fileInput.value = '';
+    }
   });
 
   clearBtn.addEventListener('click', e => {
@@ -3463,18 +3519,20 @@ document.addEventListener('keydown', e => {
 
   slot.addEventListener('click', e => { if (e.target !== clearBtn) fileInput.click(); });
 
-  fileInput.addEventListener('change', () => {
+  fileInput.addEventListener('change', async () => {
     const file = fileInput.files[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) { alert('3MB以下にしてください'); fileInput.value = ''; return; }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      hidden.value = ev.target.result;
-      preview.src  = ev.target.result;
+    if (file.size > 12 * 1024 * 1024) { alert('12MB以下にしてください'); fileInput.value = ''; return; }
+    try {
+      const dataUrl = await shrinkImageToDataUrl(file, 1024, 0.9);
+      hidden.value = dataUrl;
+      preview.src  = dataUrl;
       preview.style.display = 'block';
       slot.classList.add('has-image');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      alert('画像の処理に失敗しました：' + (err && err.message ? err.message : err));
+      fileInput.value = '';
+    }
   });
 
   clearBtn.addEventListener('click', e => {
@@ -3655,18 +3713,20 @@ function toggleRareBadge(cb) {
     const preview   = slot.querySelector('.preview');
     const clearBtn  = slot.querySelector('.clear-btn');
     slot.addEventListener('click', e => { if (e.target !== clearBtn) fileInput.click(); });
-    fileInput.addEventListener('change', () => {
+    fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
-      if (file.size > 3 * 1024 * 1024) { alert('3MB以下にしてください'); fileInput.value = ''; return; }
-      const reader = new FileReader();
-      reader.onload = ev => {
-        hidden.value = ev.target.result;
-        preview.src  = ev.target.result;
+      if (file.size > 12 * 1024 * 1024) { alert('12MB以下にしてください'); fileInput.value = ''; return; }
+      try {
+        const dataUrl = await shrinkImageToDataUrl(file);
+        hidden.value = dataUrl;
+        preview.src  = dataUrl;
         preview.style.display = 'block';
         slot.classList.add('has-image');
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        alert('画像の処理に失敗しました：' + (err && err.message ? err.message : err));
+        fileInput.value = '';
+      }
     });
     clearBtn.addEventListener('click', e => {
       e.stopPropagation();
@@ -3685,18 +3745,20 @@ function toggleRareBadge(cb) {
   const preview   = slot.querySelector('.preview');
   const clearBtn  = slot.querySelector('.clear-btn');
   slot.addEventListener('click', e => { if (e.target !== clearBtn) fileInput.click(); });
-  fileInput.addEventListener('change', () => {
+  fileInput.addEventListener('change', async () => {
     const file = fileInput.files[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) { alert('3MB以下にしてください'); fileInput.value = ''; return; }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      hidden.value = ev.target.result;
-      preview.src  = ev.target.result;
+    if (file.size > 12 * 1024 * 1024) { alert('12MB以下にしてください'); fileInput.value = ''; return; }
+    try {
+      const dataUrl = await shrinkImageToDataUrl(file, 1024, 0.9);
+      hidden.value = dataUrl;
+      preview.src  = dataUrl;
       preview.style.display = 'block';
       slot.classList.add('has-image');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      alert('画像の処理に失敗しました：' + (err && err.message ? err.message : err));
+      fileInput.value = '';
+    }
   });
   clearBtn.addEventListener('click', e => {
     e.stopPropagation();
@@ -4065,13 +4127,29 @@ function _collectAndValidateT2() {
 }
 
 function _runGenerateT2(raw, onSuccess) {
+  const overlay = document.getElementById('progressOverlay');
+  if (overlay) overlay.classList.add('visible');
   fetch('/api/generate-flyer', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify(raw)
   })
-  .then(r => r.blob())
-  .then(blob => onSuccess(blob))
-  .catch(() => alert('チラシの生成中にエラーが発生しました。'));
+  .then(async r => {
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      throw new Error('サーバー ' + r.status + (txt ? ': ' + txt.slice(0, 300) : ''));
+    }
+    const ct = r.headers.get('content-type') || '';
+    if (ct && !ct.includes('pdf') && !ct.includes('octet-stream')) {
+      const txt = await r.text().catch(() => '');
+      throw new Error('PDF以外のレスポンス (' + ct + '): ' + txt.slice(0, 300));
+    }
+    return r.blob();
+  })
+  .then(blob => { if (overlay) overlay.classList.remove('visible'); onSuccess(blob); })
+  .catch(err => {
+    if (overlay) overlay.classList.remove('visible');
+    alert('チラシの生成中にエラーが発生しました。\n' + (err && err.message ? err.message : err));
+  });
 }
 
 function previewFlyerT2() {
