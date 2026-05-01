@@ -645,8 +645,15 @@ def generate(data: dict, out):
     for i, st in enumerate(stations):
         ln     = st.get('line', '')
         stn    = st.get('station', '').replace('駅', '')
-        wk     = st.get('walk', '')
-        line_t = truncate_text(f"{ln}　{stn}駅 徒歩{wk}分", LCW - 10, ST_FONT)
+        wk     = (st.get('walk', '') or '').strip()
+        # Build line: "{line}　{stn}駅 徒歩{wk}分" but drop "徒歩X分" when wk is empty.
+        # If wk already contains "分" or "徒歩" the user typed a phrase — keep as-is.
+        if wk:
+            walk_part = wk if ('分' in wk or '徒歩' in wk) else f'徒歩{wk}分'
+            station_str = f'{stn}駅 {walk_part}' if stn else walk_part
+        else:
+            station_str = f'{stn}駅' if stn else ''
+        line_t = truncate_text(f"{ln}　{station_str}".strip(), LCW - 10, ST_FONT)
         # Baseline centred in each line slice
         st_y   = block_top - (i + 0.5) * st_line_h - ST_FONT * 0.26
         draw_text(c, line_t, LX + LCW/2, st_y, ST_FONT, color=_c_on_white, align='center')
@@ -1549,8 +1556,17 @@ def _generate_t2(c, W, H, data: dict):
                 ln  = (t.get('line', '') or '').strip()
                 stn = (t.get('station', '') or '').replace('駅', '').strip()
                 wk  = (t.get('walk', '') or '').strip()
-                txt = f'■ {ln}　{stn}駅 徒歩{wk}分' if (ln or stn) else ''
-                if not txt: continue
+                # Build only the parts that have content; never emit an
+                # orphan "徒歩分" when the user left walk blank.
+                if wk:
+                    walk_part = wk if ('分' in wk or '徒歩' in wk) else f'徒歩{wk}分'
+                else:
+                    walk_part = ''
+                stn_part = f'{stn}駅' if stn else ''
+                tail = ' '.join(p for p in (stn_part, walk_part) if p)
+                if not (ln or tail):
+                    continue
+                txt = '■ ' + (f'{ln}　{tail}' if (ln and tail) else (ln or tail))
                 ly = cream_top - 3 - (i + 0.7) * slot_h
                 # Indent the FIRST line past the corner burst so they
                 # don't collide.
