@@ -4370,6 +4370,10 @@ function _t2ShowError(message, firstWrapper) {
   if (firstWrapper) {
     firstWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+  // Also surface via alert — guarantees the user sees it even if the banner
+  // is off-screen or visually overlooked. Otherwise "preview button does
+  // nothing" looks like a broken button rather than missing input.
+  try { alert(message); } catch (e) {}
 }
 // Live-clear: any input/change inside T2 strips the invalid class
 (function wireT2LiveClear() {
@@ -4508,9 +4512,12 @@ function _runGenerateT2(raw, onSuccess) {
       clearInterval(interval);
       const bodyStr2 = JSON.stringify(raw);
       const bodySizeMB2 = (new TextEncoder().encode(bodyStr2).length / 1024 / 1024).toFixed(1);
-      if (bodySizeMB2 > 4.0) {
+      console.log('[T2] payload size:', bodySizeMB2, 'MB');
+      if (parseFloat(bodySizeMB2) > 4.0) {
         if (overlay) overlay.classList.remove('visible'); resetSteps();
-        alert(`画像データが大きすぎます（${bodySizeMB2} MB）。\n上限は4MBです。写真の枚数を減らすか、より小さい画像を使用してください。`);
+        alert(`画像データが大きすぎます（${bodySizeMB2} MB）。\n上限は4MBです。\n` +
+              `\n各写真スロットで✕を押して再アップロードすると、自動的に縮小されて4MB以下になります。\n` +
+              `（以前にアップロードした写真は古い形式のままサイズが大きい可能性があります）`);
         return;
       }
       _generateAbortController = new AbortController();
@@ -4543,6 +4550,7 @@ function _runGenerateT2(raw, onSuccess) {
         clearTimeout(timeoutId); _generateAbortController = null;
         if (overlay) overlay.classList.remove('visible');
         resetSteps();
+        console.error('[T2] generate failed:', err);
         if (err && err.name === 'AbortError') {
           alert('タイムアウト：サーバーの応答がありませんでした。しばらく待ってから再試行してください。');
         } else {
@@ -4554,14 +4562,25 @@ function _runGenerateT2(raw, onSuccess) {
 }
 
 function previewFlyerT2() {
-  const raw = _collectAndValidateT2(); if (!raw) return;
+  console.log('[T2] preview clicked');
+  const raw = _collectAndValidateT2();
+  if (!raw) { console.log('[T2] validation failed — see banner / alert'); return; }
+  console.log('[T2] payload ready, fields:', Object.keys(raw).length,
+              'photos:', [1,2,3,4,5,6,7].filter(i => raw['k'+i+'Image']).length);
   const addr = (raw.propertyName || '物件').trim();
   _previewFilename = addr.replace(/[\s\/\\:*?"<>|]/g, '_') + '_T2チラシ.pdf';
   _runGenerateT2(raw, blob => {
+    console.log('[T2] PDF received', blob.size, 'bytes');
     if (_previewBlobUrl) URL.revokeObjectURL(_previewBlobUrl);
     _previewBlobUrl = URL.createObjectURL(blob);
-    document.getElementById('previewFrame').src = _previewBlobUrl;
-    document.getElementById('previewModal').classList.add('visible');
+    const frame = document.getElementById('previewFrame');
+    const modal = document.getElementById('previewModal');
+    if (!frame || !modal) {
+      alert('プレビューモーダルが見つかりません。ページを再読み込みしてください。');
+      return;
+    }
+    frame.src = _previewBlobUrl;
+    modal.classList.add('visible');
     _updateDlBadge();
     document.body.style.overflow = 'hidden';
   });
