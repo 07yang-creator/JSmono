@@ -339,6 +339,14 @@ def draw_photo(c, x, y, w, h, b64_data, label, sublabel='', cs='square', cr=6, m
     mode='contain' → scale the image to FIT inside the rect, letterbox
                      the leftover space (used for floor plans / maps /
                      diagrams where cropping would destroy info).
+
+    AR-aware fallback: if mode='contain' is requested but the image's
+    aspect ratio is very different from the slot's (e.g. a portrait
+    photo dropped into a wide map slot), letterboxing looks ugly and
+    the user almost certainly uploaded a regular photo. In that case
+    we silently fall back to 'cover' so the slot fills cleanly.
+    AR-mismatch tolerance: 25% — within tolerance, contain barely
+    letterboxes anyway; outside it, the slot was misused on purpose.
     """
     if b64_data:
         try:
@@ -348,6 +356,12 @@ def draw_photo(c, x, y, w, h, b64_data, label, sublabel='', cs='square', cr=6, m
             iw, ih = img.getSize()
             if not iw or not ih:
                 raise ValueError('zero-size image')
+            # AR-aware contain → cover fallback
+            if mode == 'contain':
+                slot_ar = (w / h) if h else 1.0
+                img_ar  = (iw / ih) if ih else slot_ar
+                if slot_ar > 0 and abs(img_ar / slot_ar - 1.0) > 0.25:
+                    mode = 'cover'
             c.saveState()
             cp = _photo_clip_path(c, x, y, w, h, cs, cr)
             c.clipPath(cp, stroke=0)
@@ -835,9 +849,12 @@ def generate(data: dict, out):
             # Gold border
             c.setStrokeColor(C_AMBER); c.setLineWidth(1.0)
             c.drawPath(fl, fill=0, stroke=1)
-            # Text centred horizontally and vertically in flag body
-            tx = fx + fw / 2
-            ty = fy + (fh - notch - rsz) / 2 + (fh - notch) * 0.05
+            # Text centred horizontally and vertically in the visible
+            # rectangular body of the flag (from fy+notch up to cy_t).
+            # PDF baseline ≈ optical center − 0.35·font_size for bold.
+            tx     = fx + fw / 2
+            mid_y  = fy + (notch + fh) / 2
+            ty     = mid_y - rsz * 0.35
             draw_bold(c, promo, tx, ty, rsz, color=C_WHITE, align='center')
 
         c.restoreState()
@@ -1141,25 +1158,40 @@ def generate(data: dict, out):
     fee    = data.get('fee', '')
     YPW    = F_YELL_W - F_PAD*2
 
-    # Slogan in top ~65% of yellow area — try 2-line wrap for larger display
+    # Slogan in top ~65% of yellow area — try 2-line wrap for larger display.
+    # Splits prefer word boundaries (spaces) for Latin slogans like
+    # "get connected get beyond"; fall back to character splits for
+    # space-less scripts (Japanese / Chinese).
     yell_top_zone = FOOTER_H * 0.65
     if slogan:
         # Single-line size
         ssz_1 = autosize(slogan, YPW, int(yell_top_zone * 0.82), min_sz=6, bold=True)
         slogan_lines = [slogan]
         best_ssz = ssz_1
+        max2 = int(yell_top_zone / 2.4)   # max per-line size when 2 lines fit
 
-        # Try 2-line splits near midpoint; pick the split yielding the largest font
-        if len(slogan) >= 6:
+        def _try_split(l1, l2):
+            """If splitting yields a larger font than current best, take it."""
+            nonlocal best_ssz, slogan_lines
+            l1, l2 = l1.strip(), l2.strip()
+            if not l1 or not l2:
+                return
+            longer = l1 if txt_width(l1, 1, bold=True) >= txt_width(l2, 1, bold=True) else l2
+            sz2 = autosize(longer, YPW, max2, min_sz=6, bold=True)
+            if sz2 > best_ssz:
+                best_ssz = sz2
+                slogan_lines = [l1, l2]
+
+        # 1) Word-boundary splits (preferred for Latin text)
+        space_positions = [i for i, ch in enumerate(slogan) if ch == ' ']
+        for sp in space_positions:
+            _try_split(slogan[:sp], slogan[sp+1:])
+
+        # 2) Character-level split near midpoint (fallback for space-less scripts)
+        if not space_positions and len(slogan) >= 6:
             mid = len(slogan) // 2
-            max2 = int(yell_top_zone / 2.4)   # max per-line size when 2 lines fit
             for sp in range(max(2, mid - 4), min(len(slogan) - 1, mid + 5)):
-                l1, l2 = slogan[:sp], slogan[sp:]
-                longer = l1 if txt_width(l1, 1, bold=True) >= txt_width(l2, 1, bold=True) else l2
-                sz2 = autosize(longer, YPW, max2, min_sz=6, bold=True)
-                if sz2 > best_ssz:
-                    best_ssz = sz2
-                    slogan_lines = [l1, l2]
+                _try_split(slogan[:sp], slogan[sp:])
 
         line_gap = max(2, best_ssz // 6)
         sy = FY_TOP - F_PAD - best_ssz          # top-line baseline
