@@ -28,7 +28,7 @@ FOOTER  (34mm fixed, IW width)
   Logo | Name | Info | Contact | Yellow
 """
 
-import json, sys, os, io, math, base64
+import json, sys, os, io, math, base64, colorsys
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.units import mm
@@ -329,6 +329,44 @@ def _orient_image_bytes(raw_bytes):
             return buf.getvalue()
     except Exception:
         return raw_bytes
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Contrast-color helpers — used so the promo banner (ribbon/stamp/flag) always
+# pops against the active palette's primary color, regardless of theme.
+# ─────────────────────────────────────────────────────────────────────────────
+def _hex_to_rgb01(hex_str):
+    h = (hex_str or '').lstrip('#')
+    if len(h) != 6: return (0.0, 0.0, 0.0)
+    return tuple(int(h[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+
+def _rgb01_to_hex(r, g, b):
+    clamp = lambda v: max(0, min(255, int(round(v * 255))))
+    return '#{:02x}{:02x}{:02x}'.format(clamp(r), clamp(g), clamp(b))
+
+def contrast_color(hex_str, target_l=0.48, target_s=0.62, hue_rotate=0.5):
+    """Return a hex color rotated on the hue circle (default 180° = true
+    complement), normalized to a vivid saturation/lightness. Designed so the
+    result is always visually distinct from the input while staying within a
+    real-estate-friendly palette range (no neon)."""
+    try:
+        r, g, b   = _hex_to_rgb01(hex_str)
+        h, _l, _s = colorsys.rgb_to_hls(r, g, b)
+        new_h     = (h + hue_rotate) % 1.0
+        nr, ng, nb = colorsys.hls_to_rgb(new_h, target_l, target_s)
+        return _rgb01_to_hex(nr, ng, nb)
+    except Exception:
+        return '#c53d3d'   # safe fallback: warm red-orange
+
+def readable_text_on(hex_str):
+    """White or near-black, whichever is more readable on the given bg
+    (WCAG relative-luminance test). Used to pick promo banner text color."""
+    try:
+        r, g, b = _hex_to_rgb01(hex_str)
+        def _lin(v): return v/12.92 if v <= 0.03928 else ((v+0.055)/1.055)**2.4
+        L = 0.2126*_lin(r) + 0.7152*_lin(g) + 0.0722*_lin(b)
+        return '#1f1f1f' if L > 0.55 else '#ffffff'
+    except Exception:
+        return '#ffffff'
 
 def draw_photo(c, x, y, w, h, b64_data, label, sublabel='', cs='square', cr=6, mode='cover'):
     """Render a base64-encoded image into the (x,y,w,h) rect.
@@ -775,6 +813,10 @@ def generate(data: dict, out):
         cy_t = CTOP      # top edge
         rsz  = 13.0
         ptw  = txt_width(promo, rsz, bold=True)
+        # Banner fill = contrast (180° hue rotation) of theme primary, so it
+        # always pops regardless of which palette the user picked.
+        C_BANNER     = colors.HexColor(contrast_color(_pal['primary']))
+        C_BANNER_TXT = colors.HexColor(readable_text_on(contrast_color(_pal['primary'])))
         c.saveState()
         # Clip to right photo area only
         cl = c.beginPath(); cl.rect(RX, CBOT, RW, CONTENT_H); c.clipPath(cl, stroke=0)
@@ -792,7 +834,7 @@ def generate(data: dict, out):
             sh.moveTo(P1[0]+3,P1[1]-3); sh.lineTo(P2[0]+3,P2[1]-3)
             sh.lineTo(P3[0]+3,P3[1]-3); sh.lineTo(P4[0]+3,P4[1]-3)
             sh.close(); c.drawPath(sh, fill=1, stroke=0)
-            c.setFillColor(C_ACCENT)
+            c.setFillColor(C_BANNER)
             pr = c.beginPath()
             pr.moveTo(*P1); pr.lineTo(*P2); pr.lineTo(*P3); pr.lineTo(*P4)
             pr.close(); c.drawPath(pr, fill=1, stroke=0)
@@ -801,7 +843,7 @@ def generate(data: dict, out):
             mid_x = (P1[0] + P3[0]) / 2
             mid_y = (P1[1] + P3[1]) / 2
             c.translate(mid_x, mid_y); c.rotate(-45)
-            c.setFillColor(C_WHITE)
+            c.setFillColor(C_BANNER_TXT)
             _draw_rotated_text(c, promo, -ptw / 2, -rsz / 2, rsz)
 
         elif banner_style == 'stamp':
@@ -814,7 +856,7 @@ def generate(data: dict, out):
             c.setFillColor(colors.HexColor('#00000033'))
             c.circle(scx + 3, scy - 3, radius, fill=1, stroke=0)
             # Fill circle
-            c.setFillColor(C_ACCENT)
+            c.setFillColor(C_BANNER)
             c.circle(scx, scy, radius, fill=1, stroke=0)
             # Inner dashed ring (stamp effect)
             c.setStrokeColor(C_AMBER); c.setLineWidth(1.2)
@@ -822,7 +864,7 @@ def generate(data: dict, out):
             c.setDash([])
             # Text centred, slight tilt
             c.translate(scx, scy); c.rotate(-15)
-            c.setFillColor(C_WHITE)
+            c.setFillColor(C_BANNER_TXT)
             _draw_rotated_text(c, promo, -ptw / 2, -rsz / 2, rsz)
 
         elif banner_style == 'flag':
@@ -840,7 +882,7 @@ def generate(data: dict, out):
             sh.lineTo(cx_r+3, fy-3); sh.lineTo(fx+fw/2+3, fy+notch-3)
             sh.lineTo(fx+3, fy-3); sh.close(); c.drawPath(sh, fill=1, stroke=0)
             # Flag fill
-            c.setFillColor(C_ACCENT)
+            c.setFillColor(C_BANNER)
             fl = c.beginPath()
             fl.moveTo(fx, cy_t); fl.lineTo(cx_r, cy_t)
             fl.lineTo(cx_r, fy); fl.lineTo(fx + fw/2, fy + notch)
@@ -855,7 +897,7 @@ def generate(data: dict, out):
             tx     = fx + fw / 2
             mid_y  = fy + (notch + fh) / 2
             ty     = mid_y - rsz * 0.35
-            draw_bold(c, promo, tx, ty, rsz, color=C_WHITE, align='center')
+            draw_bold(c, promo, tx, ty, rsz, color=C_BANNER_TXT, align='center')
 
         c.restoreState()
 
