@@ -66,6 +66,11 @@ PHOTO_FIT_SCHEMA = {
     ('2', 'B', 'k6'): 'contain',  # map (bottom-left)
     # Variant C — 浦安-style 7-photo:  K1 big tall + K2/K3 stacked + bottom row
     ('2', 'C', 'k3'): 'contain',  # floor plan (right of K2, larger)
+    # ── Template 3 — Prestige (FORME-style) ───────────────────────────────────
+    # Variant A — 1 hero + 3 mid (exteriors/entrance) + 3 bottom (diagrams)
+    ('3', 'A', 'k5'): 'contain',  # 間取り図 — floor plan
+    ('3', 'A', 'k6'): 'contain',  # 配置図 — site layout
+    ('3', 'A', 'k7'): 'contain',  # 案内図 — location map
 }
 def fit_mode(template_id, variant, slot_key):
     """Look up the per-slot fit mode. Falls back to 'cover'."""
@@ -480,6 +485,10 @@ def generate(data: dict, out):
     # ── Template dispatch — T1 (default) vs T2 ───────────────────────────────
     if str(data.get('templateId', '1')) == '2':
         _generate_t2(c, W, H, data)
+        c.save()
+        return
+    if str(data.get('templateId', '1')) == '3':
+        _generate_t3(c, W, H, data)
         c.save()
         return
 
@@ -1947,6 +1956,347 @@ def _generate_t2(c, W, H, data: dict):
             draw_text(c, truncate_text(txt, markers_w, MSZ),
                       mk_x, my2, MSZ, color=C_BLACK, nav_font=_nav_font)
             my2 -= MSZ + MGAP
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TEMPLATE 3 — Prestige (FORME-style)
+# ═════════════════════════════════════════════════════════════════════════════
+def _generate_t3(c, W, H, data: dict):
+    """T3 prestige layout — modeled on the FORME 内藤町 sample.
+
+    Layout (A4 landscape):
+
+      ┌─────────────────┬───────────────────────────────────────┐
+      │ red catch banner│                                       │
+      │ FORME 内藤町    │                                       │
+      │                 │       K1 hero photo (big interior)    │
+      │  detail rows    │                                       │
+      │  (10 fixed +    │                                       │
+      │   2 free)       ├──────────────┬───────────┬───────────┤
+      │                 │     K2       │    K3     │    K4     │
+      │                 │   外観       │ エントランス│  建物外観  │
+      │  yellow box —   ├──────────────┼───────────┼───────────┤
+      │  recommended    │     K5       │    K6     │    K7     │
+      │  points         │   間取り図   │  配置図   │   案内図   │
+      │                 │              │           │           │
+      │  company info   │              │           │           │
+      └─────────────────┴──────────────┴───────────┴───────────┘
+    """
+    # ── Style controls ───────────────────────────────────────────────────────
+    _cs       = data.get('cornerStyle', 'square')
+    _cr       = {'small':3, 'medium':6, 'large':10}.get(data.get('cornerSize','medium'), 6)
+    _nav_font = data.get('navFont', 'droid')
+
+    # ── Page geometry ────────────────────────────────────────────────────────
+    MX        = 16
+    MY        = 14
+    IW        = W - MX * 2
+    IH        = H - MY * 2
+    LEFT_W    = IW * 0.40
+    RIGHT_W   = IW - LEFT_W - 6     # 6pt vertical gap between cols
+    LX        = MX
+    RX        = LX + LEFT_W + 6
+    Y_BOT     = MY
+    Y_TOP     = MY + IH
+
+    # ── Colors ───────────────────────────────────────────────────────────────
+    C_BANNER  = colors.HexColor('#7a1f24')        # deep red
+    C_TEXT    = colors.HexColor('#1a1a1a')
+    C_LABEL   = colors.HexColor('#5a5a5a')
+    C_DIV     = colors.HexColor('#cfcfcf')
+    C_TINT    = colors.HexColor('#f4f4f6')        # alt-row bg
+    C_HIGH_BG = colors.HexColor('#fff4d6')        # yellow highlights box
+    C_HIGH_BD = colors.HexColor('#e3c878')
+    C_HIGH_T  = colors.HexColor('#7a5a14')        # heading color in box
+    C_HIGH_BUL = colors.HexColor('#b27d2c')       # bullet color
+    C_PRICE   = colors.HexColor('#7a1f24')        # price red
+
+    # ════════════════════════════════════════════════════════════════════════
+    # LEFT COLUMN — banner, name, details, highlights, company
+    # ════════════════════════════════════════════════════════════════════════
+    cy = Y_TOP
+
+    # ── Catchphrase banner (red, ~18pt) ──────────────────────────────────────
+    catch = (data.get('catchphrase', '') or '').strip()
+    BANNER_H = 26
+    if catch:
+        rect(c, LX, cy - BANNER_H, LEFT_W, BANNER_H, fill=C_BANNER)
+        sz = autosize(catch, LEFT_W - 16, 13, min_sz=8, bold=True, nav_font=_nav_font)
+        draw_bold(c, catch, LX + 8, cy - BANNER_H/2 - sz * 0.32, sz,
+                  color=colors.white, nav_font=_nav_font)
+    cy -= BANNER_H + 6
+
+    # ── Property name (large) ────────────────────────────────────────────────
+    name = (data.get('propertyName', '') or '').strip()
+    NAME_H = 36
+    if name:
+        nsz = autosize(name, LEFT_W - 8, 26, min_sz=14, bold=True, nav_font=_nav_font)
+        draw_bold(c, name, LX + 4, cy - NAME_H + 6, nsz,
+                  color=C_TEXT, nav_font=_nav_font)
+    cy -= NAME_H + 6
+
+    # Divider under name
+    hline(c, LX, LX + LEFT_W, cy + 2, color=C_DIV, lw=0.6)
+    cy -= 4
+
+    # ── Detail table (10 fixed + up to 2 free rows) ──────────────────────────
+    detail_rows = []
+    def _add(label, val):
+        v = (val or '').strip() if isinstance(val, str) else val
+        if v:
+            detail_rows.append((label, v))
+    _add('所在地',       data.get('address', ''))
+    # Transit: collapse stations[] into multi-line text
+    stations = data.get('stations', []) or []
+    transit_lines = []
+    for s in stations[:4]:
+        ln  = (s.get('line', '') or '').strip()
+        stn = (s.get('station', '') or '').replace('駅', '').strip()
+        wk  = (s.get('walk', '') or '').strip()
+        if ln or stn:
+            walk_part = ''
+            if wk:
+                walk_part = wk if ('分' in wk or '徒歩' in wk) else f'徒歩{wk}分'
+            tail = ' '.join(p for p in (f'{stn}駅' if stn else '', walk_part) if p)
+            transit_lines.append(f'{ln}「{stn}」駅 {walk_part}'.strip() if (ln and stn) else (f'{ln} {tail}').strip())
+    if transit_lines:
+        detail_rows.append(('交通', '\n'.join(transit_lines)))
+    _add('専有面積',     data.get('exclusiveArea', ''))
+    _add('間取り',       data.get('layoutType', ''))
+    _add('構造/規模',    data.get('structure', ''))
+    _add('築年月',       data.get('builtYear', ''))
+    _add('管理費',       data.get('managementFee', ''))
+    _add('積立金',       data.get('reserveFund', ''))
+    _add('現況',         data.get('currentStatus', ''))
+    _add('取引態様',     data.get('transactionType', ''))
+    # Free rows (user-defined extras)
+    for fr in (data.get('freeRows', []) or [])[:2]:
+        if isinstance(fr, dict):
+            lab = (fr.get('label', '') or '').strip()
+            val = (fr.get('value', '') or '').strip()
+            if lab and val:
+                detail_rows.append((lab, val))
+
+    # Render detail table — auto-size row height so it fits the available space
+    DETAIL_BOT_RESERVE = 280   # space below detail table for highlights + company
+    DETAIL_TOP_Y = cy
+    DETAIL_BOT_Y = Y_BOT + DETAIL_BOT_RESERVE
+    DETAIL_H     = max(80, DETAIL_TOP_Y - DETAIL_BOT_Y)
+    # Each row gets a base slot; lines that wrap to 2-3 lines (transit) get extra
+    row_count = sum((max(1, v.count('\n') + 1)) for _, v in detail_rows)
+    BASE_ROW_H = max(14, min(22, DETAIL_H / max(row_count, 1)))
+    LBL_W      = LEFT_W * 0.28
+    TBL_LX     = LX + 4
+    TBL_RX     = LX + LEFT_W - 4
+    ry = DETAIL_TOP_Y
+    rsz = max(7, min(int(BASE_ROW_H * 0.42), 9))
+    for i, (lab, val) in enumerate(detail_rows):
+        lines = val.split('\n')
+        slot_h = BASE_ROW_H * len(lines)
+        ry -= slot_h
+        if i % 2 == 1:
+            rect(c, TBL_LX, ry, LEFT_W - 8, slot_h, fill=C_TINT)
+        # Label
+        draw_text(c, lab, TBL_LX + 6, ry + slot_h - rsz - 4, rsz,
+                  color=C_LABEL, nav_font=_nav_font)
+        # Value lines
+        for li, ln in enumerate(lines):
+            ly = ry + slot_h - (li + 1) * BASE_ROW_H + (BASE_ROW_H - rsz) / 2 + 1
+            draw_text(c, truncate_text(ln, LEFT_W - LBL_W - 12, rsz),
+                      TBL_LX + LBL_W, ly, rsz,
+                      color=C_TEXT, nav_font=_nav_font)
+    # Top + bottom border
+    hline(c, TBL_LX, LX + LEFT_W - 4, DETAIL_TOP_Y, color=C_DIV, lw=0.5)
+    hline(c, TBL_LX, LX + LEFT_W - 4, ry, color=C_DIV, lw=0.5)
+    cy = ry - 8
+
+    # ── Yellow highlights box ────────────────────────────────────────────────
+    highlights = data.get('highlights', []) or []
+    if isinstance(highlights, list):
+        highlights = highlights[:4]
+    HIGH_TITLE = (data.get('highlightTitle', '') or '物件亮点 / Recommended Points').strip()
+    # Estimated height: title (~16pt) + bullets (4 × ~22pt) + padding
+    high_h = 24 + len(highlights) * 22 + 12
+    high_h = max(80, min(high_h, 180))
+    high_top = cy
+    high_bot = cy - high_h
+    rect(c, LX, high_bot, LEFT_W, high_h, fill=C_HIGH_BG, stroke=C_HIGH_BD, lw=0.8)
+    # Title
+    tsz = 11
+    draw_bold(c, HIGH_TITLE, LX + 8, high_top - 14, tsz,
+              color=C_HIGH_T, nav_font=_nav_font)
+    hline(c, LX + 8, LX + LEFT_W - 8, high_top - 18, color=C_HIGH_BD, lw=0.5)
+    # Bullets
+    by = high_top - 26
+    for h in highlights:
+        if not isinstance(h, dict): continue
+        title = (h.get('title', '') or '').strip()
+        detail = (h.get('detail', '') or '').strip()
+        if not (title or detail): continue
+        # Bullet dot
+        c.saveState()
+        c.setFillColor(C_HIGH_BUL)
+        c.circle(LX + 12, by + 4, 1.6, fill=1, stroke=0)
+        c.restoreState()
+        # Title (bold) + detail (normal) on one auto-fit line
+        ttsz = 9
+        draw_bold(c, title + '：', LX + 18, by, ttsz,
+                  color=C_HIGH_T, nav_font=_nav_font)
+        title_w = txt_width(title + '：', ttsz, bold=True, nav_font=_nav_font)
+        avail   = LEFT_W - 18 - title_w - 8
+        dsz     = autosize(detail, avail, 8, min_sz=6, nav_font=_nav_font)
+        draw_text(c, truncate_text(detail, avail, dsz),
+                  LX + 18 + title_w, by, dsz,
+                  color=C_TEXT, nav_font=_nav_font)
+        by -= 18
+    cy = high_bot - 8
+
+    # ── Company / agent info (restricted) ────────────────────────────────────
+    # Logo (small, left), then company name, license, tels, then agent.
+    F_LOGO = 36
+    # Company logo
+    logo_b64 = data.get('logoImage', '')
+    logo_x = LX + 4
+    logo_y = Y_BOT + 4
+    if logo_b64:
+        try:
+            raw = logo_b64.split(',', 1)[-1] if ',' in logo_b64 else logo_b64
+            decoded = _orient_image_bytes(base64.b64decode(raw))
+            li = ImageReader(io.BytesIO(decoded))
+            lw_, lh_ = li.getSize()
+            sc = min(F_LOGO/lw_, F_LOGO/lh_) if lw_ and lh_ else 1
+            dw, dh = lw_*sc, lh_*sc
+            c.drawImage(li, logo_x + (F_LOGO-dw)/2, logo_y + (F_LOGO-dh)/2,
+                        dw, dh, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            pass
+    # Company column
+    co_x = LX + F_LOGO + 10
+    cy_company = cy
+    co_lines = []
+    cn = (data.get('companyName', '') or '').strip()
+    if cn: co_lines.append((cn, 11, True))
+    lic = (data.get('license', '') or '').strip()
+    if lic: co_lines.append((lic, 7.5, False))
+    tel = (data.get('companyTel', '') or '').strip()
+    if tel: co_lines.append((f'TEL：{tel}', 7.5, False))
+    mob = (data.get('companyMobile', '') or '').strip()
+    if mob: co_lines.append((f'MOBILE：{mob}', 7.5, False))
+    by_co = cy_company - 14
+    for txt, sz, bold in co_lines:
+        if bold:
+            draw_bold(c, txt, co_x, by_co, sz, color=C_TEXT, nav_font=_nav_font)
+        else:
+            draw_text(c, txt, co_x, by_co, sz, color=C_LABEL, nav_font=_nav_font)
+        by_co -= sz + 2
+
+    # Agent column (right side of left column)
+    ag_role = (data.get('agentRole', '') or '専任担当').strip()
+    ag_name = (data.get('agentName', '') or '').strip()
+    ag_mob  = (data.get('agentMobile', '') or '').strip()
+    ag_x = LX + LEFT_W * 0.62
+    by_ag = cy_company - 14
+    if ag_role:
+        draw_text(c, ag_role, ag_x, by_ag, 8.5, color=C_LABEL, nav_font=_nav_font)
+        by_ag -= 11
+    if ag_name:
+        draw_bold(c, ag_name, ag_x, by_ag, 12, color=C_TEXT, nav_font=_nav_font)
+        by_ag -= 14
+    if ag_mob:
+        draw_text(c, ag_mob, ag_x, by_ag, 8.5, color=C_TEXT, nav_font=_nav_font)
+
+    # ════════════════════════════════════════════════════════════════════════
+    # RIGHT COLUMN — price + 7 photos (1 hero + 3 mid + 3 bot)
+    # ════════════════════════════════════════════════════════════════════════
+    # Price strip (top of right column)
+    price_lab = '販売価格'
+    tax = (data.get('priceTax', '税込') or '税込').strip()
+    if '税込' in tax: tax = '税込'
+    elif '税別' in tax: tax = '税別'
+    price_num = (data.get('price', '') or data.get('priceNum', '') or '').strip()
+    PRICE_H   = 38
+    PRICE_TOP = Y_TOP
+    # Right-align price
+    pn_sz = 30
+    pn_w  = txt_width(price_num, pn_sz, bold=True)
+    unit_sz = 14
+    suf  = '万円'
+    suf_w = txt_width(suf, unit_sz)
+    label_sz = 9
+    full_w = pn_w + 6 + suf_w
+    px = RX + RIGHT_W - full_w - 6
+    # Label "販売価格 (税込)" above
+    label_full = f'{price_lab} ({tax})'
+    label_w    = txt_width(label_full, label_sz)
+    draw_text(c, label_full, RX + RIGHT_W - label_w - 6, PRICE_TOP - 12, label_sz,
+              color=C_LABEL, nav_font=_nav_font)
+    # Price number (red, big)
+    draw_bold(c, price_num, px, PRICE_TOP - 12 - pn_sz, pn_sz,
+              color=C_PRICE, nav_font=_nav_font)
+    draw_text(c, suf, px + pn_w + 6, PRICE_TOP - 12 - pn_sz + 4, unit_sz,
+              color=C_PRICE, nav_font=_nav_font)
+    # Red underline accent under price
+    hline(c, RX, RX + RIGHT_W, PRICE_TOP - PRICE_H - 4, color=C_BANNER, lw=2.0)
+
+    PHOTO_TOP = PRICE_TOP - PRICE_H - 8
+    PHOTO_BOT = Y_BOT
+    PHOTO_H   = PHOTO_TOP - PHOTO_BOT
+    PG = 4
+
+    # Hero K1 — full width × ~52% of photo zone height
+    HERO_H = PHOTO_H * 0.52
+    HERO_Y = PHOTO_TOP - HERO_H
+    draw_photo(c, RX, HERO_Y, RIGHT_W, HERO_H,
+               data.get('k1Image', ''), 'メインビュー', '（K1）',
+               cs=_cs, cr=_cr, mode=fit_mode('3','A','k1'))
+    # Caption strip on hero
+    k1_lbl = (data.get('k1Label', '') or 'リビング・ダイニングからの眺望').strip()
+    if k1_lbl:
+        c.saveState()
+        c.setFillColor(colors.HexColor('#00000088'))
+        c.rect(RX + RIGHT_W - 240, HERO_Y + 8, 232, 18, fill=1, stroke=0)
+        c.restoreState()
+        draw_text(c, k1_lbl, RX + RIGHT_W - 232, HERO_Y + 13, 9,
+                  color=colors.white, nav_font=_nav_font)
+
+    # 3-up middle row (K2/K3/K4) and 3-up bottom row (K5/K6/K7)
+    REM_H   = PHOTO_H - HERO_H - PG
+    ROW_H   = (REM_H - PG) / 2
+    COL_W   = (RIGHT_W - PG * 2) / 3
+    MID_Y   = HERO_Y - PG - ROW_H
+    BOT_Y   = MID_Y - PG - ROW_H
+    mid_specs = [
+        ('k2Image', '外観',         'K2'),
+        ('k3Image', 'エントランス', 'K3'),
+        ('k4Image', '建物外観',     'K4'),
+    ]
+    bot_specs = [
+        ('k5Image', '間取り図',     'K5'),
+        ('k6Image', '配置図',       'K6'),
+        ('k7Image', '案内図',       'K7'),
+    ]
+    def _draw_strip(specs, sy):
+        for i, (key, lab, sub) in enumerate(specs):
+            x = RX + i * (COL_W + PG)
+            slot = key.replace('Image','').lower()
+            draw_photo(c, x, sy, COL_W, ROW_H,
+                       data.get(key, ''), lab, f'（{sub}）',
+                       cs=_cs, cr=_cr, mode=fit_mode('3','A',slot))
+            # Caption pill at the bottom of each tile
+            cap = data.get(f'{slot}Label', '') or lab
+            cap = (cap or '').strip()
+            if cap:
+                cap_w = min(txt_width(cap, 8) + 12, COL_W * 0.7)
+                cx = x + (COL_W - cap_w) / 2
+                cy_ = sy + 4
+                c.saveState()
+                c.setFillColor(colors.HexColor('#00000088'))
+                c.rect(cx, cy_, cap_w, 14, fill=1, stroke=0)
+                c.restoreState()
+                draw_text(c, cap, cx + cap_w/2, cy_ + 4, 8,
+                          color=colors.white, align='center', nav_font=_nav_font)
+    _draw_strip(mid_specs, MID_Y)
+    _draw_strip(bot_specs, BOT_Y)
 
 
 # ── Vercel handler ────────────────────────────────────────────────────────────

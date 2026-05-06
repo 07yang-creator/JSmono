@@ -1271,6 +1271,27 @@
             </div>
           </label>
 
+          <label class="template-card" id="tcard-3" onclick="selectTemplate(3)">
+            <input type="radio" name="template" value="3">
+            <span class="template-badge badge-soon">プレステージ</span>
+            <div class="template-preview">
+              <div class="tp-left" style="flex:1;background:#f5e7d4;">
+                <div class="bar" style="background:#7a1f24"></div>
+                <div class="row"></div>
+                <div class="row"></div>
+              </div>
+              <div class="tp-mid" style="flex:1.2;background:#dadde6;"></div>
+            </div>
+            <div class="template-card-inner">
+              <span class="template-check"></span>
+              <div>
+                <div class="template-name">テンプレート 3 — プレステージ（FORME風）</div>
+                <div class="template-desc">縦長詳細欄 + 黄色推薦ポイント + 大型インテリア写真</div>
+                <div class="template-combos">🏛 高級・賃貸物件向け</div>
+              </div>
+            </div>
+          </label>
+
         </div>
       </div>
 
@@ -2439,6 +2460,245 @@
 
 </div><!-- /app-page-t2 -->
 
+
+<!-- ═══════════════════════════════════════════════════════════════
+     APP PAGE — TEMPLATE 3 (Prestige / FORME 風)
+═══════════════════════════════════════════════════════════════ -->
+<div id="app-page-t3" style="display:none">
+
+  <div class="app-back-bar">
+    <button class="app-back-btn" onclick="goBack()">← 設定に戻る</button>
+    <span class="app-variant-badge">Template 3 — プレステージ（FORME 風）</span>
+  </div>
+
+  <header>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img src="/logo.png" alt="JJconnect" style="height:36px;width:auto;object-fit:contain;">
+      <div>
+        <div class="logo">Just<span>Sale</span>mono</div>
+        <div class="tagline">テンプレート3 プレステージ — 高級・賃貸物件向け</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <form id="propertyFormT3">
+      <input type="hidden" name="templateId" value="3">
+      <input type="hidden" name="templateVariant" id="f3-templateVariant" value="A">
+
+      <!-- ═════ ヘッダー ═════ -->
+      <div class="section-card full-width">
+        <div class="section-header">📋 ヘッダー（必須）</div>
+        <div class="section-body">
+          <div class="field">
+            <label>① 赤キャッチフレーズ <span style="color:#dc2626">*</span> <span style="font-size:11px;color:#7d6330">（赤バナーに白文字で表示）</span></label>
+            <input type="text" name="catchphrase" id="f3-catchphrase" placeholder="例：新宿御苑全景観、専有80平方米" required>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>② 物件名（大見出し）<span style="color:#dc2626">*</span></label>
+              <input type="text" name="propertyName" id="f3-propertyName" placeholder="例：FORME 内藤町" required>
+            </div>
+            <div class="field">
+              <label>③ 販売価格（万円）<span style="color:#dc2626">*</span></label>
+              <input type="text" name="price" id="f3-price" placeholder="例：25,000" required>
+            </div>
+            <div class="field">
+              <label>税込/税別</label>
+              <select name="priceTax" id="f3-priceTax">
+                <option value="税込">税込</option>
+                <option value="税別">税別</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════ 物件詳細（左欄詳細表）═════ -->
+      <div class="section-card full-width">
+        <div class="section-header">📑 物件詳細（左欄詳細表）</div>
+        <div class="section-body">
+          <div style="margin-bottom:10px;padding:8px 12px;background:#fef9e7;border-left:3px solid #f9b44a;font-size:12px;color:#7d6330">
+            このテンプレートは左欄の詳細表が中心です。下記の項目のみ入力してください。空欄の項目は表示されません。
+          </div>
+          <div class="field"><label>所在地</label>
+            <input type="text" name="address" id="f3-address" placeholder="例：東京都新宿区内藤町1-2"></div>
+
+          <div style="margin-top:12px;font-size:12px;font-weight:700;color:var(--primary)">🚉 交通アクセス（最大4路線）</div>
+          <div id="t3-stations-container"></div>
+          <button type="button" class="btn-secondary" style="margin-top:6px" onclick="addStationT3()">＋ 路線を追加</button>
+
+          <div class="field-row" style="margin-top:14px">
+            <div class="field"><label>専有面積</label>
+              <input type="text" name="exclusiveArea" id="f3-exclusiveArea" placeholder="例：80.00㎡（約24.20坪）"></div>
+            <div class="field"><label>間取り</label>
+              <input type="text" name="layoutType" id="f3-layoutType" placeholder="例：2LDK + 景観バルコニー"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>構造/規模</label>
+              <input type="text" name="structure" id="f3-structure" placeholder="例：SRC造 地上14階建 / 5階部分"></div>
+            <div class="field"><label>築年月</label>
+              <input type="text" name="builtYear" id="f3-builtYear" placeholder="例：2009年（平成21年）"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>管理費</label>
+              <input type="text" name="managementFee" id="f3-managementFee" placeholder="例：月額 34,600円"></div>
+            <div class="field"><label>修繕積立金</label>
+              <input type="text" name="reserveFund" id="f3-reserveFund" placeholder="例：月額 10,300円"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>現況</label>
+              <input type="text" name="currentStatus" id="f3-currentStatus" placeholder="例：空室（即入居可）"></div>
+            <div class="field"><label>取引態様</label>
+              <input type="text" name="transactionType" id="f3-transactionType" placeholder="例：専任媒介"></div>
+          </div>
+
+          <div style="margin-top:14px;padding:8px 12px;background:#eef3fb;border-left:3px solid var(--primary);font-size:12px;color:var(--primary-dk)">
+            💡 自由項目：上記以外で1〜2行追加したい場合のみ入力してください（任意）。
+          </div>
+          <div class="field-row">
+            <div class="field"><label>自由項目1 — ラベル</label>
+              <input type="text" name="freeLabel1" id="f3-freeLabel1" placeholder="例：最寄学区"></div>
+            <div class="field"><label>自由項目1 — 内容</label>
+              <input type="text" name="freeValue1" id="f3-freeValue1" placeholder="例：新宿区立四谷小学校 徒歩6分"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>自由項目2 — ラベル</label>
+              <input type="text" name="freeLabel2" id="f3-freeLabel2" placeholder="例：駐車場"></div>
+            <div class="field"><label>自由項目2 — 内容</label>
+              <input type="text" name="freeValue2" id="f3-freeValue2" placeholder="例：機械式 月額 35,000円"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════ 推薦ポイント（黄色ボックス）═════ -->
+      <div class="section-card full-width">
+        <div class="section-header">⭐ 推薦ポイント（黄色ボックス・最大4件）</div>
+        <div class="section-body">
+          <div style="margin-bottom:10px;padding:8px 12px;background:#fff4d6;border-left:3px solid #e3c878;font-size:12px;color:#7a5a14">
+            この欄は<strong>オーダーメイド</strong>のセールス文を自由に入力してください。タイトル4文字程度＋短いキャッチコピーで物件の魅力を訴求。
+          </div>
+          <div class="field">
+            <label>タイトル</label>
+            <input type="text" name="highlightTitle" id="f3-highlightTitle" value="物件亮点 / Recommended Points">
+          </div>
+          <div id="t3-highlights-container">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════ 写真（7枚）═════ -->
+      <div class="section-card full-width">
+        <div class="section-header">📷 写真アップロード（7枚）</div>
+        <div class="section-body">
+          <div style="margin-bottom:10px;padding:8px 12px;background:#eef3fb;border-left:3px solid var(--primary);font-size:12px;color:var(--primary-dk)">
+            <strong>K1</strong> はメイン大型写真（眺望／室内）、<strong>K2-K4</strong> は中段の外観・エントランス、<strong>K5-K7</strong> は下段の間取り図／配置図／案内図です。
+          </div>
+          <div class="photo-grid" id="t3-photo-grid">
+            <div class="photo-slot" id="t3-slot-k1Image">
+              <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+              <img class="preview" alt=""><button class="clear-btn" type="button">✕</button>
+              <div class="slot-label"><span class="slot-icon">🌇</span>メイン大型写真<br><small>K1</small><br><span class="slot-ratio">3:2 横長</span></div>
+            </div>
+            <div class="photo-slot" id="t3-slot-k2Image">
+              <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+              <img class="preview" alt=""><button class="clear-btn" type="button">✕</button>
+              <div class="slot-label"><span class="slot-icon">🏢</span>外観<br><small>K2</small><br><span class="slot-ratio">2:3 縦長</span></div>
+            </div>
+            <div class="photo-slot" id="t3-slot-k3Image">
+              <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+              <img class="preview" alt=""><button class="clear-btn" type="button">✕</button>
+              <div class="slot-label"><span class="slot-icon">🚪</span>エントランス<br><small>K3</small><br><span class="slot-ratio">4:3</span></div>
+            </div>
+            <div class="photo-slot" id="t3-slot-k4Image">
+              <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+              <img class="preview" alt=""><button class="clear-btn" type="button">✕</button>
+              <div class="slot-label"><span class="slot-icon">🏬</span>建物外観<br><small>K4</small><br><span class="slot-ratio">4:3</span></div>
+            </div>
+            <div class="photo-slot" id="t3-slot-k5Image">
+              <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+              <img class="preview" alt=""><button class="clear-btn" type="button">✕</button>
+              <div class="slot-label"><span class="slot-icon">📐</span>間取り図<br><small>K5</small><br><span class="slot-ratio">4:3</span></div>
+            </div>
+            <div class="photo-slot" id="t3-slot-k6Image">
+              <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+              <img class="preview" alt=""><button class="clear-btn" type="button">✕</button>
+              <div class="slot-label"><span class="slot-icon">🗺</span>敷地配置図<br><small>K6</small><br><span class="slot-ratio">4:3</span></div>
+            </div>
+            <div class="photo-slot" id="t3-slot-k7Image">
+              <input type="file" accept="image/jpeg,image/jpg,image/png" style="display:none">
+              <img class="preview" alt=""><button class="clear-btn" type="button">✕</button>
+              <div class="slot-label"><span class="slot-icon">📍</span>案内図<br><small>K7</small><br><span class="slot-ratio">4:3</span></div>
+            </div>
+          </div>
+          <input type="hidden" name="k1Image" id="img-t3-k1Image" value="">
+          <input type="hidden" name="k2Image" id="img-t3-k2Image" value="">
+          <input type="hidden" name="k3Image" id="img-t3-k3Image" value="">
+          <input type="hidden" name="k4Image" id="img-t3-k4Image" value="">
+          <input type="hidden" name="k5Image" id="img-t3-k5Image" value="">
+          <input type="hidden" name="k6Image" id="img-t3-k6Image" value="">
+          <input type="hidden" name="k7Image" id="img-t3-k7Image" value="">
+
+          <div class="field-row" style="margin-top:14px">
+            <div class="field"><label>K1キャプション</label>
+              <input type="text" name="k1Label" id="f3-k1Label" placeholder="例：リビング・ダイニングからの眺望"></div>
+            <div class="field"><label>K5キャプション（間取り図）</label>
+              <input type="text" name="k5Label" id="f3-k5Label" placeholder="例：間取り図 (501号室)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════ 会社・担当者（限定）═════ -->
+      <div class="section-card full-width">
+        <div class="section-header">🏢 会社・担当者情報（限定）</div>
+        <div class="section-body">
+          <div style="margin-bottom:10px;padding:8px 12px;background:#fef9e7;border-left:3px solid #f9b44a;font-size:12px;color:#7d6330">
+            このテンプレートは下記7項目のみ表示されます。住所・FAX・メール等は表示されません。
+          </div>
+          <div class="field-row">
+            <div class="form-logo-slot" id="t3-form-logo-slot" style="width:80px;height:80px">
+              <input type="file" accept="image/png,image/jpeg,image/svg+xml" style="display:none">
+              <img class="preview" alt=""><button class="clear-btn" type="button">✕</button>
+              <div class="logo-placeholder">
+                <strong>会社ロゴ</strong>（任意）
+              </div>
+            </div>
+            <input type="hidden" name="logoImage" id="img-t3-logoImage" value="">
+            <div style="flex:1">
+              <div class="field"><label>① 会社名</label>
+                <input type="text" name="companyName" id="f3-companyName" placeholder="例：株式会社成宏商事"></div>
+              <div class="field"><label>② 免許番号</label>
+                <input type="text" name="license" id="f3-license" placeholder="例：東京都知事(1)第110651号"></div>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>③ 会社TEL</label>
+              <input type="text" name="companyTel" id="f3-companyTel" placeholder="例：03-5965-9118"></div>
+            <div class="field"><label>④ 会社MOBILE</label>
+              <input type="text" name="companyMobile" id="f3-companyMobile" placeholder="例：080-9393-2888"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>⑤ 担当者役職</label>
+              <input type="text" name="agentRole" id="f3-agentRole" placeholder="例：専任担当" value="専任担当"></div>
+            <div class="field"><label>⑥ 担当者名</label>
+              <input type="text" name="agentName" id="f3-agentName" placeholder="例：青木"></div>
+            <div class="field"><label>⑦ 担当者TEL</label>
+              <input type="text" name="agentMobile" id="f3-agentMobile" placeholder="例：090-3359 6678"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section" style="text-align:center;margin-top:30px">
+        <div id="t3-form-error" class="form-error-banner" style="display:none"></div>
+        <button type="button" class="btn-preview" onclick="previewFlyerT3()">👁 プレビュー &amp; ダウンロード</button>
+      </div>
+    </form>
+  </div>
+
+</div><!-- /app-page-t3 -->
+
+
 <!-- ── Shared modals — outside both app-page containers so they render for T1 and T2 ── -->
 
 <!-- Progress Overlay -->
@@ -2766,6 +3026,10 @@ const _VARIANT_LABELS = {
     C: { name: '🏬 浦安風（写真7枚・利回りカラウト）',
          desc: '縦長外観メイン＋間取り＋小内観＋下部サムネ4枚＋黄色利回りカラウト' },
   },
+  3: {
+    A: { name: '🏛 FORME 風 オプション1（プレステージ・写真7枚）',
+         desc: '赤キャッチ + 大型ヒーロー写真 + 黄色推薦ポイント + シンプル詳細欄' },
+  },
 };
 
 function selectTemplate(n) {
@@ -2995,6 +3259,19 @@ function startApp() {
     if (typeof applyT2VariantToggles === 'function') applyT2VariantToggles(_selectedVariant);
     document.getElementById('landing-page').style.display = 'none';
     document.getElementById('app-page-t2').style.display = 'block';
+    window.scrollTo(0, 0);
+    return;
+  }
+
+  // Template 3 — prestige (FORME風) — has its own dedicated form
+  if (_selectedTemplate === 3) {
+    const t3Var = document.getElementById('f3-templateVariant');
+    if (t3Var) t3Var.value = _selectedVariant || 'A';
+    const t3Name = document.getElementById('f3-propertyName');
+    if (buildingName && t3Name) t3Name.value = buildingName;
+    document.getElementById('landing-page').style.display = 'none';
+    const t3Page = document.getElementById('app-page-t3');
+    if (t3Page) t3Page.style.display = 'block';
     window.scrollTo(0, 0);
     return;
   }
@@ -4611,6 +4888,255 @@ function previewFlyerT2() {
     const modal = document.getElementById('previewModal');
     if (!frame || !modal) {
       alert('プレビューモーダルが見つかりません。ページを再読み込みしてください。');
+      return;
+    }
+    frame.src = _previewBlobUrl;
+    modal.classList.add('visible');
+    _updateDlBadge();
+    document.body.style.overflow = 'hidden';
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// TEMPLATE 3 — Prestige (FORME風) form helpers
+// ═══════════════════════════════════════════════════════════════
+
+// ── Station rows for T3 ────────────────────────────────────────
+let _t3StationCount = 0;
+function addStationT3(line='', station='', walk='') {
+  const wrap = document.getElementById('t3-stations-container');
+  if (!wrap) return;
+  if (wrap.children.length >= 4) { alert('交通情報は最大4路線までです。'); return; }
+  _t3StationCount++;
+  const id = 't3-station-' + _t3StationCount;
+  const div = document.createElement('div');
+  div.className = 'station-row';
+  div.id = id;
+  div.innerHTML = `
+    <div class="field"><label>路線名</label><input type="text" name="t3_line_${_t3StationCount}" value="${line}" placeholder="例：丸ノ内線"></div>
+    <div class="field"><label>駅名</label><input type="text" name="t3_station_${_t3StationCount}" value="${station}" placeholder="例：四谷三丁目"></div>
+    <div class="field"><label>徒歩（分）</label><input type="number" name="t3_walk_${_t3StationCount}" value="${walk}" placeholder="例：7" min="1"></div>
+    <button type="button" class="remove-btn" onclick="removeStationT3('${id}')" title="削除">✕</button>`;
+  wrap.appendChild(div);
+}
+function removeStationT3(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+// ── Highlight bullets for T3 (4 fixed slots) ───────────────────
+const _T3_HIGHLIGHT_PLACEHOLDERS = [
+  ['至尊景観',   '客厅拥有新宿御苑全景视线、四季美景尽收眼底。'],
+  ['寬敞空間',   '80平米大両居、格局方正、採光通透。'],
+  ['高品質管理', '平成21年築、日勤管理、建築品質卓越。'],
+  ['即入居可',   '空室状態、随时可預約現地內覧。'],
+];
+function buildT3Highlights() {
+  const wrap = document.getElementById('t3-highlights-container');
+  if (!wrap || wrap.children.length) return;
+  for (let i = 0; i < 4; i++) {
+    const row = document.createElement('div');
+    row.className = 'field-row';
+    row.style.marginTop = i ? '8px' : '4px';
+    row.innerHTML = `
+      <div class="field" style="flex:0 0 30%"><label>ポイント${i+1} — タイトル</label>
+        <input type="text" id="f3-h-title-${i}" placeholder="例：${_T3_HIGHLIGHT_PLACEHOLDERS[i][0]}"></div>
+      <div class="field"><label>ポイント${i+1} — 内容</label>
+        <input type="text" id="f3-h-detail-${i}" placeholder="例：${_T3_HIGHLIGHT_PLACEHOLDERS[i][1]}"></div>`;
+    wrap.appendChild(row);
+  }
+}
+
+// ── T3 photo + logo slot wiring (lazy — runs first time T3 page is shown) ─
+let _t3SlotsWired = false;
+function wireT3Slots() {
+  if (_t3SlotsWired) return;
+  _t3SlotsWired = true;
+  const PHOTO_SLOTS = ['k1Image','k2Image','k3Image','k4Image','k5Image','k6Image','k7Image'];
+  PHOTO_SLOTS.forEach(field => {
+    const slot = document.getElementById('t3-slot-' + field);
+    if (!slot) return;
+    const fileInput = slot.querySelector('input[type="file"]');
+    const hidden    = document.getElementById('img-t3-' + field);
+    const preview   = slot.querySelector('.preview');
+    const clearBtn  = slot.querySelector('.clear-btn');
+    slot.addEventListener('click', e => { if (e.target !== clearBtn) fileInput.click(); });
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      if (file.size > 12 * 1024 * 1024) { alert('12MB以下にしてください'); fileInput.value = ''; return; }
+      try {
+        const dataUrl = await shrinkImageToDataUrl(file);
+        hidden.value = dataUrl;
+        preview.src  = dataUrl;
+        preview.style.display = 'block';
+        slot.classList.add('has-image');
+      } catch (err) {
+        alert('画像処理に失敗しました：' + (err && err.message ? err.message : err));
+        fileInput.value = '';
+      }
+    });
+    clearBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      hidden.value = ''; preview.src = ''; preview.style.display = 'none';
+      slot.classList.remove('has-image'); fileInput.value = '';
+    });
+  });
+  // Logo
+  const lslot = document.getElementById('t3-form-logo-slot');
+  if (lslot) {
+    const fi  = lslot.querySelector('input[type="file"]');
+    const hid = document.getElementById('img-t3-logoImage');
+    const pv  = lslot.querySelector('.preview');
+    const cb  = lslot.querySelector('.clear-btn');
+    lslot.addEventListener('click', e => { if (e.target !== cb) fi.click(); });
+    fi.addEventListener('change', async () => {
+      const f = fi.files[0]; if (!f) return;
+      if (f.size > 12 * 1024 * 1024) { alert('12MB以下にしてください'); fi.value=''; return; }
+      try {
+        const dataUrl = await shrinkImageToDataUrl(f, 1024, 0.9);
+        hid.value = dataUrl; pv.src = dataUrl; pv.style.display = 'block';
+        lslot.classList.add('has-image');
+      } catch (err) { alert('画像処理に失敗：' + err.message); fi.value=''; }
+    });
+    cb.addEventListener('click', e => {
+      e.stopPropagation();
+      hid.value = ''; pv.src = ''; pv.style.display = 'none';
+      lslot.classList.remove('has-image'); fi.value = '';
+    });
+  }
+}
+
+// Hook into the T3 page becoming visible — pre-build dynamic UI on first show
+(function watchT3Page() {
+  const observer = new MutationObserver(() => {
+    const t3 = document.getElementById('app-page-t3');
+    if (t3 && t3.style.display === 'block') {
+      buildT3Highlights();
+      const stContainer = document.getElementById('t3-stations-container');
+      if (stContainer && stContainer.children.length === 0) {
+        addStationT3(); addStationT3(); addStationT3();
+      }
+      wireT3Slots();
+    }
+  });
+  const t3 = document.getElementById('app-page-t3');
+  if (t3) observer.observe(t3, { attributes: true, attributeFilter: ['style'] });
+})();
+
+// ── Collect + validate T3 ──────────────────────────────────────
+function _collectAndValidateT3() {
+  const form = document.getElementById('propertyFormT3');
+  const raw  = Object.fromEntries(new FormData(form));
+  const missing = [];
+  if (!raw.catchphrase?.trim())  missing.push('赤キャッチフレーズ');
+  if (!raw.propertyName?.trim()) missing.push('物件名');
+  if (!raw.price?.trim())        missing.push('価格');
+  if (missing.length) {
+    const msg = '必須項目が未入力：' + missing.join('、');
+    const banner = document.getElementById('t3-form-error');
+    if (banner) { banner.textContent = msg; banner.style.display = 'flex'; }
+    try { alert(msg); } catch (e) {}
+    return null;
+  }
+  // Stations
+  const stations = [];
+  document.querySelectorAll('#t3-stations-container .station-row').forEach(row => {
+    const inps = row.querySelectorAll('input');
+    const a = inps[0].value.trim(), b = inps[1].value.trim(), cw = inps[2].value.trim();
+    if (a || b) stations.push({ line: a, station: b, walk: cw });
+  });
+  raw.stations = stations;
+  // Free rows (consolidate label1+value1, label2+value2 into freeRows[])
+  const fr = [];
+  for (let i = 1; i <= 2; i++) {
+    const lab = (raw['freeLabel' + i] || '').trim();
+    const val = (raw['freeValue' + i] || '').trim();
+    if (lab && val) fr.push({ label: lab, value: val });
+  }
+  raw.freeRows = fr;
+  // Highlights — read from dynamic UI
+  const highlights = [];
+  for (let i = 0; i < 4; i++) {
+    const t = (document.getElementById('f3-h-title-'  + i) || {}).value || '';
+    const d = (document.getElementById('f3-h-detail-' + i) || {}).value || '';
+    if (t.trim() || d.trim()) {
+      highlights.push({ title: t.trim(), detail: d.trim() });
+    }
+  }
+  raw.highlights = highlights;
+  // Photos
+  for (let i = 1; i <= 7; i++) {
+    raw['k' + i + 'Image'] = (document.getElementById('img-t3-k' + i + 'Image') || {}).value || '';
+  }
+  raw.logoImage = (document.getElementById('img-t3-logoImage') || {}).value || '';
+  // Hide error banner if validation passes
+  const banner = document.getElementById('t3-form-error');
+  if (banner) { banner.style.display = 'none'; banner.textContent = ''; }
+  return raw;
+}
+
+function _runGenerateT3(raw, onSuccess) {
+  const overlay = document.getElementById('progressOverlay');
+  if (overlay) overlay.classList.add('visible');
+  const bodyStr = JSON.stringify(raw);
+  const sizeMB = (new TextEncoder().encode(bodyStr).length / 1024 / 1024).toFixed(1);
+  if (parseFloat(sizeMB) > 4.0) {
+    if (overlay) overlay.classList.remove('visible');
+    alert(`画像データが大きすぎます（${sizeMB} MB）。\n上限は4MBです。\n\n各写真スロットで✕→再アップロードすると自動で縮小されます。`);
+    return;
+  }
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), 90000);
+  fetch('/api/generate-flyer', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: bodyStr, signal: ctrl.signal,
+  })
+  .then(async r => {
+    clearTimeout(timeoutId);
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      throw new Error('サーバー ' + r.status + (txt ? ': ' + txt.slice(0, 300) : ''));
+    }
+    const ct = r.headers.get('content-type') || '';
+    if (ct && !ct.includes('pdf') && !ct.includes('octet-stream')) {
+      const txt = await r.text().catch(() => '');
+      throw new Error('PDF以外のレスポンス: ' + txt.slice(0, 300));
+    }
+    return r.blob();
+  })
+  .then(blob => {
+    clearTimeout(timeoutId);
+    if (overlay) overlay.classList.remove('visible');
+    onSuccess(blob);
+  })
+  .catch(err => {
+    clearTimeout(timeoutId);
+    if (overlay) overlay.classList.remove('visible');
+    console.error('[T3] generate failed:', err);
+    if (err && err.name === 'AbortError') {
+      alert('タイムアウト：サーバー応答なし。再試行してください。');
+    } else {
+      alert('チラシの生成中にエラーが発生しました。\n' + (err && err.message ? err.message : err));
+    }
+  });
+}
+
+function previewFlyerT3() {
+  console.log('[T3] preview clicked');
+  const raw = _collectAndValidateT3();
+  if (!raw) { console.log('[T3] validation failed'); return; }
+  console.log('[T3] payload ready, photos:', [1,2,3,4,5,6,7].filter(i => raw['k'+i+'Image']).length);
+  const addr = (raw.propertyName || '物件').trim();
+  _previewFilename = addr.replace(/[\s\/\\:*?"<>|]/g, '_') + '_T3チラシ.pdf';
+  _runGenerateT3(raw, blob => {
+    if (_previewBlobUrl) URL.revokeObjectURL(_previewBlobUrl);
+    _previewBlobUrl = URL.createObjectURL(blob);
+    const frame = document.getElementById('previewFrame');
+    const modal = document.getElementById('previewModal');
+    if (!frame || !modal) {
+      alert('プレビューモーダルが見つかりません。再読み込みしてください。');
       return;
     }
     frame.src = _previewBlobUrl;
