@@ -2077,27 +2077,63 @@ def _generate_t3(c, W, H, data: dict):
             if lab and val:
                 detail_rows.append((lab, val))
 
-    # Render detail table — auto-size row height so it fits the available space
-    DETAIL_BOT_RESERVE = 280   # space below detail table for highlights + company
+    # ── Pre-compute fixed-position blocks (company at bottom, highlights above) ─
+    # First, gather highlights so we know how tall the box needs to be.
+    highlights = data.get('highlights', []) or []
+    if isinstance(highlights, list):
+        highlights = [h for h in highlights[:4]
+                      if isinstance(h, dict)
+                      and ((h.get('title','') or '').strip()
+                           or (h.get('detail','') or '').strip())]
+    HIGH_TITLE = (data.get('highlightTitle', '') or '物件亮点 / Recommended Points').strip()
+
+    # Company block — count populated lines to size it
+    cn  = (data.get('companyName', '') or '').strip()
+    lic = (data.get('license', '') or '').strip()
+    tel = (data.get('companyTel', '') or '').strip()
+    mob = (data.get('companyMobile', '') or '').strip()
+    co_lines = []
+    if cn:  co_lines.append((cn,  11,  True))
+    if lic: co_lines.append((lic, 7.5, False))
+    if tel: co_lines.append((f'TEL：{tel}',    7.5, False))
+    if mob: co_lines.append((f'MOBILE：{mob}', 7.5, False))
+    F_LOGO     = 40
+    company_text_h = sum(sz + 3 for _, sz, _ in co_lines) + 6
+    COMPANY_H  = max(F_LOGO + 8, company_text_h, 56)
+    COMPANY_BOT = Y_BOT + 4
+    COMPANY_TOP = COMPANY_BOT + COMPANY_H
+
+    # Highlights box height — title + bullets + padding
+    HIGH_PAD_TOP    = 26
+    HIGH_PAD_BOT    = 8
+    HIGH_BULLET_H   = 16
+    HIGH_H = HIGH_PAD_TOP + max(len(highlights), 1) * HIGH_BULLET_H + HIGH_PAD_BOT
+    HIGH_H = max(72, min(HIGH_H, 150))
+    HIGH_BOT = COMPANY_TOP + 8
+    HIGH_TOP = HIGH_BOT + HIGH_H
+
+    # Detail table now fills [DETAIL_BOT_Y, DETAIL_TOP_Y] cleanly.
     DETAIL_TOP_Y = cy
-    DETAIL_BOT_Y = Y_BOT + DETAIL_BOT_RESERVE
+    DETAIL_BOT_Y = HIGH_TOP + 8
     DETAIL_H     = max(80, DETAIL_TOP_Y - DETAIL_BOT_Y)
-    # Each row gets a base slot; lines that wrap to 2-3 lines (transit) get extra
-    row_count = sum((max(1, v.count('\n') + 1)) for _, v in detail_rows)
-    BASE_ROW_H = max(14, min(22, DETAIL_H / max(row_count, 1)))
+    # Row sizing — count wrapped sub-lines so transit (multi-line) gets fair share.
+    row_units = sum((max(1, v.count('\n') + 1)) for _, v in detail_rows)
+    BASE_ROW_H = max(14, min(24, DETAIL_H / max(row_units, 1)))
     LBL_W      = LEFT_W * 0.28
     TBL_LX     = LX + 4
-    TBL_RX     = LX + LEFT_W - 4
+    rsz        = max(7, min(int(BASE_ROW_H * 0.42), 9))
+
+    # Render detail table top-down, distributing leftover space inside table.
     ry = DETAIL_TOP_Y
-    rsz = max(7, min(int(BASE_ROW_H * 0.42), 9))
     for i, (lab, val) in enumerate(detail_rows):
         lines = val.split('\n')
         slot_h = BASE_ROW_H * len(lines)
         ry -= slot_h
         if i % 2 == 1:
             rect(c, TBL_LX, ry, LEFT_W - 8, slot_h, fill=C_TINT)
-        # Label
-        draw_text(c, lab, TBL_LX + 6, ry + slot_h - rsz - 4, rsz,
+        # Label vertically centred in the row
+        draw_text(c, lab,
+                  TBL_LX + 6, ry + slot_h/2 - rsz * 0.32, rsz,
                   color=C_LABEL, nav_font=_nav_font)
         # Value lines
         for li, ln in enumerate(lines):
@@ -2108,31 +2144,24 @@ def _generate_t3(c, W, H, data: dict):
     # Top + bottom border
     hline(c, TBL_LX, LX + LEFT_W - 4, DETAIL_TOP_Y, color=C_DIV, lw=0.5)
     hline(c, TBL_LX, LX + LEFT_W - 4, ry, color=C_DIV, lw=0.5)
-    cy = ry - 8
 
     # ── Yellow highlights box ────────────────────────────────────────────────
-    highlights = data.get('highlights', []) or []
-    if isinstance(highlights, list):
-        highlights = highlights[:4]
-    HIGH_TITLE = (data.get('highlightTitle', '') or '物件亮点 / Recommended Points').strip()
-    # Estimated height: title (~16pt) + bullets (4 × ~22pt) + padding
-    high_h = 24 + len(highlights) * 22 + 12
-    high_h = max(80, min(high_h, 180))
-    high_top = cy
-    high_bot = cy - high_h
-    rect(c, LX, high_bot, LEFT_W, high_h, fill=C_HIGH_BG, stroke=C_HIGH_BD, lw=0.8)
+    rect(c, LX, HIGH_BOT, LEFT_W, HIGH_H, fill=C_HIGH_BG, stroke=C_HIGH_BD, lw=0.8)
     # Title
     tsz = 11
-    draw_bold(c, HIGH_TITLE, LX + 8, high_top - 14, tsz,
+    draw_bold(c, HIGH_TITLE, LX + 8, HIGH_TOP - 14, tsz,
               color=C_HIGH_T, nav_font=_nav_font)
-    hline(c, LX + 8, LX + LEFT_W - 8, high_top - 18, color=C_HIGH_BD, lw=0.5)
-    # Bullets
-    by = high_top - 26
-    for h in highlights:
-        if not isinstance(h, dict): continue
-        title = (h.get('title', '') or '').strip()
+    hline(c, LX + 8, LX + LEFT_W - 8, HIGH_TOP - 18, color=C_HIGH_BD, lw=0.5)
+    # Bullets — distribute evenly in remaining vertical space
+    bullet_zone_top = HIGH_TOP - HIGH_PAD_TOP
+    bullet_zone_bot = HIGH_BOT + HIGH_PAD_BOT
+    bullet_n = max(len(highlights), 1)
+    bullet_step = (bullet_zone_top - bullet_zone_bot) / bullet_n
+    for bi, h in enumerate(highlights):
+        title  = (h.get('title', '')  or '').strip()
         detail = (h.get('detail', '') or '').strip()
         if not (title or detail): continue
+        by = bullet_zone_top - (bi + 0.5) * bullet_step - 3
         # Bullet dot
         c.saveState()
         c.setFillColor(C_HIGH_BUL)
@@ -2140,24 +2169,27 @@ def _generate_t3(c, W, H, data: dict):
         c.restoreState()
         # Title (bold) + detail (normal) on one auto-fit line
         ttsz = 9
-        draw_bold(c, title + '：', LX + 18, by, ttsz,
-                  color=C_HIGH_T, nav_font=_nav_font)
-        title_w = txt_width(title + '：', ttsz, bold=True, nav_font=_nav_font)
-        avail   = LEFT_W - 18 - title_w - 8
-        dsz     = autosize(detail, avail, 8, min_sz=6, nav_font=_nav_font)
-        draw_text(c, truncate_text(detail, avail, dsz),
-                  LX + 18 + title_w, by, dsz,
-                  color=C_TEXT, nav_font=_nav_font)
-        by -= 18
-    cy = high_bot - 8
+        if title:
+            draw_bold(c, title + '：', LX + 18, by, ttsz,
+                      color=C_HIGH_T, nav_font=_nav_font)
+            title_w = txt_width(title + '：', ttsz, bold=True, nav_font=_nav_font)
+        else:
+            title_w = 0
+        avail = LEFT_W - 18 - title_w - 8
+        if detail and avail > 20:
+            dsz = autosize(detail, avail, 8, min_sz=6, nav_font=_nav_font)
+            draw_text(c, truncate_text(detail, avail, dsz),
+                      LX + 18 + title_w, by, dsz,
+                      color=C_TEXT, nav_font=_nav_font)
 
-    # ── Company / agent info (restricted) ────────────────────────────────────
-    # Logo (small, left), then company name, license, tels, then agent.
-    F_LOGO = 36
-    # Company logo
+    # ── Company / agent info (pinned at the very bottom) ─────────────────────
+    # Light divider above company block to set it off from highlights
+    hline(c, LX + 4, LX + LEFT_W - 4, COMPANY_TOP - 2, color=C_DIV, lw=0.4)
+
+    # Logo
     logo_b64 = data.get('logoImage', '')
-    logo_x = LX + 4
-    logo_y = Y_BOT + 4
+    logo_x   = LX + 4
+    logo_y   = COMPANY_BOT + (COMPANY_H - F_LOGO) / 2
     if logo_b64:
         try:
             raw = logo_b64.split(',', 1)[-1] if ',' in logo_b64 else logo_b64
@@ -2170,35 +2202,28 @@ def _generate_t3(c, W, H, data: dict):
                         dw, dh, preserveAspectRatio=True, mask='auto')
         except Exception:
             pass
-    # Company column
-    co_x = LX + F_LOGO + 10
-    cy_company = cy
-    co_lines = []
-    cn = (data.get('companyName', '') or '').strip()
-    if cn: co_lines.append((cn, 11, True))
-    lic = (data.get('license', '') or '').strip()
-    if lic: co_lines.append((lic, 7.5, False))
-    tel = (data.get('companyTel', '') or '').strip()
-    if tel: co_lines.append((f'TEL：{tel}', 7.5, False))
-    mob = (data.get('companyMobile', '') or '').strip()
-    if mob: co_lines.append((f'MOBILE：{mob}', 7.5, False))
-    by_co = cy_company - 14
+
+    # Company column — vertically centred inside COMPANY_H
+    co_x  = LX + F_LOGO + 12
+    co_total_h = sum(sz + 3 for _, sz, _ in co_lines)
+    by_co = COMPANY_BOT + (COMPANY_H + co_total_h) / 2 - 11
     for txt, sz, bold in co_lines:
         if bold:
             draw_bold(c, txt, co_x, by_co, sz, color=C_TEXT, nav_font=_nav_font)
         else:
             draw_text(c, txt, co_x, by_co, sz, color=C_LABEL, nav_font=_nav_font)
-        by_co -= sz + 2
+        by_co -= sz + 3
 
-    # Agent column (right side of left column)
+    # Agent column (right portion of left column, vertically centred)
     ag_role = (data.get('agentRole', '') or '専任担当').strip()
     ag_name = (data.get('agentName', '') or '').strip()
     ag_mob  = (data.get('agentMobile', '') or '').strip()
-    ag_x = LX + LEFT_W * 0.62
-    by_ag = cy_company - 14
+    ag_lines_h = (10 if ag_role else 0) + (14 if ag_name else 0) + (10 if ag_mob else 0) + 6
+    ag_x  = LX + LEFT_W * 0.62
+    by_ag = COMPANY_BOT + (COMPANY_H + ag_lines_h) / 2 - 10
     if ag_role:
         draw_text(c, ag_role, ag_x, by_ag, 8.5, color=C_LABEL, nav_font=_nav_font)
-        by_ag -= 11
+        by_ag -= 12
     if ag_name:
         draw_bold(c, ag_name, ag_x, by_ag, 12, color=C_TEXT, nav_font=_nav_font)
         by_ag -= 14
