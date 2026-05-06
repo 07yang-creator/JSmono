@@ -58,12 +58,13 @@ PHOTO_FIT_SCHEMA = {
     ('1', 'A', 'k5'): 'contain',  # Q2-top:    map
     # Template 1, Variant B (flex grid 2x2 — K1/K2/K3 exteriors, K4 = floor plan / map)
     ('1', 'B', 'k4'): 'contain',  # 間取り / 地図 — floor plan or map slot
-    # Template 2, Variant A (sample-accurate layout)
-    ('2', 'A', 'k2'): 'contain',  # floor plan (largest tile, middle row)
-    ('2', 'A', 'k4'): 'contain',  # map tile (top-right)
-    # Template 2, Variant B
-    ('2', 'B', 'k2'): 'contain',  # floor plan (top-right)
-    # Template 2, Variant C (Urayasu-style: big tall K1 + K2/K3 stacked + bottom row)
+    # ── Template 2 ───────────────────────────────────────────────────────────
+    # Variant A — 神田-style 5-photo:  K1 big tall + K2/K3 mid stack + K4/K5 right stack
+    ('2', 'A', 'k4'): 'contain',  # site survey / parcel diagram (top-right)
+    # Variant B — 三河-style 7-photo:  K1+K6 left, K2 floor plan w/K7 emblem, K3/K4/K5 right
+    ('2', 'B', 'k2'): 'contain',  # floor plan (centre, tall)
+    ('2', 'B', 'k6'): 'contain',  # map (bottom-left)
+    # Variant C — 浦安-style 7-photo:  K1 big tall + K2/K3 stacked + bottom row
     ('2', 'C', 'k3'): 'contain',  # floor plan (right of K2, larger)
 }
 def fit_mode(template_id, variant, slot_key):
@@ -1608,68 +1609,42 @@ def _generate_t2(c, W, H, data: dict):
     # ══════════════════════════════════════════════════════════════════════
     PG = 3
     if variant == 'A':
-        # 2A: K1 main + K4 map (top), K2 floor plan (mid), K5/6/7 thumbs (bot)
-        TOP_H = PHOTO_W * 0.42
-        BOT_H = PHOTO_W * 0.18
-        MID_H = IN_H - TOP_H - BOT_H - PG * 2
-        if MID_H < 30:
-            TOP_H = (IN_H - BOT_H - PG * 2) * 0.6
-            MID_H = IN_H - TOP_H - BOT_H - PG * 2
-        K1_W = PHOTO_W * 0.62
-        K4_W = PHOTO_W - K1_W - PG
+        # 2A — 神田-style 5-photo layout.
+        # ┌────────────┬──────┬──────┐
+        # │            │  K2  │  K4  │  K2: top-mid exterior
+        # │            │ small│survey│  K4: site survey diagram
+        # │   K1       ├──────┼──────┤  K3: bot-mid exterior
+        # │ big tall   │  K3  │  K5  │  K5: bot-right small interior
+        # │            │ small│ small│
+        # └────────────┴──────┴──────┘
+        # Left: K1 big tall (50% of photo column, full height)
+        K1_W = PHOTO_W * 0.50 - PG / 2
         K1_X = PHOTO_X
-        K1_Y = IN_Y + IN_H - TOP_H
-        draw_photo(c, K1_X, K1_Y, K1_W, TOP_H,
+        K1_Y = IN_Y
+        draw_photo(c, K1_X, K1_Y, K1_W, IN_H,
                    data.get('k1Image', ''), '外観メイン', '（K1）',
                    cs=_cs, cr=_cr, mode=fit_mode('2','A','k1'))
-        K4_X = K1_X + K1_W + PG
-        draw_photo(c, K4_X, K1_Y, K4_W, TOP_H,
-                   data.get('k4Image', ''), '地図', '（K4）',
-                   cs=_cs, cr=_cr, mode=fit_mode('2','A','k4'))
-        K2_X = PHOTO_X
-        K2_Y = K1_Y - PG - MID_H
-        draw_photo(c, K2_X, K2_Y, PHOTO_W, MID_H,
-                   data.get('k2Image', ''), '間取り図', '（K2）',
+        # Right: 2x2 grid of K2/K3/K4/K5 (each 25% width × 50% height)
+        RIGHT_X = K1_X + K1_W + PG
+        RIGHT_W = PHOTO_W - K1_W - PG
+        COL_W   = (RIGHT_W - PG) / 2
+        ROW_H   = (IN_H - PG) / 2
+        # Mid column = K2 top, K3 bottom
+        MID_X = RIGHT_X
+        draw_photo(c, MID_X, IN_Y + ROW_H + PG, COL_W, ROW_H,
+                   data.get('k2Image', ''), '外観②', '（K2）',
                    cs=_cs, cr=_cr, mode=fit_mode('2','A','k2'))
-        TH_KEYS   = ['k5Image', 'k6Image', 'k7Image']
-        TH_LABELS = [('内観1', 'K5'), ('内観2', 'K6'), ('内観3', 'K7')]
-        TH_N = len(TH_KEYS)
-        TW = (PHOTO_W - PG * (TH_N - 1)) / TH_N
-        TY = IN_Y
-        for i, (key, (lab, sub)) in enumerate(zip(TH_KEYS, TH_LABELS)):
-            tx = PHOTO_X + i * (TW + PG)
-            slot = key.replace('Image', '').lower()  # 'k5'/'k6'/'k7'
-            draw_photo(c, tx, TY, TW, BOT_H,
-                       data.get(key, ''), lab, f'（{sub}）',
-                       cs=_cs, cr=_cr, mode=fit_mode('2','A',slot))
-        # K3 — circular building-emblem overlay (top-right of K1)
-        k3_b64 = data.get('k3Image', '')
-        if k3_b64:
-            ov_r  = min(K1_W, TOP_H) * 0.16
-            ov_cx = K1_X + K1_W - ov_r - 6
-            ov_cy = K1_Y + TOP_H - ov_r - 6
-            c.saveState()
-            c.setFillColor(C_CREAM_LT)
-            c.circle(ov_cx, ov_cy, ov_r + 2.5, fill=1, stroke=0)
-            c.restoreState()
-            c.saveState()
-            cp = c.beginPath(); cp.circle(ov_cx, ov_cy, ov_r); c.clipPath(cp, stroke=0)
-            try:
-                raw = k3_b64.split(',', 1)[-1] if ',' in k3_b64 else k3_b64
-                decoded = _orient_image_bytes(base64.b64decode(raw))
-                img = ImageReader(io.BytesIO(decoded))
-                iw, ih = img.getSize()
-                box   = ov_r * 2
-                scale = max(box / iw, box / ih) if iw and ih else 1
-                dw, dh = iw * scale, ih * scale
-                c.drawImage(img, ov_cx - dw/2, ov_cy - dh/2, dw, dh,
-                            preserveAspectRatio=True, mask='auto')
-            except Exception: pass
-            c.restoreState()
-            c.saveState()
-            c.setStrokeColor(C_GREEN_DK); c.setLineWidth(1.4)
-            c.circle(ov_cx, ov_cy, ov_r, fill=0, stroke=1)
-            c.restoreState()
+        draw_photo(c, MID_X, IN_Y, COL_W, ROW_H,
+                   data.get('k3Image', ''), '外観③', '（K3）',
+                   cs=_cs, cr=_cr, mode=fit_mode('2','A','k3'))
+        # Right column = K4 top (site survey), K5 bottom (small photo)
+        FAR_X = MID_X + COL_W + PG
+        draw_photo(c, FAR_X, IN_Y + ROW_H + PG, COL_W, ROW_H,
+                   data.get('k4Image', ''), '配置図', '（K4）',
+                   cs=_cs, cr=_cr, mode=fit_mode('2','A','k4'))
+        draw_photo(c, FAR_X, IN_Y, COL_W, ROW_H,
+                   data.get('k5Image', ''), '外観④', '（K5）',
+                   cs=_cs, cr=_cr, mode=fit_mode('2','A','k5'))
     elif variant == 'C':
         # 2C — Urayasu-sample style.
         # ┌─────────┬────────────┐
@@ -1754,38 +1729,87 @@ def _generate_t2(c, W, H, data: dict):
                           color=C_RED_DK, align='center', nav_font=_nav_font)
                 ty -= line_h
     else:
-        # 2B: K1 + K2 (top), K3-K7 (bottom); optional yellow yield-callout on K1
-        TOP_H = IN_H * 0.58
-        BOT_H = IN_H - TOP_H - PG
-        K1_W  = PHOTO_W * 0.62
-        K2_W  = PHOTO_W - K1_W - PG
-        K1_X  = PHOTO_X
-        K1_Y  = IN_Y + BOT_H + PG
-        draw_photo(c, K1_X, K1_Y, K1_W, TOP_H,
+        # 2B — 三河-style 7-photo layout.
+        # ┌─────────┬────────────┬──────┐
+        # │   K1    │            │  K3  │
+        # │exterior │     K2     ├──────┤
+        # ├─────────┤ floor plan │  K4  │
+        # │   K6    │ + K7 oval  ├──────┤
+        # │   map   │   emblem   │  K5  │
+        # └─────────┴────────────┴──────┘
+        # 3 columns: 36% / 34% / 30%.   Left col stacks K1 over K6.
+        # Centre col = full-height K2 with optional K7 oval emblem overlay.
+        # Right col = K3/K4/K5 stacked equal heights.
+        LEFT_W   = PHOTO_W * 0.36 - PG / 3
+        MID_W    = PHOTO_W * 0.34 - PG / 3
+        RIGHT_W  = PHOTO_W - LEFT_W - MID_W - PG * 2
+        L_HALF_H = (IN_H - PG) / 2
+        # Left col — K1 top, K6 bottom (map)
+        K1_X = PHOTO_X
+        K1_Y = IN_Y + L_HALF_H + PG
+        draw_photo(c, K1_X, K1_Y, LEFT_W, L_HALF_H,
                    data.get('k1Image', ''), '外観メイン', '（K1）',
                    cs=_cs, cr=_cr, mode=fit_mode('2','B','k1'))
-        K2_X = K1_X + K1_W + PG
-        draw_photo(c, K2_X, K1_Y, K2_W, TOP_H,
+        K6_X = PHOTO_X
+        K6_Y = IN_Y
+        draw_photo(c, K6_X, K6_Y, LEFT_W, L_HALF_H,
+                   data.get('k6Image', ''), '地図', '（K6）',
+                   cs=_cs, cr=_cr, mode=fit_mode('2','B','k6'))
+        # Centre col — K2 floor plan full height
+        K2_X = K1_X + LEFT_W + PG
+        K2_Y = IN_Y
+        draw_photo(c, K2_X, K2_Y, MID_W, IN_H,
                    data.get('k2Image', ''), '間取り図', '（K2）',
                    cs=_cs, cr=_cr, mode=fit_mode('2','B','k2'))
-        TH_KEYS   = ['k3Image', 'k4Image', 'k5Image', 'k6Image', 'k7Image']
-        TH_LABELS = [('外観', 'K3'), ('共用部', 'K4'),
-                     ('内観1', 'K5'), ('内観2', 'K6'), ('内観3', 'K7')]
-        TH_N = len(TH_KEYS)
-        TW = (PHOTO_W - PG * (TH_N - 1)) / TH_N
-        TY = IN_Y
-        for i, (key, (lab, sub)) in enumerate(zip(TH_KEYS, TH_LABELS)):
-            tx = PHOTO_X + i * (TW + PG)
+        # Right col — K3 / K4 / K5 stacked equal heights
+        R_X    = K2_X + MID_W + PG
+        R_H    = (IN_H - PG * 2) / 3
+        for i, (key, lab, sub) in enumerate([
+            ('k3Image', '内観①', 'K3'),
+            ('k4Image', '内観②', 'K4'),
+            ('k5Image', '内観③', 'K5'),
+        ]):
             slot = key.replace('Image', '').lower()
-            draw_photo(c, tx, TY, TW, BOT_H,
+            ry   = IN_Y + (2 - i) * (R_H + PG)
+            draw_photo(c, R_X, ry, RIGHT_W, R_H,
                        data.get(key, ''), lab, f'（{sub}）',
                        cs=_cs, cr=_cr, mode=fit_mode('2','B',slot))
+        # K7 — green oval emblem overlay on K2 floor plan (signature 三河 mark).
+        # The 三河 sample uses this for the property name in white-on-green;
+        # we render it as a solid green oval with overlaid text. (We don't
+        # try to clip an arbitrary K7 photo to an ellipse — ReportLab's path
+        # ellipse doesn't always clip cleanly with cover scaling.)
+        emblem_text = (data.get('propertyName', '') or '').strip()
+        if emblem_text:
+            ov_w = min(MID_W * 0.92, 160)
+            ov_h = max(26, min(MID_W * 0.28, 38))
+            ov_cx = K2_X + MID_W / 2
+            ov_cy = K2_Y + IN_H * 0.78
+            ox0, oy0, ox1, oy1 = (ov_cx - ov_w/2, ov_cy - ov_h/2,
+                                  ov_cx + ov_w/2, ov_cy + ov_h/2)
+            # Drop shadow
+            c.saveState()
+            c.setFillColor(colors.HexColor('#00000022'))
+            c.ellipse(ox0 + 2, oy0 - 2, ox1 + 2, oy1 - 2, fill=1, stroke=0)
+            c.restoreState()
+            # Solid green fill
+            c.saveState()
+            c.setFillColor(C_GREEN_DK); c.setStrokeColor(C_GREEN_DK); c.setLineWidth(1.6)
+            c.ellipse(ox0, oy0, ox1, oy1, fill=1, stroke=1)
+            c.restoreState()
+            # Property name in white
+            ez = autosize(emblem_text, ov_w - 12, 13, min_sz=7,
+                          bold=True, nav_font=_nav_font)
+            draw_bold(c, emblem_text, ov_cx, ov_cy - ez * 0.32, ez,
+                      color=C_WHITE, align='center', nav_font=_nav_font)
+        # Optional yield callout (rendered in the bottom-left of K1 if user
+        # provided one — keeps backward compat with old 2B form)
         callout = (data.get('yieldCallout', '') or '').strip()
         if callout:
-            cw  = min(K1_W * 0.50, 130)
+            cw  = min(LEFT_W * 0.85, 140)
             ch_ = 28
-            cox = K1_X + K1_W - cw - 8
-            coy = K1_Y + TOP_H - ch_ - 8
+            cox = K1_X + 6
+            coy = K1_Y + 8
             c.saveState()
             c.setFillColor(colors.HexColor('#00000022'))
             c.ellipse(cox + 2, coy - 2, cox + cw + 2, coy - 2 + ch_, fill=1, stroke=0)

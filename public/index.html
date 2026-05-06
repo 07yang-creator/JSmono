@@ -1301,8 +1301,8 @@
             <input type="radio" name="variant" value="C">
             <span class="variant-radio"></span>
             <div class="variant-body">
-              <div class="vname" id="vname-C">🏬 物件詳細＋利回り（サンプル浦安風・テンプレ2専用）</div>
-              <div class="vdesc" id="vdesc-C">縦長外観をメインに、間取り図＋小内観＋下部4枚サムネ。中央に黄色利回りカラウト</div>
+              <div class="vname" id="vname-C">🏬 浦安風（写真7枚・利回りカラウト）</div>
+              <div class="vdesc" id="vdesc-C">縦長外観メイン＋間取り＋小内観＋下部サムネ4枚＋黄色利回りカラウト</div>
             </div>
           </label>
 
@@ -2759,11 +2759,11 @@ const _VARIANT_LABELS = {
          desc: '右エリアを写真4枚で構成。視覚インパクト重視' },
   },
   2: {
-    A: { name: '🏛 サンプル1風（クリーム枠 + 円形ロゴ + 地図タイル）',
-         desc: '4路線の交通情報、円形オーバーレイ、地図タイル付き' },
-    B: { name: '🏷 サンプル2/3風（緑タグ + 想定賃料カラウト）',
-         desc: '緑色駅徒歩タグ、利回り情報の黄色カラウト（任意）' },
-    C: { name: '🏬 物件詳細＋利回り（浦安サンプル風）',
+    A: { name: '🏙 神田風（写真5枚・土地/物件外観重視）',
+         desc: '左に縦長外観、中央列に外観②③、右列に配置図と外観④。土地・戸建向き' },
+    B: { name: '🏢 三河風（写真7枚・室内重視＋緑エンブレム）',
+         desc: '外観＋地図＋間取り図（緑オーバルエンブレム）＋内観3枚。マンション向き' },
+    C: { name: '🏬 浦安風（写真7枚・利回りカラウト）',
          desc: '縦長外観メイン＋間取り＋小内観＋下部サムネ4枚＋黄色利回りカラウト' },
   },
 };
@@ -3999,33 +3999,35 @@ const T2_DETAIL_FIELDS = [
 
 const T2_MAX_ROWS = 20;
 
-// ── 2A / 2B / 2C variant toggles ───────────────────────────────
+// ── 2A 神田 / 2B 三河 / 2C 浦安 variant toggles ────────────────
 function applyT2VariantToggles(v) {
-  // Transit UI: 2A and 2C use the multi-station list; 2B uses single pill
-  const useMultiStation = (v === 'A' || v === 'C');
-  document.getElementById('t2-transit-2a').style.display = useMultiStation ? '' : 'none';
-  document.getElementById('t2-transit-2b').style.display = useMultiStation ? 'none' : '';
-  // Yield callout: 2B and 2C surface the yellow callout; 2A doesn't
+  // All three new variants use the multi-station transit list. The single-pill
+  // form is no longer reachable but kept in DOM for backward compatibility.
+  document.getElementById('t2-transit-2a').style.display = '';
+  document.getElementById('t2-transit-2b').style.display = 'none';
+  // Yield callout — only 2C 浦安 has a prominent callout. 2B 三河 reuses the
+  // field as a small optional badge on K1; 2A 神田 hides it entirely.
   document.getElementById('f2-callout-wrap').style.display = (v === 'A') ? 'none' : '';
-  // K3 / K4 labels per variant
+  // K-slot labels per variant (only the labels in the form preview tile)
   const k3 = document.getElementById('t2-k3-label');
   const k4 = document.getElementById('t2-k4-label');
   if (v === 'A') {
-    if (k3) k3.textContent = 'エンブレム/外観';
-    if (k4) k4.textContent = '地図タイル';
+    // 神田: K1 big tall, K2/K3 mid, K4 site survey, K5 small
+    if (k3) k3.textContent = '外観③';
+    if (k4) k4.textContent = '配置図';
+  } else if (v === 'B') {
+    // 三河: K1 exterior, K2 floor plan, K3-K5 interiors, K6 map, K7 emblem
+    if (k3) k3.textContent = '内観①';
+    if (k4) k4.textContent = '内観②';
   } else if (v === 'C') {
+    // 浦安: K1 big tall, K2 small interior, K3 floor plan, K4-K7 thumbs
     if (k3) k3.textContent = '間取り図';
     if (k4) k4.textContent = '内観1';
-  } else {
-    if (k3) k3.textContent = 'サブ外観';
-    if (k4) k4.textContent = 'フロアマップ';
   }
-  // Default 2A / 2C to 4 station rows when first entering them
-  if (useMultiStation) {
-    const wrap = document.getElementById('t2-stations-container');
-    if (wrap && wrap.children.length === 0) {
-      addStationT2(); addStationT2(); addStationT2(); addStationT2();
-    }
+  // Pre-populate transit rows for new variants
+  const wrap = document.getElementById('t2-stations-container');
+  if (wrap && wrap.children.length === 0) {
+    addStationT2(); addStationT2(); addStationT2(); addStationT2();
   }
 }
 
@@ -4447,8 +4449,10 @@ function _collectAndValidateT2() {
   // Optional 新 badge flag
   raw.newPriceBadge = document.getElementById('f2-newPriceBadge').checked;
 
-  // Variant-specific transit. 2A and 2C share the multi-station list.
-  if (raw.templateVariant === 'A' || raw.templateVariant === 'C') {
+  // All three current variants (2A 神田 / 2B 三河 / 2C 浦安) use the
+  // multi-station list. The legacy single-pill path is retained below in
+  // case templateVariant arrives as something unexpected.
+  if (raw.templateVariant === 'A' || raw.templateVariant === 'B' || raw.templateVariant === 'C') {
     const stations = [];
     let anyValid = false, firstRow = null;
     document.querySelectorAll('#t2-stations-container .station-row').forEach(row => {
