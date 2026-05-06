@@ -2,6 +2,14 @@
   "framework": null,
   "outputDirectory": "public",
   "buildCommand": "python3 scripts/download_fonts.py",
+  "functions": {
+    "api/generate-flyer.py": {
+      "maxDuration": 60
+    },
+    "api/parse-pdf.py": {
+      "maxDuration": 30
+    }
+  },
   "env": {
     "FONT_PATH": "/var/task/fonts/DroidSansFallbackFull.ttf",
     "NOTO_REGULAR_PATH": "/var/task/fonts/NotoSansJP-Regular.ttf",
