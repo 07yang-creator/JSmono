@@ -63,6 +63,8 @@ PHOTO_FIT_SCHEMA = {
     ('2', 'A', 'k4'): 'contain',  # map tile (top-right)
     # Template 2, Variant B
     ('2', 'B', 'k2'): 'contain',  # floor plan (top-right)
+    # Template 2, Variant C (Urayasu-style: big tall K1 + K2/K3 stacked + bottom row)
+    ('2', 'C', 'k3'): 'contain',  # floor plan (right of K2, larger)
 }
 def fit_mode(template_id, variant, slot_key):
     """Look up the per-slot fit mode. Falls back to 'cover'."""
@@ -1668,6 +1670,89 @@ def _generate_t2(c, W, H, data: dict):
             c.setStrokeColor(C_GREEN_DK); c.setLineWidth(1.4)
             c.circle(ov_cx, ov_cy, ov_r, fill=0, stroke=1)
             c.restoreState()
+    elif variant == 'C':
+        # 2C — Urayasu-sample style.
+        # ┌─────────┬────────────┐
+        # │         │  K2 (small)│
+        # │   K1    ├────────────┤
+        # │ (big    │  K3        │
+        # │  tall)  │ (floor plan)│
+        # │ +callout│            │
+        # ├──┬──┬──┬┴────────────┤
+        # │K4│K5│K6│   K7  wide  │
+        # └──┴──┴──┴─────────────┘
+        BOT_H = IN_H * 0.27
+        TOP_H = IN_H - BOT_H - PG
+        # Left: K1 tall exterior (40% of photo column)
+        K1_W = PHOTO_W * 0.40 - PG / 2
+        K1_X = PHOTO_X
+        K1_Y = IN_Y + BOT_H + PG
+        draw_photo(c, K1_X, K1_Y, K1_W, TOP_H,
+                   data.get('k1Image', ''), '外観メイン', '（K1）',
+                   cs=_cs, cr=_cr, mode=fit_mode('2','C','k1'))
+        # Right: K2 (small interior) above K3 (floor plan, larger)
+        RIGHT_X = K1_X + K1_W + PG
+        RIGHT_W = PHOTO_W - K1_W - PG
+        K2_H    = TOP_H * 0.32
+        K3_H    = TOP_H - K2_H - PG
+        K2_Y    = K1_Y + K3_H + PG
+        draw_photo(c, RIGHT_X, K2_Y, RIGHT_W, K2_H,
+                   data.get('k2Image', ''), '内観', '（K2）',
+                   cs=_cs, cr=_cr, mode=fit_mode('2','C','k2'))
+        K3_Y    = K1_Y
+        draw_photo(c, RIGHT_X, K3_Y, RIGHT_W, K3_H,
+                   data.get('k3Image', ''), '間取り図', '（K3）',
+                   cs=_cs, cr=_cr, mode=fit_mode('2','C','k3'))
+        # Bottom row: 4 thumbs (K4 K5 K6 narrow + K7 wider — like the
+        # Urayasu mailbox panel).  Width ratios 1:1:1:1.5.
+        TY        = IN_Y
+        THUMB_GAP = PG
+        # Solve: 3·u + 1.5·u + 3·gap = PHOTO_W → u = (PHOTO_W - 3·gap) / 4.5
+        u    = (PHOTO_W - 3 * THUMB_GAP) / 4.5
+        K4_W = K5_W = K6_W = u
+        K7_W = PHOTO_W - 3 * u - 3 * THUMB_GAP
+        cur_x = PHOTO_X
+        for key, lab, sub, ww in [
+            ('k4Image', '内観1',  'K4', K4_W),
+            ('k5Image', '内観2',  'K5', K5_W),
+            ('k6Image', '内観3',  'K6', K6_W),
+            ('k7Image', '共用部', 'K7', K7_W),
+        ]:
+            slot = key.replace('Image', '').lower()
+            draw_photo(c, cur_x, TY, ww, BOT_H,
+                       data.get(key, ''), lab, f'（{sub}）',
+                       cs=_cs, cr=_cr, mode=fit_mode('2','C',slot))
+            cur_x += ww + THUMB_GAP
+        # Yield callout on K1 (signature feature of the Urayasu sample)
+        callout = (data.get('yieldCallout', '') or '').strip()
+        if callout:
+            cw  = min(K1_W * 0.92, 170)
+            ch_ = 36
+            cox = K1_X + (K1_W - cw) / 2
+            coy = K1_Y + TOP_H * 0.32
+            c.saveState()
+            c.setFillColor(colors.HexColor('#00000022'))
+            c.ellipse(cox + 2, coy - 2, cox + cw + 2, coy - 2 + ch_, fill=1, stroke=0)
+            c.restoreState()
+            c.saveState()
+            c.setFillColor(C_YELLOW); c.setStrokeColor(C_RED_DK); c.setLineWidth(1.3)
+            c.ellipse(cox, coy, cox + cw, coy + ch_, fill=1, stroke=1)
+            c.restoreState()
+            # Allow 2 lines if user used '\n' or '/' separator
+            lines = [s.strip() for s in callout.replace('／','/').split('\n') if s.strip()]
+            if len(lines) == 1 and '/' in lines[0]:
+                a, b = lines[0].split('/', 1); lines = [a.strip(), b.strip()]
+            lines = lines[:2]
+            longest = max(lines, key=len) if lines else callout
+            line_sz = autosize(longest, cw - 14, 12 if len(lines) <= 1 else 10,
+                               min_sz=6, bold=True, nav_font=_nav_font)
+            line_h  = line_sz + 1
+            total_h = line_h * len(lines)
+            ty      = coy + (ch_ + total_h) / 2 - line_sz
+            for ln in lines:
+                draw_bold(c, ln, cox + cw/2, ty, line_sz,
+                          color=C_RED_DK, align='center', nav_font=_nav_font)
+                ty -= line_h
     else:
         # 2B: K1 + K2 (top), K3-K7 (bottom); optional yellow yield-callout on K1
         TOP_H = IN_H * 0.58

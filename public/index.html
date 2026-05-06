@@ -1297,6 +1297,15 @@
             </div>
           </label>
 
+          <label class="variant-card" id="vcard-C" onclick="selectVariant('C')" style="display:none">
+            <input type="radio" name="variant" value="C">
+            <span class="variant-radio"></span>
+            <div class="variant-body">
+              <div class="vname" id="vname-C">🏬 物件詳細＋利回り（サンプル浦安風・テンプレ2専用）</div>
+              <div class="vdesc" id="vdesc-C">縦長外観をメインに、間取り図＋小内観＋下部4枚サムネ。中央に黄色利回りカラウト</div>
+            </div>
+          </label>
+
         </div>
       </div>
 
@@ -2754,6 +2763,8 @@ const _VARIANT_LABELS = {
          desc: '4路線の交通情報、円形オーバーレイ、地図タイル付き' },
     B: { name: '🏷 サンプル2/3風（緑タグ + 想定賃料カラウト）',
          desc: '緑色駅徒歩タグ、利回り情報の黄色カラウト（任意）' },
+    C: { name: '🏬 物件詳細＋利回り（浦安サンプル風）',
+         desc: '縦長外観メイン＋間取り＋小内観＋下部サムネ4枚＋黄色利回りカラウト' },
   },
 };
 
@@ -2763,11 +2774,20 @@ function selectTemplate(n) {
   document.getElementById('tcard-' + n).classList.add('selected');
   // Swap variant card labels to match the chosen template
   const labels = _VARIANT_LABELS[_selectedTemplate] || _VARIANT_LABELS[1];
-  ['A', 'B'].forEach(v => {
+  ['A', 'B', 'C'].forEach(v => {
     const nm = document.getElementById('vname-' + v);
     const dc = document.getElementById('vdesc-' + v);
-    if (nm) nm.textContent = labels[v].name;
-    if (dc) dc.textContent = labels[v].desc;
+    const card = document.getElementById('vcard-' + v);
+    if (labels[v]) {
+      if (nm) nm.textContent = labels[v].name;
+      if (dc) dc.textContent = labels[v].desc;
+      if (card) card.style.display = '';
+    } else {
+      // This template doesn't have this variant — hide the card and bounce
+      // back to A if it was selected.
+      if (card) card.style.display = 'none';
+      if (_selectedVariant === v) selectVariant('A');
+    }
   });
 }
 
@@ -3979,19 +3999,29 @@ const T2_DETAIL_FIELDS = [
 
 const T2_MAX_ROWS = 20;
 
-// ── 2A/2B variant toggles ──────────────────────────────────────
+// ── 2A / 2B / 2C variant toggles ───────────────────────────────
 function applyT2VariantToggles(v) {
-  const isA = v === 'A';
-  document.getElementById('t2-transit-2a').style.display = isA ? '' : 'none';
-  document.getElementById('t2-transit-2b').style.display = isA ? 'none' : '';
-  document.getElementById('f2-callout-wrap').style.display = isA ? 'none' : '';
-  // K3/K4 labels differ slightly between 2A and 2B per spec
+  // Transit UI: 2A and 2C use the multi-station list; 2B uses single pill
+  const useMultiStation = (v === 'A' || v === 'C');
+  document.getElementById('t2-transit-2a').style.display = useMultiStation ? '' : 'none';
+  document.getElementById('t2-transit-2b').style.display = useMultiStation ? 'none' : '';
+  // Yield callout: 2B and 2C surface the yellow callout; 2A doesn't
+  document.getElementById('f2-callout-wrap').style.display = (v === 'A') ? 'none' : '';
+  // K3 / K4 labels per variant
   const k3 = document.getElementById('t2-k3-label');
   const k4 = document.getElementById('t2-k4-label');
-  if (k3) k3.textContent = isA ? 'エンブレム/外観' : 'サブ外観';
-  if (k4) k4.textContent = isA ? '地図タイル'      : 'フロアマップ';
-  // Default 2A to 4 station rows when first entering A
-  if (isA) {
+  if (v === 'A') {
+    if (k3) k3.textContent = 'エンブレム/外観';
+    if (k4) k4.textContent = '地図タイル';
+  } else if (v === 'C') {
+    if (k3) k3.textContent = '間取り図';
+    if (k4) k4.textContent = '内観1';
+  } else {
+    if (k3) k3.textContent = 'サブ外観';
+    if (k4) k4.textContent = 'フロアマップ';
+  }
+  // Default 2A / 2C to 4 station rows when first entering them
+  if (useMultiStation) {
     const wrap = document.getElementById('t2-stations-container');
     if (wrap && wrap.children.length === 0) {
       addStationT2(); addStationT2(); addStationT2(); addStationT2();
@@ -4417,8 +4447,8 @@ function _collectAndValidateT2() {
   // Optional 新 badge flag
   raw.newPriceBadge = document.getElementById('f2-newPriceBadge').checked;
 
-  // Variant-specific transit
-  if (raw.templateVariant === 'A') {
+  // Variant-specific transit. 2A and 2C share the multi-station list.
+  if (raw.templateVariant === 'A' || raw.templateVariant === 'C') {
     const stations = [];
     let anyValid = false, firstRow = null;
     document.querySelectorAll('#t2-stations-container .station-row').forEach(row => {
