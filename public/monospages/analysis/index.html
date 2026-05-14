@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>快速分析 — 法拍管理系统</title>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+  <!-- ⚠️ TEST MODE — set TEST_MODE=false before production -->
+  <script>
+  (function () {
+    window.TEST_MODE = false;            // test shim disabled
+    if (!window.TEST_MODE) return;
+
+    /* Fake Auth0 user (admin role) */
+    var _fake = { name:'测试管理员', email:'test@example.com', picture:null, sub:'test|000' };
+    var _client = {
+      isAuthenticated:      function(){ return Promise.resolve(true); },
+      getUser:              function(){ return Promise.resolve(_fake); },
+      getTokenSilently:     function(){ return Promise.resolve('test-token-000'); },
+      handleRedirectCallback: function(){ return Promise.resolve({}); },
+      checkSession:         function(){ return Promise.resolve(); },
+      loginWithRedirect:    function(){ /* no-op in test mode */ },
+      logout: function(o){
+        location.href = (o && o.logoutParams && o.logoutParams.returnTo)
+                        || '/monospages/';
+      },
+    };
+
+    /* Override Auth0Client constructor (most pages) */
+    if (window.auth0) window.auth0.Auth0Client = function(){ return _client; };
+    /* Override createAuth0Client helper (batches page) */
+    window.createAuth0Client = function(){ return Promise.resolve(_client); };
+
+    /* Intercept fetch — fake the role API, pass everything else through */
+    var _orig = window.fetch.bind(window);
+    window.fetch = function(url, opts) {
+      var u = typeof url === 'string' ? url : '';
+      if (u.indexOf('/api/monospages-admin') !== -1) {
+        return Promise.resolve(new Response(
+          JSON.stringify({ monospages_role:'admin', email:'test@example.com', name:'测试管理员' }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      if (u.indexOf('/api/monospages-config') !== -1 && opts && opts.method === 'POST') {
+        return Promise.resolve(new Response(
+          JSON.stringify({ ok:true }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      return _orig(url, opts);
+    };
+  })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue:     #2B6CB0; --blue-dk: #215387; --blue-lt: #3a80c9; --blue-bg: #EBF4FF;
+      --orange:   #f76a0c; --orange-lt: #ff8534; --orange-bg: #fff3eb;
+      --red:      #c0392b; --red-lt: #e74c3c; --red-bg: #fdf2f1;
+      --green:    #38a169; --green-bg: #e6fffa;
+      --bg:       #F7FAFC; --card: #ffffff; --border: #E2E8F0;
+      --text:     #1A202C; --text-body: #2D3748; --muted: #718096;
+      --radius:   8px;
+      --shadow:   0 1px 3px rgba(0,0,0,0.08);
+      --nav-h:    56px;  /* navbar height */
+      --hdr-h:    52px;  /* search bar height */
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+                   'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: var(--bg); color: var(--text-body);
+      font-size: 13px; line-height: 1.6;
+      display: flex; flex-direction: column;
+    }
+    a { text-decoration: none; color: inherit; }
+
+    /* ── NAVBAR ── */
+    .navbar {
+      flex-shrink: 0;
+      background: var(--blue-dk); border-bottom: 3px solid var(--orange);
+      display: flex; align-items: center;
+      padding: 0 20px; height: var(--nav-h);
+      box-shadow: 0 2px 8px rgba(33,83,135,0.25);
+      z-index: 200;
+    }
+    .navbar-brand { display: flex; align-items: center; gap: 8px; margin-right: 24px; }
+    .navbar-brand-icon {
+      width: 28px; height: 28px; background: var(--orange); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: #fff;
+    }
+    .navbar-brand-main { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.2; }
+    .navbar-brand-sub  { font-size: 10px; color: rgba(255,255,255,0.42); }
+    .navbar-links { display: flex; align-items: center; gap: 2px; flex: 1; }
+    .navbar-links a {
+      color: rgba(255,255,255,0.75); font-size: 12px; font-weight: 500;
+      padding: 5px 12px; border-radius: 6px; white-space: nowrap;
+    }
+    .navbar-links a:hover  { background: rgba(255,255,255,0.1); color: #fff; }
+    .navbar-links a.active { color: #fff; background: rgba(43,108,176,0.5); }
+    .navbar-links a.admin-link { color: rgba(247,106,12,0.9); margin-left: 6px; }
+    .navbar-right { display: flex; align-items: center; gap: 8px; }
+    .btn-nav { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); border: 1px solid rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+    .btn-nav:hover { background: rgba(255,255,255,0.18); color: #fff; }
+    .btn-nav-login { background: var(--orange); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-logout { background: transparent; color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2); padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .btn-logout:hover { color: #fff; border-color: rgba(255,255,255,0.5); }
+    .nav-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; overflow: hidden; }
+    .nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .nav-username { font-size: 12px; color: rgba(255,255,255,0.8); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #nav-auth-user { display: none; align-items: center; gap: 7px; }
+
+    /* ── SEARCH BAR ── */
+    .search-bar {
+      flex-shrink: 0;
+      background: var(--card); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 20px; height: var(--hdr-h);
+      z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .search-bar-label { font-size: 12px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+    .search-input {
+      flex: 0 0 220px; border: 1.5px solid var(--border); border-radius: 7px;
+      padding: 7px 12px; font-size: 13px; color: var(--text);
+      font-family: inherit; transition: border-color 0.15s;
+    }
+    .search-input:focus { outline: none; border-color: var(--blue); }
+    .search-input::placeholder { color: var(--muted); }
+    .btn-search {
+      background: var(--blue); color: #fff; border: none;
+      padding: 7px 16px; border-radius: 7px; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-search:hover { background: var(--blue-dk); }
+    .search-status { font-size: 12px; }
+    .search-status.loading { color: var(--blue); }
+    .search-status.error   { color: var(--red); }
+    .search-spacer { flex: 1; }
+    .prop-badge {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--blue-bg); border-radius: 6px; padding: 5px 12px;
+      font-size: 12px; color: var(--blue); font-weight: 600;
+    }
+    .prop-badge .close-btn { color: var(--muted); cursor: pointer; font-weight: 400; font-size: 14px; }
+    .prop-badge .close-btn:hover { color: var(--red); }
+
+    /* ── SPLIT PANE LAYOUT ── */
+    .split-panes {
+      flex: 1; display: flex; overflow: hidden;
+      min-height: 0; /* important: allows flex children to scroll */
+    }
+
+    /* LEFT PANE — property data (read-only) */
+    .pane-left {
+      flex: 0 0 50%; max-width: 50%; min-width: 360px;
+      border-right: 2px solid var(--border);
+      overflow-y: auto; overflow-x: hidden;
+      display: flex; flex-direction: column;
+      background: var(--bg);
+    }
+    /* RIGHT PANE — analysis form */
+    .pane-right {
+      flex: 1; min-width: 320px;
+      overflow-y: auto; overflow-x: hidden;
+      display: flex; flex-direction: column;
+      background: var(--card);
+    }
+
+    /* Pane headers */
+    .pane-hdr {
+      flex-shrink: 0; position: sticky; top: 0; z-index: 10;
+      background: var(--blue-dk); color: #fff;
+      padding: 8px 16px; font-size: 12px; font-weight: 700;
+      letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;
+    }
+    .pane-hdr.right-hdr { background: var(--blue); }
+    .pane-hdr .pane-badge {
+      font-size: 10px; font-weight: 600;
+      background: rgba(255,255,255,0.18); border-radius: 4px; padding: 2px 8px;
+    }
+    .pane-hdr-spacer { flex: 1; }
+
+    /* ── EMPTY STATE (before search) ── */
+    .pane-empty {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--muted); gap: 10px; padding: 40px;
+    }
+    .pane-empty .empty-icon { font-size: 40px; }
+    .pane-empty .empty-txt  { font-size: 13px; text-align: center; line-height: 1.7; }
+
+    /* ── DATA PANEL (left pane content) ── */
+    .data-content { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+    .data-section-title {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 4px 0 2px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+    }
+
+    .subsection {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+    }
+    .subsection-head {
+      padding: 8px 12px; border-bottom: 1px solid var(--border);
+      font-size: 12px; font-weight: 700; color: var(--text);
+      background: var(--bg); display: flex; align-items: center; gap: 6px;
+    }
+    .subsection-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; }
+    .field-cell {
+      padding: 7px 10px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);
+    }
+    .field-cell:nth-child(even) { border-right: none; }
+    .field-cell.full { grid-column: 1 / -1; border-right: none; }
+    .field-lbl { font-size: 10px; color: var(--muted); margin-bottom: 1px; display: flex; align-items: center; gap: 3px; }
+    .field-lbl .rdot { width: 4px; height: 4px; border-radius: 50%; background: var(--red); }
+    .field-val { font-size: 12px; font-weight: 500; color: var(--text); word-break: break-word; }
+    .field-val.empty { color: #ccc; font-weight: 400; }
+    .field-val.price { color: var(--red); font-size: 14px; font-weight: 700; }
+    .field-val.long  { white-space: pre-wrap; line-height: 1.55; }
+
+    /* Map in left pane */
+    .map-cell { grid-column: 1 / -1; border-right: none; padding: 10px; }
+    .map-cell iframe { width: 100%; height: 180px; border: none; border-radius: 6px; }
+    .map-link-sm {
+      display: block; text-align: center; padding: 10px;
+      color: var(--blue); font-size: 12px; text-decoration: underline;
+    }
+
+    /* Red section divider in left pane */
+    .data-divider {
+      height: 3px; background: linear-gradient(90deg, var(--red), var(--red-lt), transparent);
+      border-radius: 2px; margin: 4px 0;
+    }
+
+    /* ── ANALYSIS FORM (right pane) ── */
+    .form-content { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+    .form-section {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .form-section-head {
+      padding: 8px 12px; border-bottom: 1px solid var(--border);
+      font-size: 12px; font-weight: 700; color: var(--text);
+      background: var(--card);
+    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; }
+    .form-cell {
+      padding: 8px 10px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 4px; background: #fff;
+    }
+    .form-cell:nth-child(even) { border-right: none; }
+    .form-cell.full { grid-column: 1 / -1; border-right: none; }
+    .form-cell label { font-size: 10px; color: var(--muted); font-weight: 500; }
+    .form-cell input, .form-cell select, .form-cell textarea {
+      border: 1px solid var(--border); border-radius: 5px;
+      padding: 5px 8px; font-size: 12px; color: var(--text);
+      font-family: inherit; background: #fff; width: 100%;
+      transition: border-color 0.12s;
+    }
+    .form-cell input:focus, .form-cell select:focus, .form-cell textarea:focus {
+      outline: none; border-color: var(--blue);
+      box-shadow: 0 0 0 2px rgba(43,108,176,0.12);
+    }
+    .form-cell textarea { resize: vertical; min-height: 60px; }
+    .form-cell.readonly input, .form-cell.readonly textarea {
+      background: var(--bg); color: var(--muted); cursor: default;
+    }
+
+    /* Calculated / derived display */
+    .calc-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 12px; background: var(--blue-bg); font-size: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .calc-label { color: var(--muted); }
+    .calc-value { font-weight: 700; color: var(--blue); }
+    .calc-value.highlight { color: var(--red); font-size: 14px; }
+
+    /* ── SUBMIT BAR (sticky bottom of right pane) ── */
+    .submit-bar {
+      flex-shrink: 0; position: sticky; bottom: 0; z-index: 10;
+      background: var(--card); border-top: 1px solid var(--border);
+      padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    }
+    .btn-submit {
+      background: var(--blue); color: #fff; border: none;
+      padding: 9px 22px; border-radius: 7px; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: background 0.15s;
+    }
+    .btn-submit:hover    { background: var(--blue-dk); }
+    .btn-submit:disabled { background: var(--muted); cursor: not-allowed; }
+    .btn-clear {
+      background: transparent; color: var(--muted); border: 1px solid var(--border);
+      padding: 8px 14px; border-radius: 7px; font-size: 12px; cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-clear:hover { border-color: var(--red); color: var(--red); }
+    .submit-spacer { flex: 1; }
+    .submit-status { font-size: 12px; }
+    .submit-status.ok  { color: var(--green); font-weight: 600; }
+    .submit-status.err { color: var(--red); }
+
+    /* ── PUBLISH TOGGLE ── */
+    .publish-toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .toggle-sw { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .toggle-sw input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; cursor: pointer; background: var(--border);
+      border-radius: 20px; transition: background 0.2s;
+    }
+    .toggle-slider:before {
+      content: ''; position: absolute; width: 14px; height: 14px;
+      left: 3px; top: 3px; background: #fff; border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle-sw input:checked + .toggle-slider { background: var(--green); }
+    .toggle-sw input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+    /* ── ACCESS GATE / LOGIN GATE ── */
+    #gate {
+      flex: 1; display: none; align-items: center; justify-content: center;
+    }
+    .gate-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 40px 32px; text-align: center;
+      max-width: 360px; box-shadow: var(--shadow);
+    }
+    .gate-card .icon { font-size: 36px; margin-bottom: 12px; }
+    .gate-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .gate-card p  { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .btn-gate-login {
+      background: var(--blue); color: #fff; border: none;
+      padding: 11px 28px; border-radius: 7px; font-size: 14px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+    }
+
+    /* ── MOBILE FALLBACK ── */
+    @media (max-width: 768px) {
+      html, body { overflow: auto; }
+      .split-panes { flex-direction: column; overflow: visible; }
+      .pane-left, .pane-right {
+        flex: none; max-width: 100%; min-width: 0;
+        border-right: none; border-bottom: 2px solid var(--border);
+        overflow: visible; min-height: auto;
+      }
+      .search-input { flex: 1; }
+    }
+
+    /* ── PRINT ── */
+    @media print {
+      html, body { overflow: visible; height: auto; }
+      .navbar, .search-bar, .submit-bar, .pane-hdr { display: none !important; }
+      .split-panes { flex-direction: column; overflow: visible; }
+      .pane-left, .pane-right { overflow: visible; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="navbar-brand-icon">拍</div>
+    <div>
+      <div class="navbar-brand-main">法拍管理系统</div>
+      <div class="navbar-brand-sub">快速分析</div>
+    </div>
+  </div>
+  <div class="navbar-links">
+    <a href="/monospages/">首页</a>
+    <a href="/monospages/batches/">批次总览</a>
+    <a href="/monospages/field/">现地调查</a>
+    <a href="/monospages/analysis/" class="active">快速分析</a>
+    <a href="/monospages/admin/" class="admin-link" id="nav-admin-link" style="display:none;">⚙ 管理</a>
+  </div>
+  <div class="navbar-right">
+    <button class="btn-nav" onclick="window.print()">🖨 打印</button>
+    <button id="btn-nav-login" class="btn-nav-login" onclick="authLogin()">登录</button>
+    <div id="nav-auth-user">
+      <div class="nav-avatar">
+        <img id="nav-avatar-img" src="" alt="" onerror="this.style.display='none';document.getElementById('nav-avatar-init').style.display='flex';">
+        <span id="nav-avatar-init" style="display:none;"></span>
+      </div>
+      <span class="nav-username" id="nav-username"></span>
+      <button class="btn-logout" onclick="authLogout()">退出</button>
+    </div>
+  </div>
+</nav>
+
+<!-- SEARCH BAR -->
+<div class="search-bar" id="search-bar" style="display:none;">
+  <span class="search-bar-label">物件编号</span>
+  <input type="text" class="search-input" id="search-input"
+    placeholder="例：TYO-003" autocomplete="off" autocorrect="off"
+    onkeydown="if(event.key==='Enter')doSearch()">
+  <button class="btn-search" onclick="doSearch()">载入</button>
+  <span class="search-status" id="search-status"></span>
+  <div class="search-spacer"></div>
+  <div id="prop-badge-wrap" style="display:none;">
+    <div class="prop-badge">
+      <span id="badge-name"></span>
+      <span class="close-btn" onclick="clearProp()" title="清除">×</span>
+    </div>
+  </div>
+</div>
+
+<!-- ACCESS GATE -->
+<div id="gate">
+  <div class="gate-card">
+    <div class="icon">🔒</div>
+    <h3 id="gate-title">请先登录</h3>
+    <p id="gate-msg">需要登录才能使用快速分析功能。</p>
+    <button class="btn-gate-login" onclick="authLogin()">登录 / Login</button>
+  </div>
+</div>
+
+<!-- SPLIT PANES -->
+<div class="split-panes" id="split-panes" style="display:none;">
+
+  <!-- LEFT: Property Data -->
+  <div class="pane-left">
+    <div class="pane-hdr">
+      物件数据
+      <span class="pane-badge">只读</span>
+      <div class="pane-hdr-spacer"></div>
+      <span id="left-prop-name" style="font-size:11px;font-weight:400;opacity:0.7;"></span>
+    </div>
+    <div id="left-content">
+      <div class="pane-empty" id="left-empty">
+        <div class="empty-icon">📋</div>
+        <div class="empty-txt">在上方输入物件编号<br>物件全部数据将显示在此处</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Analysis Form -->
+  <div class="pane-right">
+    <div class="pane-hdr right-hdr">
+      投资分析
+      <span class="pane-badge" id="right-role-badge">编辑员</span>
+      <div class="pane-hdr-spacer"></div>
+    </div>
+    <div id="right-content">
+      <div class="pane-empty" id="right-empty">
+        <div class="empty-icon">📊</div>
+        <div class="empty-txt">载入物件后<br>在此处填写投资分析</div>
+      </div>
+    </div>
+
+    <!-- Submit bar (always visible when data loaded) -->
+    <div class="submit-bar" id="submit-bar" style="display:none;">
+      <button class="btn-submit" id="btn-submit" onclick="doSubmit()">提交分析</button>
+      <button class="btn-clear" onclick="clearForm()">清空表单</button>
+      <div class="submit-spacer"></div>
+      <div class="publish-toggle" id="publish-toggle" style="display:none;">
+        <label class="toggle-sw">
+          <input type="checkbox" id="toggle-publish" onchange="onPublishToggle(this)">
+          <span class="toggle-slider"></span>
+        </label>
+        <span>发布分析结果</span>
+      </div>
+      <span class="submit-status" id="submit-status"></span>
+    </div>
+  </div>
+
+</div><!-- /split-panes -->
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   CONFIG
+───────────────────────────────────────────────────────────── */
+const BATCH = {
+  id: '2026-5a',
+  sheet_id: '13YPzFbgNnrEQSTTuOXLaevapiL3OW_3L',
+  sheet_name: '入例表【土地+建物】'
+};
+const GOOGLE_MAPS_API_KEY = '';
+const APPS_SCRIPT_URL     = '';
+
+/* ─────────────────────────────────────────────────────────────
+   STATE
+───────────────────────────────────────────────────────────── */
+let _auth0 = null, _token = null, _role = null;
+let _prop  = null;
+
+function _authHeaders(extra) {
+  return Object.assign({ 'Authorization': 'Bearer ' + _token }, extra || {});
+}
+
+async function hydrateAnalysisRecord(propId) {
+  if (!_token || !propId) return;
+  try {
+    const q = `batch_id=${encodeURIComponent(BATCH.id)}&prop_id=${encodeURIComponent(propId)}`;
+    const r = await fetch('/api/monospages-analysis-record?' + q, {
+      headers: _authHeaders()
+    });
+    if (!r.ok) return;
+    const d = await r.json();
+    const fields = (d && d.record && d.record.fields) || {};
+    Object.assign(_prop, fields);
+  } catch (_) {}
+}
+
+/* ─────────────────────────────────────────────────────────────
+   AUTH0
+───────────────────────────────────────────────────────────── */
+const AUTH0_DOMAIN    = 'dev-5z54p7b3gul1eb27.jp.auth0.com';
+const AUTH0_CLIENT_ID = 'oGyqJ3R55KbNjZ6hOru7tpCaPgAHe5Ph';
+const REDIRECT_URI    = window.location.origin + '/monospages/analysis/';
+
+async function initAuth() {
+  _auth0 = new window.auth0.Auth0Client({
+    domain: AUTH0_DOMAIN, clientId: AUTH0_CLIENT_ID,
+    authorizationParams: { redirect_uri: REDIRECT_URI, scope: 'openid profile email offline_access' },
+    cacheLocation: 'localstorage', useRefreshTokens: true
+  });
+  if (location.search.includes('code=') && location.search.includes('state=')) {
+    try { await _auth0.handleRedirectCallback(); } catch(e) {}
+    history.replaceState({}, document.title, location.pathname);
+  } else { try { await _auth0.checkSession(); } catch(_) {} }
+  await applyAuth();
+}
+
+async function applyAuth() {
+  let ok = false;
+  try { ok = await _auth0.isAuthenticated(); } catch(_) {}
+  if (!ok) {
+    document.getElementById('gate').style.display = 'flex';
+    return;
+  }
+  const user = await _auth0.getUser();
+  _token = await _auth0.getTokenSilently();
+  const name = user.name || user.email || '';
+  document.getElementById('nav-username').textContent = name;
+  const img = document.getElementById('nav-avatar-img');
+  const ini = document.getElementById('nav-avatar-init');
+  if (user.picture) { img.src = user.picture; img.style.display=''; ini.style.display='none'; }
+  else { img.style.display='none'; ini.textContent=name[0]?.toUpperCase()||'?'; ini.style.display='flex'; }
+  document.getElementById('btn-nav-login').style.display = 'none';
+  document.getElementById('nav-auth-user').style.display = 'flex';
+
+  try {
+    const r = await fetch('/api/monospages-admin', { headers: {'Authorization':'Bearer '+_token} });
+    if (r.ok) { const d = await r.json(); _role = d.monospages_role || 'viewer_basic'; }
+  } catch(_) {}
+  if (!_role) _role = 'viewer_basic';
+
+  document.getElementById('nav-admin-link').style.display = _role==='admin' ? '' : 'none';
+
+  if (_role !== 'worker' && _role !== 'admin') {
+    document.getElementById('gate-title').textContent = '访问受限';
+    document.getElementById('gate-msg').textContent   = '快速分析页面仅限编辑员和管理员使用。如需权限请联系管理员。';
+    document.getElementById('gate').style.display = 'flex';
+    return;
+  }
+
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('search-bar').style.display = '';
+  document.getElementById('split-panes').style.display = '';
+  document.getElementById('right-role-badge').textContent = _role === 'admin' ? '管理员' : '编辑员';
+
+  /* Restore last search */
+  const last = localStorage.getItem('analysis_last_prop');
+  if (last) { document.getElementById('search-input').value = last; doSearch(true); }
+}
+
+function authLogin()  { if(_auth0) _auth0.loginWithRedirect({authorizationParams:{redirect_uri:REDIRECT_URI}}); }
+function authLogout() { if(_auth0) _auth0.logout({logoutParams:{returnTo:window.location.origin+'/monospages/'}}); }
+
+/* ─────────────────────────────────────────────────────────────
+   MOCK DATA
+───────────────────────────────────────────────────────────── */
+const MOCK = {
+  '物件命名':'TYO-003','法拍文件编号':'R07K-00003',
+  '入扎日期始':'2026-05-21','入扎日期终':'2026-05-28','开扎日期':'2026-06-03',
+  '贩卖决定日':'2026-06-10','裁判所':'東京地方裁判所',
+  '标的':'所有権','保证金':3450000,'卖却基准价额':36800000,'买受可能价额':34500000,
+  '固定资产税':280000,'都市计划税':85000,
+  '物件明细书特记':'区分所有建物。管理費・修繕積立金滞納なし。',
+  '法律关系描述':'抵当権設定あり（第1順位）。占有者なし。',
+  '所在地县市':'東京都','所在地区域':'文京区','建物名称':'本郷コートハウス',
+  '住居表示':'東京都文京区本郷5-26-3','位置交通':'都営三田線白山駅徒歩5分',
+  '构造':'RC造','面积（专有）':78.2,'面积（建物）':82.5,'面积（地积）':610,
+  '建物初建':'2016-03','建物年限':8,'楼层':3,'总户数':12,
+  '建蔽率':60,'容积率':200,'用途地域':'第1種住居地域',
+  '管理费':15000,'修缮基金':12000,'滞纳':0,'占有者及状况':'空室',
+  '目的外物件':'なし','初判备注':'立地良好。築浅。占有なし。積極的に検討する。',
+  // pre-filled analysis
+  '第三方评估价格':42000000,'AI评估价格':39500000,'竞争性报价预估':36000000,
+  '室内清理':80000,'内装想定':500000,'入居者赔偿':0,'驱逐费用':0,'其他1':50000,
+  '预期利润':3800000,'收益率（年）':8.5,'关注级别':'A',
+  '要点':'築浅・占有なし・文京区好立地。即座に転売または賃貸可能。',
+  '处置方式':'修缮出租','修缮出租':120000,'收益预计':1440000,'预计收益率':4.2,
+  '可行入扎价格':34000000,'按入扎价格收益率':11.2,'二判备注':'入扎推奨。ROI良好。'
+};
+
+/* ─────────────────────────────────────────────────────────────
+   SEARCH
+───────────────────────────────────────────────────────────── */
+async function doSearch(silent) {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  const status = document.getElementById('search-status');
+  if (!silent) { status.className='search-status loading'; status.textContent='⏳ 载入中…'; }
+
+  _prop = null;
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${BATCH.sheet_id}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(BATCH.sheet_name)}`;
+    const res  = await fetch(url);
+    const text = await res.text();
+    const s = text.indexOf('{'), e = text.lastIndexOf('}');
+    if (s>=0 && e>=0) {
+      const table = JSON.parse(text.slice(s,e+1)).table;
+      _prop = findProp(table, q);
+    }
+  } catch(_) {}
+
+  if (!_prop && q === MOCK['物件命名']) _prop = MOCK;
+  if (!_prop && !silent) {
+    status.className='search-status error'; status.textContent=`✗ 未找到「${q}」`;
+    return;
+  }
+  if (!_prop) return;
+
+  status.textContent = '';
+  localStorage.setItem('analysis_last_prop', q);
+  document.getElementById('badge-name').textContent = _prop['物件命名'];
+  document.getElementById('prop-badge-wrap').style.display = '';
+  document.getElementById('left-prop-name').textContent = _prop['物件命名'];
+  await hydrateAnalysisRecord(_prop['物件命名'] || _prop['法拍文件编号'] || '');
+  renderLeft(_prop);
+  renderRight(_prop);
+  document.getElementById('left-empty').style.display  = 'none';
+  document.getElementById('right-empty').style.display = 'none';
+  document.getElementById('submit-bar').style.display  = '';
+  if (_role === 'admin') document.getElementById('publish-toggle').style.display = '';
+}
+
+function findProp(table, q) {
+  if (!table?.rows) return null;
+  const rows = table.rows;
+  const nProps = table.cols.length - 2;
+  for (let p = 0; p < nProps; p++) {
+    const obj = {};
+    for (let r = 0; r < rows.length; r++) {
+      const fn = rows[r]?.c?.[1]?.v;
+      const v  = rows[r]?.c?.[p+2]?.v;
+      if (fn != null) obj[fn] = v ?? '';
+    }
+    if (String(obj['物件命名'])===q || String(obj['法拍文件编号'])===q) return obj;
+  }
+  return null;
+}
+
+function clearProp() {
+  _prop = null;
+  document.getElementById('search-input').value = '';
+  document.getElementById('prop-badge-wrap').style.display = 'none';
+  document.getElementById('left-prop-name').textContent = '';
+  document.getElementById('left-content').innerHTML = '';
+  document.getElementById('left-content').appendChild(Object.assign(document.createElement('div'), {id:'left-empty',className:'pane-empty',innerHTML:'<div class="empty-icon">📋</div><div class="empty-txt">在上方输入物件编号<br>物件全部数据将显示在此处</div>'}));
+  document.getElementById('right-content').innerHTML = '';
+  document.getElementById('right-content').appendChild(Object.assign(document.createElement('div'), {id:'right-empty',className:'pane-empty',innerHTML:'<div class="empty-icon">📊</div><div class="empty-txt">载入物件后<br>在此处填写投资分析</div>'}));
+  document.getElementById('submit-bar').style.display = 'none';
+  localStorage.removeItem('analysis_last_prop');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER LEFT PANE (all property data, read-only)
+───────────────────────────────────────────────────────────── */
+function fmt(v, f) {
+  if (v===null||v===undefined||v==='') return null;
+  switch(f) {
+    case 'currency_jpy':         return fmtJpy(v,false);
+    case 'currency_jpy_monthly': return fmtJpy(v,true);
+    case 'area_m2':              return Number(v).toFixed(2)+' m²';
+    case 'percent':              return Number(v).toFixed(1)+'%';
+    case 'years':                return Number(v)+'年';
+    case 'number':               return String(v);
+    default: return String(v);
+  }
+}
+function fmtJpy(v,mo) {
+  const n=Number(v);
+  if(isNaN(n)) return String(v);
+  const b=n>=1e8?(n/1e8).toFixed(1).replace(/\.0$/,'')+'億':n>=1e4?Math.round(n/1e4)+'万':n.toLocaleString();
+  return '¥'+b+'円'+(mo?'/月':'');
+}
+
+function frow(l, v, f, basic, full) {
+  const val = fmt(v,f);
+  const dot  = basic ? '<span class="rdot"></span>' : '';
+  const cls  = [full?'full':'', f==='currency_jpy'&&basic?'price':'', f==='text_long'?'long':''].filter(Boolean).join(' ');
+  return `<div class="field-cell ${full?'full':''}">
+    <div class="field-lbl">${dot}${l}</div>
+    <div class="field-val ${val?cls:cls+' empty'}">${val||'—'}</div>
+  </div>`;
+}
+
+function makeSubsection(title, rows) {
+  return `<div class="subsection">
+    <div class="subsection-head"><span class="subsection-dot"></span>${title}</div>
+    <div class="field-grid">${rows.join('')}</div>
+  </div>`;
+}
+
+function renderLeft(p) {
+  const c = document.getElementById('left-content');
+  const addr = p['住居表示']||'';
+  const mapHtml = addr
+    ? (GOOGLE_MAPS_API_KEY
+        ? `<div class="field-cell map-cell"><iframe src="https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(addr)}&language=ja" allowfullscreen loading="lazy"></iframe></div>`
+        : `<div class="field-cell map-cell"><a class="map-link-sm" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank">🗺 ${addr}</a></div>`)
+    : '';
+
+  c.innerHTML = `<div class="data-content">
+    <div class="data-section-title">物件数据</div>
+    ${makeSubsection('竞买程序信息', [
+      frow('入扎日期始',p['入扎日期始'],'text',true),frow('入扎日期终',p['入扎日期终'],'text',true),
+      frow('开扎日期',p['开扎日期'],'text',true),frow('贩卖决定日',p['贩卖决定日'],'text',true),
+      frow('裁判所',p['裁判所'],'text',true,true),
+      frow('入札价格',p['入札价格'],'currency_jpy',false),frow('中标价格',p['中标价格'],'currency_jpy',false)
+    ])}
+    ${makeSubsection('标的价格', [
+      frow('标的',p['标的'],'text',true),frow('保证金',p['保证金'],'currency_jpy',true),
+      frow('卖却基准价额',p['卖却基准价额'],'currency_jpy',true),frow('买受可能价额',p['买受可能价额'],'currency_jpy',true),
+      frow('固定资产税',p['固定资产税'],'currency_jpy',true),frow('都市计划税',p['都市计划税'],'currency_jpy',true),
+      frow('敷地利用权价格',p['敷地利用权价格'],'currency_jpy',false),frow('建物价格',p['建物价格'],'currency_jpy',false),
+      frow('积算价格',p['积算价格'],'currency_jpy',false),frow('收益价格',p['收益价格'],'currency_jpy',false)
+    ])}
+    ${makeSubsection('基础信息', [
+      frow('所在地区域',p['所在地区域'],'text',true),frow('建物名称',p['建物名称'],'text',true),
+      frow('住居表示',p['住居表示'],'text',true,true),frow('位置交通',p['位置交通'],'text',true,true),
+      mapHtml,
+      frow('所在地县市',p['所在地县市'],'text',false),frow('地番号',p['地番号'],'text',false),
+      frow('现况地目',p['现况地目'],'text',false),frow('付近の状況',p['付近の状況'],'text',false,true)
+    ])}
+    ${makeSubsection('物件信息', [
+      frow('构造',p['构造'],'text',true),frow('标的',p['标的'],'text',true),
+      frow('面积（专有）',p['面积（专有）'],'area_m2',true),frow('面积（建物）',p['面积（建物）'],'area_m2',true),
+      frow('面积（地积）',p['面积（地积）'],'area_m2',true),frow('建物初建',p['建物初建'],'text',true),
+      frow('建物年限',p['建物年限'],'years',true),frow('楼层',p['楼层'],'number',true),
+      frow('总户数',p['总户数'],'number',true),frow('建蔽率',p['建蔽率'],'percent',true),
+      frow('容积率',p['容积率'],'percent',true),frow('用途地域',p['用途地域'],'text',false),
+      frow('延床面积',p['延床面积'],'area_m2',false),frow('建物状况',p['建物状况'],'text',false),
+      frow('设备',p['设备'],'text_long',false,true)
+    ])}
+    ${makeSubsection('关联费用', [
+      frow('管理费',p['管理费'],'currency_jpy_monthly',false),frow('修缮基金',p['修缮基金'],'currency_jpy_monthly',true),
+      frow('滞纳',p['滞纳'],'currency_jpy',true),frow('驻车费',p['驻车费'],'currency_jpy_monthly',false)
+    ])}
+    ${makeSubsection('物件陈述 & 占有', [
+      frow('物件明细书特记',p['物件明细书特记'],'text_long',true,true),
+      frow('法律关系描述',p['法律关系描述'],'text_long',false,true),
+      frow('占有者及状况',p['占有者及状况'],'text',true),frow('目的外物件',p['目的外物件'],'text_long',true,true)
+    ])}
+    ${makeSubsection('初判', [frow('初判备注',p['初判备注'],'text_long',true,true)])}
+    <div class="data-divider"></div>
+    <div class="data-section-title">现地调查（快照）</div>
+    ${makeSubsection('现状调查备注', [
+      frow('现场考察',p['现场考察'],'text_long',false,true),
+      frow('周边商业',p['周边商业'],'text_long',false,true),
+      frow('公共设施',p['公共设施'],'text_long',false,true),
+      frow('噪音',p['噪音'],'text_long',false,true)
+    ])}
+  </div>`;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER RIGHT PANE (editable analysis form)
+───────────────────────────────────────────────────────────── */
+function renderRight(p) {
+  const canEdit = _role==='worker'||_role==='admin';
+  const ro = canEdit ? '' : 'readonly';
+  const rd = canEdit ? '' : 'disabled';
+
+  function inp(label, key, type, cls) {
+    const v = p[key]??'';
+    return `<div class="form-cell ${cls||''}${canEdit?'':' readonly'}">
+      <label>${label}</label>
+      <input type="${type||'text'}" data-key="${key}" value="${v}" ${ro}>
+    </div>`;
+  }
+  function sel(label, key, opts, cls) {
+    const v = p[key]??'';
+    const os = opts.map(o=>`<option value="${o}"${o==v?' selected':''}>${o}</option>`).join('');
+    return `<div class="form-cell ${cls||''}${canEdit?'':' readonly'}">
+      <label>${label}</label>
+      <select data-key="${key}" ${rd}><option value="">—</option>${os}</select>
+    </div>`;
+  }
+  function txt(label, key, cls) {
+    const v = p[key]??'';
+    return `<div class="form-cell full ${cls||''}${canEdit?'':' readonly'}">
+      <label>${label}</label>
+      <textarea data-key="${key}" ${ro}>${v}</textarea>
+    </div>`;
+  }
+
+  /* Calculated display (bid price basis) */
+  const bid   = Number(p['买受可能价额'])||0;
+  const costs = (Number(p['室内清理'])||0)+(Number(p['内装想定'])||0)+(Number(p['入居者赔偿'])||0)+(Number(p['驱逐费用'])||0)+(Number(p['其他1'])||0);
+  const calcHtml = bid ? `
+    <div class="calc-row"><span class="calc-label">买受可能价额</span><span class="calc-value">${fmtJpy(bid,false)}</span></div>
+    <div class="calc-row"><span class="calc-label">处置费用合计</span><span class="calc-value">${fmtJpy(costs,false)}</span></div>
+    <div class="calc-row"><span class="calc-label">可行入扎价格</span><span class="calc-value highlight" id="calc-bid">（填写后自动更新）</span></div>` : '';
+
+  document.getElementById('right-content').innerHTML = `
+    <div class="form-content">
+      <div class="form-section">
+        <div class="form-section-head">现状调查数值</div>
+        <div class="form-grid">
+          ${inp('第三方评估价格（円）','第三方评估价格','number')}
+          ${inp('AI评估价格（円）','AI评估价格','number')}
+          ${inp('竞争性报价预估（円）','竞争性报价预估','number')}
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-head">处置费用（円）</div>
+        <div class="form-grid">
+          ${inp('室内清理','室内清理','number')}
+          ${inp('内装想定','内装想定','number')}
+          ${inp('入居者赔偿','入居者赔偿','number')}
+          ${inp('驱逐费用','驱逐费用','number')}
+          ${inp('其他1','其他1','number')}
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-head">收益</div>
+        ${calcHtml}
+        <div class="form-grid">
+          ${inp('预期利润（円）','预期利润','number')}
+          ${inp('收益率 年（%）','收益率（年）','number')}
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-head">二判</div>
+        <div class="form-grid">${txt('二判备注','二判备注')}</div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-head">机会分析</div>
+        <div class="form-grid">
+          ${sel('关注级别','关注级别',['A','B','C','D'])}
+          ${sel('处置方式','处置方式',['修缮出租','修整转售','其他'])}
+          ${txt('要点','要点')}
+          ${inp('修缮出租 月租（円）','修缮出租','number')}
+          ${inp('收益预计（円）','收益预计','number')}
+          ${inp('预计收益率（%）','预计收益率','number')}
+          ${inp('修整转售（円）','修整转售','number')}
+          ${inp('持有时间','持有时间','text')}
+          ${inp('转售价格（円）','转售价格','number')}
+          ${inp('转售收益（円）','转售收益','number')}
+          ${inp('转售收益年化（%）','转售收益年化','number')}
+          ${inp('可行入扎价格（円）','可行入扎价格','number')}
+          ${inp('按入扎价格收益率（%）','按入扎价格收益率','number')}
+        </div>
+      </div>
+    </div>`;
+
+  /* Update calc display on input */
+  document.querySelectorAll('[data-key="可行入扎价格"]').forEach(el =>
+    el.addEventListener('input', updateCalc));
+  updateCalc();
+}
+
+function updateCalc() {
+  const el = document.getElementById('calc-bid');
+  if (!el) return;
+  const v = document.querySelector('[data-key="可行入扎价格"]')?.value;
+  el.textContent = v ? fmtJpy(Number(v), false) : '（填写后自动更新）';
+}
+
+function clearForm() {
+  document.querySelectorAll('.pane-right [data-key]').forEach(el => {
+    if (el.tagName === 'SELECT') el.value = '';
+    else el.value = '';
+  });
+  updateCalc();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SUBMIT
+───────────────────────────────────────────────────────────── */
+async function doSubmit() {
+  const btn = document.getElementById('btn-submit');
+  const st  = document.getElementById('submit-status');
+  btn.disabled = true;
+  st.className = 'submit-status'; st.textContent = '⏳ 提交中…';
+
+  const propId = _prop['物件命名'] || _prop['法拍文件编号'] || '';
+  const payload = { prop_id: propId, batch_id: BATCH.id, fields: {} };
+  document.querySelectorAll('.pane-right [data-key]').forEach(el => {
+    payload.fields[el.dataset.key] = el.value;
+  });
+
+  try {
+    const r = await fetch('/api/monospages-analysis-record', {
+      method: 'POST',
+      headers: _authHeaders({ 'Content-Type':'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    await hydrateAnalysisRecord(propId); // instant refresh from persisted source
+    renderLeft(_prop);
+    renderRight(_prop);
+    st.className = 'submit-status ok'; st.textContent = '✓ 已提交';
+  } catch(e) {
+    st.className = 'submit-status err'; st.textContent = '✗ ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function onPublishToggle(cb) {
+  /* TODO: toggle published state in Sheet / config */
+  const st = document.getElementById('submit-status');
+  st.className = 'submit-status ok';
+  st.textContent = cb.checked ? '✓ 已发布' : '✓ 已撤回';
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BOOT
+───────────────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', initAuth);
+</script>
+</body>
+</html>

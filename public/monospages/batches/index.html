@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>批次总览 — 法拍管理系统</title>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+  <!-- ⚠️ TEST MODE — set TEST_MODE=false before production -->
+  <script>
+  (function () {
+    window.TEST_MODE = false;            // test shim disabled
+    if (!window.TEST_MODE) return;
+
+    /* Fake Auth0 user (admin role) */
+    var _fake = { name:'测试管理员', email:'test@example.com', picture:null, sub:'test|000' };
+    var _client = {
+      isAuthenticated:      function(){ return Promise.resolve(true); },
+      getUser:              function(){ return Promise.resolve(_fake); },
+      getTokenSilently:     function(){ return Promise.resolve('test-token-000'); },
+      handleRedirectCallback: function(){ return Promise.resolve({}); },
+      checkSession:         function(){ return Promise.resolve(); },
+      loginWithRedirect:    function(){ /* no-op in test mode */ },
+      logout: function(o){
+        location.href = (o && o.logoutParams && o.logoutParams.returnTo)
+                        || '/monospages/';
+      },
+    };
+
+    /* Override Auth0Client constructor (most pages) */
+    if (window.auth0) window.auth0.Auth0Client = function(){ return _client; };
+    /* Override createAuth0Client helper (batches page) */
+    window.createAuth0Client = function(){ return Promise.resolve(_client); };
+
+    /* Intercept fetch — fake the role API, pass everything else through */
+    var _orig = window.fetch.bind(window);
+    window.fetch = function(url, opts) {
+      var u = typeof url === 'string' ? url : '';
+      if (u.indexOf('/api/monospages-admin') !== -1) {
+        return Promise.resolve(new Response(
+          JSON.stringify({ monospages_role:'admin', email:'test@example.com', name:'测试管理员' }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      if (u.indexOf('/api/monospages-config') !== -1 && opts && opts.method === 'POST') {
+        return Promise.resolve(new Response(
+          JSON.stringify({ ok:true }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      return _orig(url, opts);
+    };
+  })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Variables ── */
+    :root {
+      --blue:       #2B6CB0;
+      --blue-dk:    #215387;
+      --blue-lt:    #3a80c9;
+      --blue-bg:    #EBF4FF;
+      --orange:     #f76a0c;
+      --orange-lt:  #ff8534;
+      --orange-bg:  #fff3eb;
+      --red:        #c0392b;
+      --bg:         #F7FAFC;
+      --bg2:        #EDF2F7;
+      --card:       #ffffff;
+      --border:     #E2E8F0;
+      --text:       #1A202C;
+      --text-body:  #2D3748;
+      --muted:      #718096;
+      --success:    #38a169;
+      --warn:       #d69e2e;
+      --radius:     10px;
+      --shadow-sm:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md:  0 4px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+                   'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      color: var(--text-body);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    a { text-decoration: none; color: inherit; }
+
+    /* ══ NAVBAR ══ */
+    .navbar {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--blue-dk);
+      border-bottom: 3px solid var(--orange);
+      display: flex; align-items: center;
+      padding: 0 28px; height: 56px; gap: 0;
+      box-shadow: 0 2px 8px rgba(33,83,135,0.25);
+    }
+    .navbar-brand {
+      display: flex; align-items: center; gap: 10px;
+      margin-right: 36px; flex-shrink: 0;
+    }
+    .navbar-brand-icon {
+      width: 30px; height: 30px;
+      background: var(--orange); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; color: #fff;
+    }
+    .navbar-brand-text { display: flex; flex-direction: column; }
+    .navbar-brand-main { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.2; }
+    .navbar-brand-sub  { font-size: 10px; color: rgba(255,255,255,0.42); line-height: 1; }
+    .navbar-links { display: flex; align-items: center; gap: 4px; flex: 1; }
+    .navbar-links a {
+      color: rgba(255,255,255,0.75);
+      font-size: 13px; font-weight: 500;
+      padding: 6px 14px; border-radius: 6px;
+      transition: background 0.15s, color 0.15s; white-space: nowrap;
+    }
+    .navbar-links a:hover  { background: rgba(255,255,255,0.1); color: #fff; }
+    .navbar-links a.active { color: #fff; background: rgba(43,108,176,0.5); }
+    .navbar-links a.admin-link { color: rgba(247,106,12,0.9); margin-left: 8px; }
+    .navbar-links a.admin-link:hover { background: rgba(247,106,12,0.15); color: var(--orange-lt); }
+    .navbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .btn-login {
+      background: var(--orange); color: #fff; border: none;
+      padding: 7px 18px; border-radius: 6px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-login:hover { background: var(--orange-lt); }
+    .btn-logout {
+      background: transparent; color: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 5px 12px; border-radius: 6px;
+      font-size: 12px; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-logout:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
+    .nav-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--blue); display: flex; align-items: center;
+      justify-content: center; font-size: 13px; font-weight: 700;
+      color: #fff; overflow: hidden; flex-shrink: 0;
+    }
+    .nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .nav-username {
+      font-size: 13px; color: rgba(255,255,255,0.8);
+      max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #nav-auth-user { display: none; align-items: center; gap: 8px; }
+
+    /* ══ PAGE HEADER ══ */
+    .page-header {
+      background: var(--blue-dk);
+      padding: 28px 32px 24px;
+      position: relative; overflow: hidden;
+    }
+    .page-header::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1200&q=60&auto=format&fit=crop');
+      background-size: cover; background-position: center 40%;
+      opacity: 0.12;
+    }
+    .page-header-inner {
+      position: relative; z-index: 1;
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+    }
+    .breadcrumb {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: rgba(255,255,255,0.5);
+      margin-bottom: 10px;
+    }
+    .breadcrumb a { color: rgba(255,255,255,0.5); }
+    .breadcrumb a:hover { color: rgba(255,255,255,0.85); }
+    .breadcrumb-sep { opacity: 0.4; }
+    .breadcrumb-cur { color: rgba(255,255,255,0.85); }
+    .page-title {
+      font-size: 22px; font-weight: 700; color: #fff;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .page-title-tag {
+      font-size: 11px; font-weight: 700;
+      background: var(--orange); color: #fff;
+      padding: 2px 10px; border-radius: 20px; letter-spacing: 0.5px;
+    }
+    .page-subtitle { font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 5px; }
+    .header-stats {
+      display: flex; gap: 16px; flex-shrink: 0;
+    }
+    .hstat {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 8px; padding: 10px 18px;
+      text-align: center; min-width: 80px;
+    }
+    .hstat-num { font-size: 22px; font-weight: 700; color: #fff; line-height: 1; }
+    .hstat-lbl { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 3px; }
+
+    /* ══ MAIN CONTENT ══ */
+    .main-wrap { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+
+    /* ══ FILTER / TOOLBAR BAR ══ */
+    .toolbar {
+      display: flex; align-items: center; gap: 10px;
+      flex-wrap: wrap; margin-bottom: 24px;
+    }
+    .toolbar-left { display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap; }
+    .toolbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+    .filter-group {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 5px 10px;
+    }
+    .filter-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    select.filter-select {
+      border: none; outline: none; background: transparent;
+      font-size: 13px; color: var(--text); font-family: inherit;
+      cursor: pointer; padding: 2px 4px;
+    }
+    .search-box {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 5px 12px;
+    }
+    .search-box input {
+      border: none; outline: none; background: transparent;
+      font-size: 13px; color: var(--text); font-family: inherit;
+      width: 160px;
+    }
+    .search-box input::placeholder { color: var(--muted); }
+
+    /* toggle buttons for status filter */
+    .status-tabs { display: flex; gap: 3px; }
+    .status-tab {
+      padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1px solid transparent; transition: all 0.15s;
+      color: var(--muted); background: var(--card); border-color: var(--border);
+    }
+    .status-tab:hover { border-color: var(--blue); color: var(--blue); }
+    .status-tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+    /* action buttons */
+    .btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 14px; border-radius: 7px; font-size: 13px;
+      font-weight: 600; cursor: pointer; transition: all 0.15s; border: none;
+    }
+    .btn-outline {
+      background: var(--card); border: 1px solid var(--border); color: var(--text-body);
+    }
+    .btn-outline:hover { border-color: var(--blue); color: var(--blue); }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { background: var(--blue-lt); }
+    .btn svg { flex-shrink: 0; }
+
+    /* save indicator */
+    .saved-badge {
+      font-size: 11px; color: var(--success); display: none;
+      align-items: center; gap: 3px;
+    }
+
+    /* ══ BATCH CARDS ══ */
+    .batches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 18px;
+    }
+    .batch-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      transition: box-shadow 0.2s, transform 0.15s;
+      cursor: pointer;
+    }
+    .batch-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+    .batch-card-header {
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+    }
+    .batch-name {
+      font-size: 16px; font-weight: 700; color: var(--text);
+      margin-bottom: 3px;
+    }
+    .batch-court {
+      font-size: 12px; color: var(--muted);
+    }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+    .status-badge.active {
+      background: rgba(56,161,105,0.12); color: var(--success);
+      border: 1px solid rgba(56,161,105,0.25);
+    }
+    .status-badge.closed {
+      background: var(--bg2); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .status-badge.pending {
+      background: rgba(214,158,46,0.12); color: var(--warn);
+      border: 1px solid rgba(214,158,46,0.25);
+    }
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor;
+    }
+
+    .batch-card-body { padding: 14px 18px; }
+    .batch-meta-row {
+      display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .meta-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; color: var(--muted);
+      background: var(--bg2); border-radius: 5px;
+      padding: 3px 8px;
+    }
+    .meta-tag strong { color: var(--text); font-weight: 600; }
+
+    .batch-dates {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin-bottom: 14px;
+    }
+    .date-item { }
+    .date-lbl { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .date-val { font-size: 13px; font-weight: 600; color: var(--text); }
+    .date-val.urgent { color: var(--red); }
+
+    .batch-bar {
+      background: var(--bg2); border-radius: 4px; height: 5px;
+      overflow: hidden; margin-bottom: 8px;
+    }
+    .batch-bar-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--blue), var(--blue-lt));
+      transition: width 0.4s ease;
+    }
+    .batch-bar-label {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--muted);
+    }
+
+    .batch-card-footer {
+      padding: 11px 18px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .batch-prop-count {
+      font-size: 13px; font-weight: 700; color: var(--text);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .batch-prop-icon {
+      width: 24px; height: 24px; border-radius: 5px;
+      background: var(--blue-bg); display: flex; align-items: center;
+      justify-content: center; font-size: 13px;
+    }
+    .btn-view-batch {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--blue); color: #fff;
+      padding: 6px 14px; border-radius: 6px;
+      font-size: 12px; font-weight: 600;
+      transition: background 0.15s;
+    }
+    .btn-view-batch:hover { background: var(--blue-lt); }
+
+    /* deadline pulse for active batches */
+    @keyframes pulse-red {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .deadline-pulse { animation: pulse-red 1.5s ease-in-out infinite; }
+
+    /* empty state */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center; padding: 64px 20px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .empty-text { font-size: 13px; }
+
+    /* ══ TIMELINE VIEW ══ */
+    .view-toggle { display: flex; gap: 3px; }
+    .view-btn {
+      padding: 5px 10px; border-radius: 6px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--card);
+      color: var(--muted); font-size: 12px; transition: all 0.15s;
+    }
+    .view-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    /* toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      background: var(--text); color: #fff;
+      padding: 10px 18px; border-radius: 8px;
+      font-size: 13px; box-shadow: var(--shadow-md);
+      display: none; align-items: center; gap: 8px;
+    }
+    .toast.show { display: flex; }
+
+    /* ══ PRINT ══ */
+    @media print {
+      .navbar, .toolbar, .page-header::before { display: none !important; }
+      .page-header { background: var(--blue-dk) !important; padding: 16px !important; }
+      .page-title { color: #000 !important; font-size: 18px !important; }
+      .page-subtitle { color: #555 !important; }
+      .hstat-num { color: #000 !important; }
+      .hstat-lbl { color: #555 !important; }
+      .main-wrap { padding: 16px 0 !important; }
+      .batches-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+      .batch-card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ccc !important; }
+      .batch-card:hover { transform: none !important; }
+      .btn-view-batch, .btn { display: none !important; }
+      body { font-size: 12px !important; }
+    }
+
+    /* ══ RESPONSIVE ══ */
+    @media (max-width: 768px) {
+      .navbar { padding: 0 14px; }
+      .navbar-brand-sub, .nav-username { display: none; }
+      .navbar-links a { padding: 5px 9px; font-size: 12px; }
+      .page-header-inner { flex-direction: column; }
+      .header-stats { gap: 10px; }
+      .main-wrap { padding: 18px 14px; }
+      .toolbar { gap: 8px; }
+      .toolbar-right { width: 100%; justify-content: flex-end; }
+      .batches-grid { grid-template-columns: 1fr; }
+      .batch-dates { grid-template-columns: 1fr; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ NAVBAR ══ -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="navbar-brand-icon">法</div>
+    <div class="navbar-brand-text">
+      <span class="navbar-brand-main">法拍管理系统</span>
+      <span class="navbar-brand-sub">jjconnect.online</span>
+    </div>
+  </div>
+  <div class="navbar-links">
+    <a href="/monospages/">首页</a>
+    <a href="/monospages/batches/" class="active">批次总览</a>
+    <a href="/monospages/field/">现地调查</a>
+    <a href="/monospages/analysis/">投资分析</a>
+    <a href="/monospages/admin/" class="admin-link" id="nav-admin" style="display:none">⚙ 管理</a>
+  </div>
+  <div class="navbar-right">
+    <div id="nav-auth-user">
+      <div class="nav-avatar" id="nav-avatar-wrap">
+        <span id="nav-avatar-letter"></span>
+      </div>
+      <span class="nav-username" id="nav-username-el"></span>
+      <button class="btn-logout" onclick="doLogout()">退出</button>
+    </div>
+    <button class="btn-login" id="nav-login-btn" onclick="doLogin()">登录</button>
+  </div>
+</nav>
+
+<!-- ══ PAGE HEADER ══ -->
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <div class="breadcrumb">
+        <a href="/monospages/">首页</a>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-cur">批次总览</span>
+      </div>
+      <div class="page-title">
+        批次总览
+        <span class="page-title-tag">全部批次</span>
+      </div>
+      <div class="page-subtitle">东京都内法拍竞买批次汇总 — 每两周更新一次</div>
+    </div>
+    <div class="header-stats">
+      <div class="hstat">
+        <div class="hstat-num" id="stat-total">—</div>
+        <div class="hstat-lbl">总批次</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-num" id="stat-active" style="color:#6ee7b7">—</div>
+        <div class="hstat-lbl">进行中</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-num" id="stat-props">—</div>
+        <div class="hstat-lbl">总物件</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MAIN ══ -->
+<div class="main-wrap">
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <!-- Status filter tabs -->
+      <div class="status-tabs">
+        <div class="status-tab active" data-status="all" onclick="setStatusFilter('all',this)">全部</div>
+        <div class="status-tab" data-status="active" onclick="setStatusFilter('active',this)">进行中</div>
+        <div class="status-tab" data-status="pending" onclick="setStatusFilter('pending',this)">即将开始</div>
+        <div class="status-tab" data-status="closed" onclick="setStatusFilter('closed',this)">已结束</div>
+      </div>
+      <!-- Year filter -->
+      <div class="filter-group">
+        <span class="filter-label">年度</span>
+        <select class="filter-select" id="filter-year" onchange="applyFilters()">
+          <option value="">全部年度</option>
+          <option value="2026" selected>2026年</option>
+          <option value="2025">2025年</option>
+        </select>
+      </div>
+      <!-- Sort -->
+      <div class="filter-group">
+        <span class="filter-label">排序</span>
+        <select class="filter-select" id="sort-select" onchange="applyFilters()">
+          <option value="date-desc">最新批次优先</option>
+          <option value="date-asc">最早批次优先</option>
+          <option value="count-desc">物件数量↓</option>
+          <option value="status">状态</option>
+        </select>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <span class="saved-badge" id="saved-badge">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        已保存筛选
+      </span>
+      <!-- View toggle: grid / list -->
+      <div class="view-toggle">
+        <button class="view-btn active" id="view-grid" onclick="setView('grid')" title="卡片视图">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/>
+            <rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor"/>
+            <rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor"/>
+            <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="view-btn" id="view-list" onclick="setView('list')" title="列表视图">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <button class="btn btn-outline" onclick="saveFilters()">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <path d="M13 2H3a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V3a1 1 0 00-1-1z" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5 2v4h6V2M5 9h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        保存筛选
+      </button>
+      <button class="btn btn-outline" onclick="window.print()">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <path d="M4 6V2h8v4M4 12H2V7h12v5h-2M4 12v2h8v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        打印
+      </button>
+    </div>
+  </div>
+
+  <!-- BATCH CARDS / LIST -->
+  <div class="batches-grid" id="batches-container">
+    <!-- populated by JS -->
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════
+   BATCH DATA — hardcoded; in production, load from
+   GET /api/monospages-config?section=batches
+   ════════════════════════════════════════════════ */
+const BATCHES = [
+  {
+    id:       '2026-5a',
+    name:     '2026年5月A批次',
+    url:      '/monospages/2026-5a/',
+    sheet:    '13YPzFbgNnrEQSTTuOXLaevapiL3OW_3L',
+    court:    '東京地方裁判所',
+    bid_start: '2026-05-21',
+    bid_end:   '2026-05-28',
+    kaifuda:   '2026-06-03',
+    hanbai:    '2026-06-20',
+    prop_count: 21,
+    status:    'active',   // active | pending | closed
+    notes:     '本期含文京区、新宿区、渋谷区等优质地段物件',
+  },
+  /* ── 以下为示例历史批次，实际数据请在管理员页维护 ── */
+  {
+    id:       '2026-4b',
+    name:     '2026年4月B批次',
+    url:      '/monospages/2026-4b/',
+    sheet:    '',
+    court:    '東京地方裁判所',
+    bid_start: '2026-04-15',
+    bid_end:   '2026-04-22',
+    kaifuda:   '2026-04-28',
+    hanbai:    '2026-05-15',
+    prop_count: 18,
+    status:    'closed',
+    notes:     '',
+  },
+  {
+    id:       '2026-4a',
+    name:     '2026年4月A批次',
+    url:      '/monospages/2026-4a/',
+    sheet:    '',
+    court:    '東京地方裁判所',
+    bid_start: '2026-04-01',
+    bid_end:   '2026-04-08',
+    kaifuda:   '2026-04-14',
+    hanbai:    '2026-05-01',
+    prop_count: 23,
+    status:    'closed',
+    notes:     '',
+  },
+  {
+    id:       '2026-3b',
+    name:     '2026年3月B批次',
+    url:      '/monospages/2026-3b/',
+    sheet:    '',
+    court:    '東京地方裁判所',
+    bid_start: '2026-03-17',
+    bid_end:   '2026-03-24',
+    kaifuda:   '2026-03-30',
+    hanbai:    '2026-04-17',
+    prop_count: 19,
+    status:    'closed',
+    notes:     '',
+  },
+];
+
+/* ── State ── */
+let _statusFilter = 'all';
+let _viewMode     = 'grid';
+let _auth0Client  = null;
+let _role         = null;
+
+/* ════════════════════════════════════════════════
+   AUTH0
+   ════════════════════════════════════════════════ */
+async function initAuth() {
+  _auth0Client = await createAuth0Client({
+    domain:        'dev-5z54p7b3gul1eb27.jp.auth0.com',
+    clientId:      'oGyqJ3R55KbNjZ6hOru7tpCaPgAHe5Ph',
+    authorizationParams: { redirect_uri: window.location.origin + window.location.pathname },
+    cacheLocation: 'localstorage',
+    useRefreshTokens: true,
+  });
+
+  // Handle redirect callback
+  if (location.search.includes('code=') && location.search.includes('state=')) {
+    await _auth0Client.handleRedirectCallback();
+    history.replaceState({}, document.title, location.pathname);
+  }
+
+  const isAuth = await _auth0Client.isAuthenticated();
+  if (isAuth) {
+    const user = await _auth0Client.getUser();
+    showUser(user);
+    try {
+      const tok = await _auth0Client.getTokenSilently();
+      const res = await fetch('/api/monospages-admin', { headers: { Authorization: `Bearer ${tok}` } });
+      if (res.ok) {
+        const d = await res.json();
+        _role = d.monospages_role || '';
+      }
+    } catch (_) {}
+    if (!_role) _role = 'viewer_basic';
+    if (_role === 'admin') document.getElementById('nav-admin').style.display = 'flex';
+  } else {
+    document.getElementById('nav-login-btn').style.display = 'inline-flex';
+  }
+
+  restoreFilters();
+  applyFilters();
+}
+
+function showUser(u) {
+  document.getElementById('nav-login-btn').style.display = 'none';
+  const wrap = document.getElementById('nav-auth-user');
+  wrap.style.display = 'flex';
+  document.getElementById('nav-username-el').textContent = u.name || u.email;
+  const av = document.getElementById('nav-avatar-wrap');
+  if (u.picture) {
+    av.innerHTML = `<img src="${u.picture}" alt="">`;
+  } else {
+    document.getElementById('nav-avatar-letter').textContent = (u.name||u.email||'U')[0].toUpperCase();
+  }
+}
+
+function doLogin()  { _auth0Client.loginWithRedirect({ authorizationParams: { redirect_uri: window.location.origin + window.location.pathname } }); }
+function doLogout() { _auth0Client.logout({ logoutParams: { returnTo: window.location.origin + '/monospages/' } }); }
+
+/* ════════════════════════════════════════════════
+   FILTER & RENDER
+   ════════════════════════════════════════════════ */
+function setStatusFilter(val, el) {
+  _statusFilter = val;
+  document.querySelectorAll('.status-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  const year   = document.getElementById('filter-year').value;
+  const sort   = document.getElementById('sort-select').value;
+
+  let list = BATCHES.filter(b => {
+    if (_statusFilter !== 'all' && b.status !== _statusFilter) return false;
+    if (year && !b.bid_start.startsWith(year)) return false;
+    return true;
+  });
+
+  // Sort
+  if (sort === 'date-asc') {
+    list.sort((a, b) => a.bid_start.localeCompare(b.bid_start));
+  } else if (sort === 'date-desc') {
+    list.sort((a, b) => b.bid_start.localeCompare(a.bid_start));
+  } else if (sort === 'count-desc') {
+    list.sort((a, b) => b.prop_count - a.prop_count);
+  } else if (sort === 'status') {
+    const order = { active: 0, pending: 1, closed: 2 };
+    list.sort((a, b) => (order[a.status]||9) - (order[b.status]||9));
+  }
+
+  renderBatches(list);
+  updateHeaderStats();
+}
+
+function updateHeaderStats() {
+  const total  = BATCHES.length;
+  const active = BATCHES.filter(b => b.status === 'active').length;
+  const props  = BATCHES.reduce((s, b) => s + (b.prop_count || 0), 0);
+  document.getElementById('stat-total').textContent  = total;
+  document.getElementById('stat-active').textContent = active;
+  document.getElementById('stat-props').textContent  = props;
+}
+
+function renderBatches(list) {
+  const container = document.getElementById('batches-container');
+  container.className = _viewMode === 'list' ? 'batches-list' : 'batches-grid';
+
+  if (!list.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">暂无匹配批次</div>
+        <div class="empty-text">请调整筛选条件</div>
+      </div>`;
+    return;
+  }
+
+  const now = new Date();
+  container.innerHTML = list.map(b => {
+    const bidEnd  = new Date(b.bid_end);
+    const daysLeft = Math.ceil((bidEnd - now) / 86400000);
+    const isUrgent = b.status === 'active' && daysLeft >= 0 && daysLeft <= 3;
+    const progress = computeProgress(b);
+
+    const statusMap = {
+      active:  { label: '进行中', cls: 'active' },
+      pending: { label: '即将开始', cls: 'pending' },
+      closed:  { label: '已结束', cls: 'closed' },
+    };
+    const st = statusMap[b.status] || { label: b.status, cls: 'closed' };
+
+    const deadlineClass = isUrgent ? 'date-val urgent deadline-pulse' : 'date-val';
+
+    return `
+    <div class="batch-card" onclick="location.href='${b.url}'">
+      <div class="batch-card-header">
+        <div>
+          <div class="batch-name">${b.name}</div>
+          <div class="batch-court">📍 ${b.court}</div>
+        </div>
+        <span class="status-badge ${st.cls}">
+          <span class="status-dot"></span>${st.label}
+        </span>
+      </div>
+      <div class="batch-card-body">
+        <div class="batch-meta-row">
+          <span class="meta-tag">🏠 <strong>${b.prop_count}</strong> 件物件</span>
+          ${b.notes ? `<span class="meta-tag" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${b.notes}">${b.notes}</span>` : ''}
+        </div>
+        <div class="batch-dates">
+          <div class="date-item">
+            <div class="date-lbl">入札开始</div>
+            <div class="date-val">${fmtDate(b.bid_start)}</div>
+          </div>
+          <div class="date-item">
+            <div class="date-lbl">入札截止</div>
+            <div class="${deadlineClass}">
+              ${fmtDate(b.bid_end)}
+              ${isUrgent ? `<span style="font-size:11px;margin-left:4px;font-weight:700">(剩 ${daysLeft} 天)</span>` : ''}
+            </div>
+          </div>
+          <div class="date-item">
+            <div class="date-lbl">开札日</div>
+            <div class="date-val">${fmtDate(b.kaifuda)}</div>
+          </div>
+          <div class="date-item">
+            <div class="date-lbl">贩卖决定日</div>
+            <div class="date-val">${fmtDate(b.hanbai)}</div>
+          </div>
+        </div>
+        ${b.status !== 'pending' ? `
+        <div class="batch-bar">
+          <div class="batch-bar-fill" style="width:${progress}%"></div>
+        </div>
+        <div class="batch-bar-label">
+          <span>入札期间</span>
+          <span>${b.status === 'closed' ? '已结束' : `${daysLeft} 天后截止`}</span>
+        </div>` : ''}
+      </div>
+      <div class="batch-card-footer">
+        <div class="batch-prop-count">
+          <div class="batch-prop-icon">🏢</div>
+          ${b.prop_count} 件竞买物件
+        </div>
+        <a href="${b.url}" class="btn-view-batch" onclick="event.stopPropagation()">
+          查看物件
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function computeProgress(b) {
+  if (b.status === 'closed') return 100;
+  if (b.status === 'pending') return 0;
+  const start = new Date(b.bid_start);
+  const end   = new Date(b.bid_end);
+  const now   = new Date();
+  const total = end - start;
+  const elapsed = now - start;
+  return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const [y, m, d] = s.split('-');
+  return `${y}年${m}月${d}日`;
+}
+
+/* ════════════════════════════════════════════════
+   VIEW TOGGLE
+   ════════════════════════════════════════════════ */
+function setView(mode) {
+  _viewMode = mode;
+  document.getElementById('view-grid').classList.toggle('active', mode === 'grid');
+  document.getElementById('view-list').classList.toggle('active', mode === 'list');
+  applyFilters();
+}
+
+/* ════════════════════════════════════════════════
+   SAVE / RESTORE FILTERS
+   ════════════════════════════════════════════════ */
+function saveFilters() {
+  const prefs = {
+    statusFilter: _statusFilter,
+    year:  document.getElementById('filter-year').value,
+    sort:  document.getElementById('sort-select').value,
+    view:  _viewMode,
+  };
+  localStorage.setItem('batches_prefs', JSON.stringify(prefs));
+
+  // Also save to user_metadata if logged in
+  if (_auth0Client) {
+    _auth0Client.isAuthenticated().then(async ok => {
+      if (!ok) return;
+      try {
+        const tok = await _auth0Client.getTokenSilently();
+        await fetch('/api/user-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+          body: JSON.stringify({ batches_prefs: prefs }),
+        });
+      } catch (_) {}
+    });
+  }
+
+  const badge = document.getElementById('saved-badge');
+  badge.style.display = 'flex';
+  setTimeout(() => { badge.style.display = 'none'; }, 3000);
+  showToast('✓ 筛选偏好已保存');
+}
+
+function restoreFilters() {
+  const raw = localStorage.getItem('batches_prefs');
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    if (p.statusFilter) {
+      _statusFilter = p.statusFilter;
+      document.querySelectorAll('.status-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.status === p.statusFilter);
+      });
+    }
+    if (p.year) document.getElementById('filter-year').value = p.year;
+    if (p.sort) document.getElementById('sort-select').value = p.sort;
+    if (p.view) setView(p.view);
+
+    const badge = document.getElementById('saved-badge');
+    badge.style.display = 'flex';
+    setTimeout(() => { badge.style.display = 'none'; }, 2500);
+  } catch (_) {}
+}
+
+/* ════════════════════════════════════════════════
+   TOAST
+   ════════════════════════════════════════════════ */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════ */
+initAuth().catch(err => {
+  console.error('Auth init error:', err);
+  restoreFilters();
+  applyFilters();
+});
+</script>
+</body>
+</html>

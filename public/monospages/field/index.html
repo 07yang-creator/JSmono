@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>快速现地调查 — 法拍管理系统</title>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+  <!-- ⚠️ TEST MODE — set TEST_MODE=false before production -->
+  <script>
+  (function () {
+    window.TEST_MODE = false;            // test shim disabled
+    if (!window.TEST_MODE) return;
+
+    /* Fake Auth0 user (admin role) */
+    var _fake = { name:'测试管理员', email:'test@example.com', picture:null, sub:'test|000' };
+    var _client = {
+      isAuthenticated:      function(){ return Promise.resolve(true); },
+      getUser:              function(){ return Promise.resolve(_fake); },
+      getTokenSilently:     function(){ return Promise.resolve('test-token-000'); },
+      handleRedirectCallback: function(){ return Promise.resolve({}); },
+      checkSession:         function(){ return Promise.resolve(); },
+      loginWithRedirect:    function(){ /* no-op in test mode */ },
+      logout: function(o){
+        location.href = (o && o.logoutParams && o.logoutParams.returnTo)
+                        || '/monospages/';
+      },
+    };
+
+    /* Override Auth0Client constructor (most pages) */
+    if (window.auth0) window.auth0.Auth0Client = function(){ return _client; };
+    /* Override createAuth0Client helper (batches page) */
+    window.createAuth0Client = function(){ return Promise.resolve(_client); };
+
+    /* Intercept fetch — fake the role API, pass everything else through */
+    var _orig = window.fetch.bind(window);
+    window.fetch = function(url, opts) {
+      var u = typeof url === 'string' ? url : '';
+      if (u.indexOf('/api/monospages-admin') !== -1) {
+        return Promise.resolve(new Response(
+          JSON.stringify({ monospages_role:'admin', email:'test@example.com', name:'测试管理员' }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      if (u.indexOf('/api/monospages-config') !== -1 && opts && opts.method === 'POST') {
+        return Promise.resolve(new Response(
+          JSON.stringify({ ok:true }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      return _orig(url, opts);
+    };
+  })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue:     #2B6CB0; --blue-dk: #215387; --blue-bg: #EBF4FF;
+      --orange:   #f76a0c; --orange-lt: #ff8534; --orange-bg: #fff3eb;
+      --red:      #c0392b; --red-bg: #fdf2f1;
+      --green:    #38a169; --green-bg: #e6fffa;
+      --bg:       #F7FAFC; --card: #ffffff; --border: #E2E8F0;
+      --text:     #1A202C; --text-body: #2D3748; --muted: #718096;
+      --radius:   10px;
+      --shadow:   0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, 'PingFang SC', 'Hiragino Sans GB',
+                   'Microsoft YaHei', sans-serif;
+      background: var(--bg); color: var(--text-body);
+      font-size: 15px; line-height: 1.6;
+      /* prevent iOS rubber-band scroll on whole page */
+      overscroll-behavior: none;
+    }
+    a { text-decoration: none; color: inherit; }
+
+    /* ── NAVBAR ── */
+    .navbar {
+      position: sticky; top: 0; z-index: 200;
+      background: var(--blue-dk); border-bottom: 3px solid var(--orange);
+      display: flex; align-items: center;
+      padding: 0 16px; height: 52px;
+      box-shadow: 0 2px 8px rgba(33,83,135,0.25);
+    }
+    .navbar-brand { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .navbar-brand-icon {
+      width: 28px; height: 28px; background: var(--orange); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: #fff;
+    }
+    .navbar-brand-text { font-size: 14px; font-weight: 700; color: #fff; }
+    .navbar-brand-sub  { font-size: 11px; color: rgba(255,255,255,0.55); }
+    .navbar-right { display: flex; align-items: center; gap: 8px; }
+    .btn-nav-login { background: var(--orange); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-logout { background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.25); padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .nav-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; overflow: hidden; flex-shrink: 0; }
+    .nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    #nav-auth-user { display: none; align-items: center; gap: 7px; }
+    .nav-name { font-size: 12px; color: rgba(255,255,255,0.8); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── STEP INDICATOR ── */
+    .steps {
+      display: flex; align-items: center;
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 10px 16px; gap: 0; overflow-x: auto;
+    }
+    .step {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--muted); white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .step.active { color: var(--blue); font-weight: 600; }
+    .step.done   { color: var(--green); }
+    .step-num {
+      width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; flex-shrink: 0; transition: all 0.2s;
+    }
+    .step.active .step-num { border-color: var(--blue); background: var(--blue); color: #fff; }
+    .step.done   .step-num { border-color: var(--green); background: var(--green); color: #fff; }
+    .step-arrow { color: var(--border); margin: 0 8px; font-size: 14px; }
+
+    /* ── MAIN ── */
+    .main { max-width: 640px; margin: 0 auto; padding: 16px 14px 80px; display: flex; flex-direction: column; gap: 14px; }
+
+    /* ── CARDS / PANELS ── */
+    .panel {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+    }
+    .panel-head {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      font-size: 14px; font-weight: 700; color: var(--text);
+      display: flex; align-items: center; gap: 8px; background: var(--bg);
+    }
+    .panel-head .icon { font-size: 16px; }
+    .panel-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+    /* ── SEARCH BOX ── */
+    .search-row { display: flex; gap: 10px; align-items: center; }
+    .search-input {
+      flex: 1; border: 2px solid var(--border); border-radius: 8px;
+      padding: 12px 14px; font-size: 16px; color: var(--text);
+      font-family: inherit; transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    .search-input:focus { outline: none; border-color: var(--blue); }
+    .search-input::placeholder { color: var(--muted); }
+    .btn-search {
+      background: var(--blue); color: #fff; border: none;
+      padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
+    }
+    .btn-search:hover { background: var(--blue-dk); }
+    .btn-search:active { transform: scale(0.97); }
+
+    /* Recent searches */
+    .recent-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .recent-tag {
+      font-size: 12px; color: var(--blue); background: var(--blue-bg);
+      border-radius: 20px; padding: 4px 12px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .recent-tag:active { opacity: 0.7; }
+
+    /* ── PROPERTY INFO (step 1 result) ── */
+    .info-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    }
+    .info-cell {
+      padding: 9px 12px; border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+    .info-cell:nth-child(even) { border-right: none; }
+    .info-cell.full { grid-column: 1 / -1; border-right: none; }
+    .info-lbl { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .info-val { font-size: 13px; font-weight: 600; color: var(--text); }
+    .info-val.price { color: var(--red); font-size: 15px; }
+
+    /* Map */
+    .map-wrap { padding: 12px; }
+    .map-wrap iframe { width: 100%; height: 220px; border: none; border-radius: 8px; display: block; }
+    .map-link {
+      display: block; text-align: center; padding: 14px;
+      color: var(--blue); font-size: 13px; text-decoration: underline;
+    }
+
+    /* ── UPLOAD ── */
+    .upload-area {
+      border: 2px dashed var(--border); border-radius: 10px;
+      padding: 24px 16px; text-align: center; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .upload-area:hover, .upload-area.drag-over { border-color: var(--blue); background: var(--blue-bg); }
+    .upload-area input { display: none; }
+    .upload-area .upload-icon { font-size: 32px; margin-bottom: 8px; }
+    .upload-area .upload-hint { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .upload-area .upload-hint strong { color: var(--blue); }
+
+    .preview-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px;
+    }
+    .preview-thumb {
+      position: relative; height: 90px; border-radius: 8px;
+      overflow: hidden; background: var(--bg); border: 1px solid var(--border);
+    }
+    .preview-thumb img, .preview-thumb video { width: 100%; height: 100%; object-fit: cover; }
+    .preview-thumb .del-btn {
+      position: absolute; top: 4px; right: 4px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: rgba(0,0,0,0.55); color: #fff;
+      border: none; font-size: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .preview-count { font-size: 12px; color: var(--muted); }
+
+    /* ── COMMENT FIELDS ── */
+    .comment-field { display: flex; flex-direction: column; gap: 6px; }
+    .comment-field label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .comment-field textarea {
+      border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 10px 12px; font-size: 14px; font-family: inherit;
+      color: var(--text); resize: none; min-height: 80px;
+      transition: border-color 0.15s; -webkit-appearance: none;
+    }
+    .comment-field textarea:focus { outline: none; border-color: var(--blue); }
+
+    /* ── BUTTONS ── */
+    .btn-primary {
+      background: var(--blue); color: #fff; border: none;
+      padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: inherit; width: 100%;
+      transition: background 0.15s; -webkit-tap-highlight-color: transparent;
+    }
+    .btn-primary:hover   { background: var(--blue-dk); }
+    .btn-primary:active  { transform: scale(0.98); }
+    .btn-primary:disabled { background: var(--muted); cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--bg); color: var(--blue);
+      border: 1.5px solid var(--blue);
+      padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600;
+      cursor: pointer; font-family: inherit; width: 100%;
+      transition: background 0.12s; -webkit-tap-highlight-color: transparent;
+    }
+    .btn-secondary:hover { background: var(--blue-bg); }
+    .btn-orange {
+      background: var(--orange); color: #fff; border: none;
+      padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: inherit; width: 100%;
+      transition: background 0.15s; -webkit-tap-highlight-color: transparent;
+    }
+    .btn-orange:hover { background: var(--orange-lt); }
+    .btn-row { display: flex; gap: 10px; }
+    .btn-row > * { flex: 1; }
+
+    /* ── STATUS / MESSAGES ── */
+    .status-msg {
+      padding: 12px 16px; border-radius: 8px;
+      font-size: 13px; display: flex; align-items: flex-start; gap: 8px;
+    }
+    .status-msg.loading { background: var(--blue-bg); color: var(--blue); }
+    .status-msg.error   { background: var(--red-bg); color: var(--red); }
+    .status-msg.success { background: var(--green-bg); color: var(--green); }
+
+    /* ── PREVIEW PANEL ── */
+    .preview-section { background: var(--bg); border-radius: 8px; padding: 12px; }
+    .preview-section h4 { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .preview-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+    .preview-row .pl { color: var(--muted); min-width: 80px; flex-shrink: 0; }
+    .preview-row .pv { color: var(--text); }
+
+    /* ── SUCCESS SCREEN ── */
+    .success-screen { text-align: center; padding: 32px 16px; }
+    .success-screen .big-icon { font-size: 56px; margin-bottom: 16px; }
+    .success-screen h3 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .success-screen p  { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+
+    /* ── ACCESS GATE ── */
+    .access-gate {
+      max-width: 400px; margin: 48px auto;
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 40px 24px; text-align: center; box-shadow: var(--shadow);
+    }
+    .access-gate .icon { font-size: 36px; margin-bottom: 12px; }
+    .access-gate h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .access-gate p  { font-size: 13px; color: var(--muted); }
+    .btn-login-big {
+      display: block; background: var(--blue); color: #fff; border: none;
+      padding: 13px; border-radius: 8px; font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: inherit; margin-top: 20px;
+    }
+
+    /* ── HIDDEN ── */
+    .hidden { display: none !important; }
+
+    /* ── PRINT ── */
+    @media print {
+      .navbar, .steps, .btn-primary, .btn-secondary, .btn-orange,
+      .upload-area, .search-row { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="navbar-brand-icon">拍</div>
+    <div>
+      <div class="navbar-brand-text">快速现地调查</div>
+      <div class="navbar-brand-sub">法拍管理系统</div>
+    </div>
+  </div>
+  <div class="navbar-right">
+    <button id="btn-nav-login" class="btn-nav-login" onclick="authLogin()">登录</button>
+    <div id="nav-auth-user">
+      <div class="nav-avatar">
+        <img id="nav-avatar-img" src="" alt="" onerror="this.style.display='none';document.getElementById('nav-avatar-init').style.display='flex';">
+        <span id="nav-avatar-init" style="display:none;"></span>
+      </div>
+      <span class="nav-name" id="nav-name"></span>
+      <button class="btn-logout" onclick="authLogout()">退出</button>
+    </div>
+  </div>
+</nav>
+
+<!-- STEP INDICATOR -->
+<div class="steps" id="step-bar" style="display:none;">
+  <div class="step active" id="step1-ind">
+    <div class="step-num">1</div><span>搜索物件</span>
+  </div>
+  <div class="step-arrow">›</div>
+  <div class="step" id="step2-ind">
+    <div class="step-num">2</div><span>上传照片</span>
+  </div>
+  <div class="step-arrow">›</div>
+  <div class="step" id="step3-ind">
+    <div class="step-num">3</div><span>填写备注</span>
+  </div>
+  <div class="step-arrow">›</div>
+  <div class="step" id="step4-ind">
+    <div class="step-num">4</div><span>确认提交</span>
+  </div>
+</div>
+
+<!-- ACCESS GATE -->
+<div class="main" id="gate" style="display:none;">
+  <div class="access-gate">
+    <div class="icon">🔒</div>
+    <h3 id="gate-title">请先登录</h3>
+    <p id="gate-msg">需要登录才能使用现地调查功能。</p>
+    <button class="btn-login-big" onclick="authLogin()">登录 / Login</button>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main" id="main" style="display:none;">
+
+  <!-- STEP 1: Search -->
+  <div id="panel-search">
+    <div class="panel">
+      <div class="panel-head"><span class="icon">🔍</span>输入物件编号</div>
+      <div class="panel-body">
+        <div class="search-row">
+          <input type="text" class="search-input" id="search-input"
+            placeholder="物件编号，例：TYO-003"
+            inputmode="text" autocomplete="off" autocorrect="off"
+            onkeydown="if(event.key==='Enter')doSearch()">
+          <button class="btn-search" onclick="doSearch()">查询</button>
+        </div>
+        <div id="search-status" class="hidden"></div>
+        <div id="recent-wrap" class="hidden">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">最近查询</div>
+          <div class="recent-tags" id="recent-tags"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 1 result: Property info -->
+  <div id="panel-propinfo" class="hidden">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="icon">🏠</span>
+        <span id="propinfo-name">物件信息</span>
+        <span style="flex:1"></span>
+        <button style="font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;" onclick="resetSearch()">重新搜索</button>
+      </div>
+      <div class="info-grid" id="propinfo-grid"></div>
+      <div id="propinfo-map"></div>
+    </div>
+    <button class="btn-primary" onclick="goStep(2)">下一步：上传照片 →</button>
+  </div>
+
+  <!-- STEP 2: Upload media -->
+  <div id="panel-upload" class="hidden">
+    <div class="panel">
+      <div class="panel-head"><span class="icon">📷</span>上传现场照片 / 视频</div>
+      <div class="panel-body">
+        <div class="upload-area" id="upload-area"
+          onclick="document.getElementById('file-input').click()"
+          ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragleave="onDragLeave()">
+          <input type="file" id="file-input" multiple accept="image/*,video/*" onchange="onFilePick(this)">
+          <div class="upload-icon">📎</div>
+          <div class="upload-hint">
+            <strong>点击选择</strong>或拖放文件<br>
+            支持 JPG、PNG、MP4、MOV<br>
+            <span style="font-size:11px;">文件将上传至 Google Drive → 批次文件夹 / 物件子目录</span>
+          </div>
+        </div>
+        <div id="preview-grid-wrap" class="hidden">
+          <div class="preview-count" id="preview-count"></div>
+          <div class="preview-grid" id="preview-grid"></div>
+        </div>
+        <div id="upload-status" class="hidden"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="goStep(1)">← 返回</button>
+      <button class="btn-primary" onclick="goStep(3)">下一步：填写备注 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Comments -->
+  <div id="panel-comments" class="hidden">
+    <div class="panel">
+      <div class="panel-head"><span class="icon">📝</span>现状调查备注</div>
+      <div class="panel-body">
+        <div class="comment-field">
+          <label>现场考察</label>
+          <textarea id="c-genjou" placeholder="物件整体现状、建物状态、设备情况等…" rows="3"></textarea>
+        </div>
+        <div class="comment-field">
+          <label>周边商业</label>
+          <textarea id="c-shogyou" placeholder="周边商业设施、便利性、市场活跃度等…" rows="3"></textarea>
+        </div>
+        <div class="comment-field">
+          <label>公共设施</label>
+          <textarea id="c-kokyou" placeholder="学校、医院、公园、行政设施等…" rows="3"></textarea>
+        </div>
+        <div class="comment-field">
+          <label>噪音</label>
+          <textarea id="c-noise" placeholder="道路噪音、工场、商业噪声等…" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="goStep(2)">← 返回</button>
+      <button class="btn-primary" onclick="goStep(4)">预览确认 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 4: Preview & Submit -->
+  <div id="panel-preview" class="hidden">
+    <div class="panel">
+      <div class="panel-head"><span class="icon">✅</span>确认提交内容</div>
+      <div class="panel-body">
+        <div class="preview-section">
+          <h4>物件信息</h4>
+          <div id="preview-prop"></div>
+        </div>
+        <div class="preview-section" id="preview-media-wrap">
+          <h4>照片 / 视频</h4>
+          <div id="preview-media"></div>
+        </div>
+        <div class="preview-section">
+          <h4>现状调查备注</h4>
+          <div id="preview-comments"></div>
+        </div>
+        <div id="submit-status" class="hidden"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="goStep(3)">← 修改</button>
+      <button class="btn-orange" id="btn-submit" onclick="doSubmit()">提交记录 ✓</button>
+    </div>
+  </div>
+
+  <!-- SUCCESS SCREEN -->
+  <div id="panel-success" class="hidden">
+    <div class="panel">
+      <div class="success-screen">
+        <div class="big-icon">🎉</div>
+        <h3>提交成功！</h3>
+        <p>现地调查记录已写入 Google Sheet，<br>照片已保存至 Google Drive。</p>
+        <button class="btn-primary" onclick="newRecord()">继续调查下一物件</button>
+        <div style="margin-top:10px;">
+          <button class="btn-secondary" onclick="editRecord()">修改本次记录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   CONFIG
+───────────────────────────────────────────────────────────── */
+const BATCH = {
+  id: '2026-5a',
+  sheet_id: '13YPzFbgNnrEQSTTuOXLaevapiL3OW_3L',
+  sheet_name: '入例表【土地+建物】'
+};
+const GOOGLE_MAPS_API_KEY = '';  // Vercel env: GOOGLE_MAPS_API_KEY
+const APPS_SCRIPT_URL     = '';  // Apps Script deployment URL
+
+/* ─────────────────────────────────────────────────────────────
+   STATE
+───────────────────────────────────────────────────────────── */
+let _auth0 = null, _token = null, _role = null;
+let _currentStep = 1;
+let _prop = null;           // found property data
+let _files = [];            // staged files for upload
+let _uploadedUrls = [];     // URLs returned from persisted record
+let _fieldMediaItems = [];  // persisted media metadata for the property
+
+/* ─────────────────────────────────────────────────────────────
+   AUTH0
+───────────────────────────────────────────────────────────── */
+const AUTH0_DOMAIN    = 'dev-5z54p7b3gul1eb27.jp.auth0.com';
+const AUTH0_CLIENT_ID = 'oGyqJ3R55KbNjZ6hOru7tpCaPgAHe5Ph';
+const REDIRECT_URI    = window.location.origin + '/monospages/field/';
+
+async function initAuth() {
+  _auth0 = new window.auth0.Auth0Client({
+    domain: AUTH0_DOMAIN, clientId: AUTH0_CLIENT_ID,
+    authorizationParams: { redirect_uri: REDIRECT_URI, scope: 'openid profile email offline_access' },
+    cacheLocation: 'localstorage', useRefreshTokens: true
+  });
+  if (location.search.includes('code=') && location.search.includes('state=')) {
+    try { await _auth0.handleRedirectCallback(); } catch(e) {}
+    history.replaceState({}, document.title, location.pathname);
+  } else { try { await _auth0.checkSession(); } catch(_) {} }
+  await applyAuth();
+}
+
+async function applyAuth() {
+  let ok = false;
+  try { ok = await _auth0.isAuthenticated(); } catch(_) {}
+  if (!ok) {
+    showGate('请先登录', '需要登录才能使用现地调查功能。');
+    return;
+  }
+  const user = await _auth0.getUser();
+  _token = await _auth0.getTokenSilently();
+  const name = user.name || user.email || '';
+  document.getElementById('nav-name').textContent = name;
+  const img = document.getElementById('nav-avatar-img');
+  const ini = document.getElementById('nav-avatar-init');
+  if (user.picture) { img.src = user.picture; img.style.display=''; ini.style.display='none'; }
+  else { img.style.display='none'; ini.textContent=name[0]?.toUpperCase()||'?'; ini.style.display='flex'; }
+  document.getElementById('btn-nav-login').style.display = 'none';
+  document.getElementById('nav-auth-user').style.display = 'flex';
+
+  try {
+    const r = await fetch('/api/monospages-admin', { headers: { 'Authorization':'Bearer '+_token } });
+    if (r.ok) { const d = await r.json(); _role = d.monospages_role || 'viewer_basic'; }
+  } catch(_) {}
+  if (!_role) _role = 'viewer_basic';
+
+  if (_role !== 'worker' && _role !== 'admin') {
+    showGate('访问受限', '快速现地调查页面仅限编辑员和管理员使用。如需权限请联系管理员。');
+    return;
+  }
+
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('step-bar').style.display = '';
+  document.getElementById('main').style.display = '';
+  loadRecentSearches();
+}
+
+function showGate(title, msg) {
+  document.getElementById('gate-title').textContent = title;
+  document.getElementById('gate-msg').textContent   = msg;
+  document.getElementById('gate').style.display     = 'flex';
+  document.getElementById('main').style.display     = 'none';
+  document.getElementById('step-bar').style.display = 'none';
+}
+
+function authLogin()  { if(_auth0) _auth0.loginWithRedirect({authorizationParams:{redirect_uri:REDIRECT_URI}}); }
+function authLogout() { if(_auth0) _auth0.logout({logoutParams:{returnTo:window.location.origin+'/monospages/'}}); }
+
+function _authHeaders(extra) {
+  return Object.assign({ 'Authorization': 'Bearer ' + _token }, extra || {});
+}
+
+function _collectFieldComments() {
+  return {
+    '现场考察': document.getElementById('c-genjou').value,
+    '周边商业': document.getElementById('c-shogyou').value,
+    '公共设施': document.getElementById('c-kokyou').value,
+    '噪音':     document.getElementById('c-noise').value
+  };
+}
+
+function _applyFieldRecord(record) {
+  const f = (record && record.fields) || {};
+  document.getElementById('c-genjou').value  = f['现场考察'] || '';
+  document.getElementById('c-shogyou').value = f['周边商业'] || '';
+  document.getElementById('c-kokyou').value  = f['公共设施'] || '';
+  document.getElementById('c-noise').value   = f['噪音'] || '';
+
+  _fieldMediaItems = Array.isArray(record && record.media_items) ? record.media_items : [];
+  _uploadedUrls = _fieldMediaItems
+    .map(m => (m && m.url) ? m.url : '')
+    .filter(Boolean);
+}
+
+function _mergeMediaItems(existing, incoming) {
+  const out = [];
+  const seen = new Set();
+  (existing || []).concat(incoming || []).forEach(item => {
+    if (!item || !item.url) return;
+    if (seen.has(item.url)) return;
+    seen.add(item.url);
+    out.push(item);
+  });
+  return out;
+}
+
+async function loadFieldRecord() {
+  if (!_prop || !_token) return;
+  const propId = _prop['物件命名'] || _prop['法拍文件编号'] || '';
+  if (!propId) return;
+  try {
+    const q = `batch_id=${encodeURIComponent(BATCH.id)}&prop_id=${encodeURIComponent(propId)}`;
+    const r = await fetch('/api/monospages-field-record?' + q, {
+      headers: _authHeaders()
+    });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d && d.record) _applyFieldRecord(d.record);
+  } catch (_) {}
+}
+
+async function saveFieldRecord(mediaItems) {
+  if (!_prop || !_token) throw new Error('property/token missing');
+  const propId = _prop['物件命名'] || _prop['法拍文件编号'] || '';
+  const payload = {
+    batch_id: BATCH.id,
+    prop_id: propId,
+    fields: _collectFieldComments(),
+    media_items: mediaItems || _fieldMediaItems
+  };
+  const r = await fetch('/api/monospages-field-record', {
+    method: 'POST',
+    headers: _authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+}
+
+/* ─────────────────────────────────────────────────────────────
+   STEP NAVIGATION
+───────────────────────────────────────────────────────────── */
+const STEP_PANELS = ['panel-search','panel-propinfo','panel-upload','panel-comments','panel-preview','panel-success'];
+const STEP_IND    = ['step1-ind','step2-ind','step3-ind','step4-ind'];
+
+function goStep(n) {
+  _currentStep = n;
+  /* Show/hide panels */
+  document.getElementById('panel-search').classList.toggle('hidden', n > 1);
+  document.getElementById('panel-propinfo').classList.toggle('hidden', n !== 1 || !_prop);
+  document.getElementById('panel-upload').classList.toggle('hidden', n !== 2);
+  document.getElementById('panel-comments').classList.toggle('hidden', n !== 3);
+  document.getElementById('panel-preview').classList.toggle('hidden', n !== 4);
+  document.getElementById('panel-success').classList.toggle('hidden', n !== 5);
+
+  /* Step indicators */
+  STEP_IND.forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    if (i+1 < n) el.classList.add('done');
+    else if (i+1 === n) el.classList.add('active');
+  });
+
+  if (n === 4) buildPreview();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SEARCH PROPERTY
+───────────────────────────────────────────────────────────── */
+const MOCK_PROPS = {
+  'TYO-001': { '物件命名':'TYO-001','法拍文件编号':'R07K-00001','入扎日期终':'2026-05-28','标的':'区分所有権','买受可能价额':15600000,'所在地区域':'新宿区','住居表示':'東京都新宿区西新宿2-3-1','面积（专有）':45.5,'构造':'RC造','建物年限':25,'楼层':12,'位置交通':'JR新宿駅徒歩8分' },
+  'TYO-002': { '物件命名':'TYO-002','法拍文件编号':'R07K-00002','入扎日期终':'2026-05-28','标的':'区分所有権','买受可能价额':8900000,'所在地区域':'港区','住居表示':'東京都港区芝浦4-15-1','面积（专有）':32.0,'构造':'SRC造','建物年限':18,'楼层':8,'位置交通':'地下鉄田町駅徒歩10分' },
+  'TYO-003': { '物件命名':'TYO-003','法拍文件编号':'R07K-00003','入扎日期终':'2026-05-28','标的':'所有権','买受可能价额':34500000,'所在地区域':'文京区','住居表示':'東京都文京区本郷5-26-3','面积（专有）':78.2,'构造':'RC造','建物年限':8,'楼层':3,'位置交通':'都営三田線白山駅徒歩5分' }
+};
+
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+
+  const statusEl = document.getElementById('search-status');
+  statusEl.className = 'status-msg loading';
+  statusEl.textContent = '⏳ 查询中…';
+  statusEl.classList.remove('hidden');
+  document.getElementById('panel-propinfo').classList.add('hidden');
+
+  _prop = null;
+
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${BATCH.sheet_id}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(BATCH.sheet_name)}`;
+    const res  = await fetch(url);
+    const text = await res.text();
+    const s = text.indexOf('{'), e = text.lastIndexOf('}');
+    if (s >= 0 && e >= 0) {
+      const table = JSON.parse(text.slice(s,e+1)).table;
+      _prop = findInTable(table, q);
+    }
+  } catch(_) {}
+
+  if (!_prop) _prop = MOCK_PROPS[q] || null;
+
+  if (!_prop) {
+    statusEl.className = 'status-msg error';
+    statusEl.textContent = `✗ 未找到物件「${q}」，请检查编号后重试。`;
+    return;
+  }
+
+  statusEl.classList.add('hidden');
+  saveRecentSearch(q);
+  _fieldMediaItems = [];
+  _uploadedUrls = [];
+  ['c-genjou','c-shogyou','c-kokyou','c-noise'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  await loadFieldRecord();
+  renderPropInfo(_prop);
+  document.getElementById('panel-propinfo').classList.remove('hidden');
+  goStep(1);  // stay on step 1 but show result
+}
+
+function findInTable(table, q) {
+  if (!table?.rows) return null;
+  const rows = table.rows;
+  const numProps = table.cols.length - 2;
+  for (let p = 0; p < numProps; p++) {
+    const obj = {};
+    for (let r = 0; r < rows.length; r++) {
+      const fn = rows[r]?.c?.[1]?.v;
+      const v  = rows[r]?.c?.[p+2]?.v;
+      if (fn != null) obj[fn] = v ?? '';
+    }
+    if (String(obj['物件命名'])===q || String(obj['法拍文件编号'])===q) return obj;
+  }
+  return null;
+}
+
+function renderPropInfo(p) {
+  document.getElementById('propinfo-name').textContent = p['物件命名'] || '物件信息';
+  const fields = [
+    ['区域',       p['所在地区域'],''],
+    ['住居表示',   p['住居表示'],'full'],
+    ['位置交通',   p['位置交通'],'full'],
+    ['构造',       p['构造'],''],
+    ['专有面积',   p['面积（专有）'] ? p['面积（专有）']+' m²' : null,''],
+    ['建物年限',   p['建物年限'] ? p['建物年限']+'年' : null,''],
+    ['楼层',       p['楼层'] ? p['楼层']+'F' : null,''],
+    ['买受可能价额', fmtJpy(p['买受可能价额']),'price']
+  ];
+  document.getElementById('propinfo-grid').innerHTML = fields.map(([l,v,cls]) =>
+    `<div class="info-cell ${cls==='full'?'full':''}">
+      <div class="info-lbl">${l}</div>
+      <div class="info-val ${cls==='price'?'price':''}">${v||'—'}</div>
+    </div>`
+  ).join('');
+
+  /* Map */
+  const addr = p['住居表示'] || '';
+  const mapDiv = document.getElementById('propinfo-map');
+  if (addr) {
+    if (GOOGLE_MAPS_API_KEY) {
+      mapDiv.innerHTML = `<div class="map-wrap"><iframe src="https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(addr)}&language=ja" allowfullscreen loading="lazy"></iframe></div>`;
+    } else {
+      mapDiv.innerHTML = `<a class="map-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank">🗺 在 Google Maps 中查看：${addr}</a>`;
+    }
+  }
+}
+
+function resetSearch() {
+  _prop = null;
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-status').classList.add('hidden');
+  document.getElementById('panel-propinfo').classList.add('hidden');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RECENT SEARCHES
+───────────────────────────────────────────────────────────── */
+function saveRecentSearch(q) {
+  let list = JSON.parse(localStorage.getItem('field_recent') || '[]');
+  list = [q, ...list.filter(x => x!==q)].slice(0,5);
+  localStorage.setItem('field_recent', JSON.stringify(list));
+  loadRecentSearches();
+}
+function loadRecentSearches() {
+  const list = JSON.parse(localStorage.getItem('field_recent') || '[]');
+  const wrap = document.getElementById('recent-wrap');
+  const tags = document.getElementById('recent-tags');
+  if (!list.length) { wrap.classList.add('hidden'); return; }
+  tags.innerHTML = list.map(q =>
+    `<span class="recent-tag" onclick="document.getElementById('search-input').value='${q}';doSearch()">${q}</span>`
+  ).join('');
+  wrap.classList.remove('hidden');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FILE UPLOAD
+───────────────────────────────────────────────────────────── */
+function onFilePick(input) { addFiles(Array.from(input.files)); input.value=''; }
+function onDragOver(e) { e.preventDefault(); document.getElementById('upload-area').classList.add('drag-over'); }
+function onDragLeave()     { document.getElementById('upload-area').classList.remove('drag-over'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-area').classList.remove('drag-over');
+  addFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')||f.type.startsWith('video/')));
+}
+
+function addFiles(newFiles) {
+  _files = [..._files, ...newFiles];
+  renderPreviews();
+}
+
+function removeFile(idx) {
+  _files.splice(idx, 1);
+  renderPreviews();
+}
+
+function renderPreviews() {
+  const grid = document.getElementById('preview-grid');
+  const wrap = document.getElementById('preview-grid-wrap');
+  const count = document.getElementById('preview-count');
+  if (!_files.length) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  count.textContent = `已选择 ${_files.length} 个文件`;
+  grid.innerHTML = _files.map((f,i) => {
+    const url = URL.createObjectURL(f);
+    const isVideo = f.type.startsWith('video/');
+    return `<div class="preview-thumb">
+      ${isVideo
+        ? `<video src="${url}" muted playsinline></video>`
+        : `<img src="${url}" alt="${f.name}">`}
+      <button class="del-btn" onclick="removeFile(${i})">×</button>
+    </div>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PREVIEW
+───────────────────────────────────────────────────────────── */
+function buildPreview() {
+  if (!_prop) return;
+  /* Property summary */
+  document.getElementById('preview-prop').innerHTML = [
+    ['物件编号', _prop['物件命名']],
+    ['住居表示', _prop['住居表示']],
+    ['入札截止', _prop['入扎日期终']]
+  ].map(([l,v]) =>
+    `<div class="preview-row"><span class="pl">${l}</span><span class="pv">${v||'—'}</span></div>`
+  ).join('');
+
+  /* Media */
+  const mw = document.getElementById('preview-media-wrap');
+  const pm = document.getElementById('preview-media');
+  if (_files.length) {
+    mw.classList.remove('hidden');
+    pm.textContent = `${_files.length} 个文件待上传`;
+  } else if (_fieldMediaItems.length) {
+    mw.classList.remove('hidden');
+    pm.textContent = `已保存 ${_fieldMediaItems.length} 个文件`;
+  } else {
+    mw.classList.add('hidden');
+  }
+
+  /* Comments */
+  const keys = [['现场考察','c-genjou'],['周边商业','c-shogyou'],['公共设施','c-kokyou'],['噪音','c-noise']];
+  document.getElementById('preview-comments').innerHTML = keys.map(([l,id]) => {
+    const v = document.getElementById(id).value.trim() || '（未填写）';
+    return `<div class="preview-row" style="flex-direction:column;gap:2px;margin-bottom:10px;">
+      <span class="pl" style="min-width:auto;">${l}</span>
+      <span class="pv" style="white-space:pre-wrap;font-size:13px;">${v}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SUBMIT
+───────────────────────────────────────────────────────────── */
+async function doSubmit() {
+  const btn = document.getElementById('btn-submit');
+  const statusEl = document.getElementById('submit-status');
+  btn.disabled = true;
+  statusEl.className = 'status-msg loading';
+  statusEl.textContent = '⏳ 提交中，请稍候…';
+  statusEl.classList.remove('hidden');
+
+  try {
+    /* Step A: upload files to Drive via API */
+    const newlyUploaded = [];
+    if (_files.length) {
+      for (const f of _files) {
+        const fd = new FormData();
+        fd.append('file', f);
+        fd.append('prop_id', _prop['物件命名']);
+        fd.append('batch_id', BATCH.id);
+        const r = await fetch('/api/monospages-upload', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + _token },
+          body: fd
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || ('上传失败 HTTP ' + r.status));
+        const item = d.media_item || (d.url ? { url: d.url, name: f.name, mime_type: f.type || '' } : null);
+        if (item && item.url) newlyUploaded.push(item);
+      }
+    }
+
+    /* Step B: persist comments + media in field-record store */
+    const mergedMedia = _mergeMediaItems(_fieldMediaItems, newlyUploaded);
+    await saveFieldRecord(mergedMedia);
+    await loadFieldRecord();   // instant rehydrate from persisted source
+
+    _files = [];
+    renderPreviews();
+    goStep(5);
+  } catch(err) {
+    statusEl.className = 'status-msg error';
+    statusEl.textContent = '✗ 提交失败：' + err.message + '。请重试或联系管理员。';
+    btn.disabled = false;
+  }
+}
+
+function newRecord() {
+  _prop = null; _files = []; _uploadedUrls = []; _fieldMediaItems = [];
+  document.getElementById('search-input').value = '';
+  ['c-genjou','c-shogyou','c-kokyou','c-noise'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('preview-grid').innerHTML = '';
+  document.getElementById('search-status').classList.add('hidden');
+  document.getElementById('panel-propinfo').classList.add('hidden');
+  goStep(1);
+}
+
+function editRecord() { goStep(2); }
+
+/* ─────────────────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────────────────── */
+function fmtJpy(v) {
+  if (!v && v!==0) return null;
+  const n = Number(v);
+  if (n >= 1e8) return (n/1e8).toFixed(1).replace(/\.0$/,'')+'億円';
+  if (n >= 1e4) return Math.round(n/1e4)+'万円';
+  return n.toLocaleString()+'円';
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BOOT
+───────────────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', initAuth);
+</script>
+</body>
+</html>

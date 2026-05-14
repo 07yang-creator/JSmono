@@ -1,0 +1,260 @@
+{
+  "_comment": "Source of truth for property page field layout. Edit this file to change which fields are basic/extended, their order, and section groupings. The admin page reads and writes this file.",
+  "_types": {
+    "basic": "Always visible to all tiers (red-marked in sheet)",
+    "extended": "Collapsed by default; visible to viewer_premium+ when expanded",
+    "input": "Editable by worker/admin; read-only to viewer_premium",
+    "media": "Photo/video assets from Google Drive; visible to viewer_premium+"
+  },
+  "_tiers": ["viewer_basic", "viewer_premium", "worker", "admin"],
+
+  "page_sections": [
+    {
+      "id": "mono_data",
+      "title": "物件数据",
+      "min_tier_full": "viewer_premium",
+      "min_tier_basic": "viewer_basic",
+      "subsections": [
+        {
+          "id": "bid_procedure",
+          "title": "竞买程序信息",
+          "fields": [
+            { "name": "物件命名",     "type": "basic",    "sheet_row": 1,  "format": "text" },
+            { "name": "法拍文件编号", "type": "basic",    "sheet_row": 2,  "format": "text" },
+            { "name": "入扎日期始",   "type": "basic",    "sheet_row": 3,  "format": "date" },
+            { "name": "入扎日期终",   "type": "basic",    "sheet_row": 4,  "format": "date" },
+            { "name": "开扎日期",     "type": "basic",    "sheet_row": 5,  "format": "date" },
+            { "name": "贩卖决定日",   "type": "basic",    "sheet_row": 8,  "format": "date" },
+            { "name": "裁判所",       "type": "basic",    "sheet_row": 9,  "format": "text" },
+            { "name": "特殊贩卖日期①","type": "extended", "sheet_row": 6,  "format": "date" },
+            { "name": "特殊贩卖日期②","type": "extended", "sheet_row": 7,  "format": "date" },
+            { "name": "入札价格",     "type": "extended", "sheet_row": 10, "format": "currency_jpy" },
+            { "name": "中标价格",     "type": "extended", "sheet_row": 11, "format": "currency_jpy" }
+          ]
+        },
+        {
+          "id": "price",
+          "title": "标的价格",
+          "fields": [
+            { "name": "标的",         "type": "basic",    "sheet_row": 13, "format": "text" },
+            { "name": "保证金",       "type": "basic",    "sheet_row": 14, "format": "currency_jpy" },
+            { "name": "卖却基准价额", "type": "basic",    "sheet_row": 15, "format": "currency_jpy" },
+            { "name": "买受可能价额", "type": "basic",    "sheet_row": 16, "format": "currency_jpy" },
+            { "name": "固定资产税",   "type": "basic",    "sheet_row": 17, "format": "currency_jpy" },
+            { "name": "都市计划税",   "type": "basic",    "sheet_row": 18, "format": "currency_jpy" },
+            { "name": "敷地利用权价格","type": "extended","sheet_row": 19, "format": "currency_jpy" },
+            { "name": "建物价格",     "type": "extended", "sheet_row": 20, "format": "currency_jpy" },
+            { "name": "土地价格",     "type": "extended", "sheet_row": 21, "format": "currency_jpy" },
+            { "name": "基础价格",     "type": "extended", "sheet_row": 22, "format": "currency_jpy" },
+            { "name": "查定（一括）", "type": "extended", "sheet_row": 23, "format": "currency_jpy" },
+            { "name": "积算价格",     "type": "extended", "sheet_row": 24, "format": "currency_jpy" },
+            { "name": "收益价格",     "type": "extended", "sheet_row": 25, "format": "currency_jpy" },
+            { "name": "调整价格",     "type": "extended", "sheet_row": 26, "format": "currency_jpy" },
+            { "name": "评价额判定",   "type": "extended", "sheet_row": 27, "format": "currency_jpy" }
+          ]
+        },
+        {
+          "id": "location",
+          "title": "基础信息",
+          "fields": [
+            { "name": "所在地区域",   "type": "basic",    "sheet_row": 31, "format": "text" },
+            { "name": "建物名称",     "type": "basic",    "sheet_row": 33, "format": "text" },
+            { "name": "住居表示",     "type": "basic",    "sheet_row": 37, "format": "text" },
+            { "name": "位置交通",     "type": "basic",    "sheet_row": 39, "format": "text" },
+            { "name": "地图",         "type": "basic",    "sheet_row": null, "format": "google_map", "source_field": "住居表示", "_note": "Embedded Google Map using 住居表示 as address query" },
+            { "name": "所在地县市",   "type": "extended", "sheet_row": 30, "format": "text" },
+            { "name": "地番号",       "type": "extended", "sheet_row": 32, "format": "text" },
+            { "name": "现况地目",     "type": "extended", "sheet_row": 34, "format": "text" },
+            { "name": "种类",         "type": "extended", "sheet_row": 35, "format": "text" },
+            { "name": "家屋番号",     "type": "extended", "sheet_row": 36, "format": "text" },
+            { "name": "交通特征",     "type": "extended", "sheet_row": 38, "format": "text" },
+            { "name": "付近の状況",   "type": "extended", "sheet_row": 40, "format": "text" }
+          ]
+        },
+        {
+          "id": "building",
+          "title": "物件信息",
+          "fields": [
+            { "name": "构造",         "type": "basic",    "sheet_row": 41, "format": "text" },
+            { "name": "面积（专有）", "type": "basic",    "sheet_row": 44, "format": "area_m2" },
+            { "name": "面积（建物）", "type": "basic",    "sheet_row": 45, "format": "area_m2" },
+            { "name": "面积（地积）", "type": "basic",    "sheet_row": 46, "format": "area_m2" },
+            { "name": "建物初建",     "type": "basic",    "sheet_row": 60, "format": "text" },
+            { "name": "建物年限",     "type": "basic",    "sheet_row": 61, "format": "years" },
+            { "name": "楼层",         "type": "basic",    "sheet_row": 62, "format": "number" },
+            { "name": "总户数",       "type": "basic",    "sheet_row": 63, "format": "number" },
+            { "name": "建蔽率",       "type": "basic",    "sheet_row": 51, "format": "percent" },
+            { "name": "容积率",       "type": "basic",    "sheet_row": 52, "format": "percent" },
+            { "name": "建物种类",     "type": "extended", "sheet_row": 42, "format": "text" },
+            { "name": "建物用途",     "type": "extended", "sheet_row": 43, "format": "text" },
+            { "name": "特记事项",     "type": "extended", "sheet_row": 47, "format": "text_long" },
+            { "name": "写真状况",     "type": "extended", "sheet_row": 48, "format": "text_long" },
+            { "name": "用途地域",     "type": "extended", "sheet_row": 49, "format": "text" },
+            { "name": "都市区划",     "type": "extended", "sheet_row": 50, "format": "text" },
+            { "name": "登记地积面积", "type": "extended", "sheet_row": 53, "format": "area_m2" },
+            { "name": "延床面积",     "type": "extended", "sheet_row": 54, "format": "area_m2" },
+            { "name": "间口奥行",     "type": "extended", "sheet_row": 55, "format": "text" },
+            { "name": "方位",         "type": "extended", "sheet_row": 56, "format": "text" },
+            { "name": "景观",         "type": "extended", "sheet_row": 57, "format": "text" },
+            { "name": "采光",         "type": "extended", "sheet_row": 58, "format": "text" },
+            { "name": "接路",         "type": "extended", "sheet_row": 59, "format": "text" },
+            { "name": "建物状况",     "type": "extended", "sheet_row": 64, "format": "text" },
+            { "name": "设备",         "type": "extended", "sheet_row": 65, "format": "text" },
+            { "name": "附属建筑",     "type": "extended", "sheet_row": 66, "format": "text" },
+            { "name": "管理组合",     "type": "extended", "sheet_row": 67, "format": "text" },
+            { "name": "管理会社",     "type": "extended", "sheet_row": 68, "format": "text" },
+            { "name": "管理状态",     "type": "extended", "sheet_row": 69, "format": "text" },
+            { "name": "管理费",       "type": "extended", "sheet_row": 70, "format": "currency_jpy_monthly" }
+          ]
+        },
+        {
+          "id": "costs",
+          "title": "关联费用",
+          "fields": [
+            { "name": "修缮基金",     "type": "basic",    "sheet_row": 71, "format": "currency_jpy_monthly" },
+            { "name": "滞纳",         "type": "basic",    "sheet_row": 76, "format": "currency_jpy" },
+            { "name": "垃圾处理费",   "type": "extended", "sheet_row": 72, "format": "currency_jpy_monthly" },
+            { "name": "网络费",       "type": "extended", "sheet_row": 73, "format": "currency_jpy_monthly" },
+            { "name": "驻车费",       "type": "extended", "sheet_row": 75, "format": "currency_jpy_monthly" },
+            { "name": "其他费用",     "type": "extended", "sheet_row": 74, "format": "currency_jpy_monthly" }
+          ]
+        },
+        {
+          "id": "disclosure",
+          "title": "物件陈述",
+          "fields": [
+            { "name": "物件明细书特记","type": "basic",   "sheet_row": 28, "format": "text_long" },
+            { "name": "法律关系描述", "type": "extended", "sheet_row": 29, "format": "text_long" },
+            { "name": "调查信息摘要", "type": "extended", "sheet_row": null,"format": "text_long" },
+            { "name": "执行官意见摘要","type": "extended","sheet_row": null,"format": "text_long" }
+          ]
+        },
+        {
+          "id": "alerts",
+          "title": "特别提示",
+          "fields": [
+            { "name": "目的外物件",   "type": "basic",    "sheet_row": 77, "format": "text_long" },
+            { "name": "第三者权利",   "type": "extended", "sheet_row": 78, "format": "text_long" },
+            { "name": "债务（律师裁判）","type": "extended","sheet_row": 79,"format": "currency_jpy" },
+            { "name": "其他提示",     "type": "extended", "sheet_row": 80, "format": "text_long" }
+          ]
+        },
+        {
+          "id": "occupancy",
+          "title": "权利占有",
+          "fields": [
+            { "name": "占有者及状况", "type": "basic",    "sheet_row": 82, "format": "text" },
+            { "name": "权利持分",     "type": "extended", "sheet_row": 81, "format": "text" },
+            { "name": "赁借契约期限", "type": "extended", "sheet_row": 83, "format": "text" },
+            { "name": "赁借料金",     "type": "extended", "sheet_row": 84, "format": "currency_jpy_monthly" },
+            { "name": "赁借共益费",   "type": "extended", "sheet_row": 85, "format": "currency_jpy_monthly" },
+            { "name": "目的外建物土地","type": "extended","sheet_row": 86, "format": "text" },
+            { "name": "建物所有权",   "type": "extended", "sheet_row": 87, "format": "text" },
+            { "name": "第三者权利",   "type": "extended", "sheet_row": 88, "format": "text" },
+            { "name": "借地面积",     "type": "extended", "sheet_row": 89, "format": "area_m2" },
+            { "name": "借地赁料",     "type": "extended", "sheet_row": 90, "format": "currency_jpy_monthly" },
+            { "name": "地代滞纳及损害","type": "extended","sheet_row": 91, "format": "currency_jpy" },
+            { "name": "借地契约期限", "type": "extended", "sheet_row": 92, "format": "text" },
+            { "name": "借地契约更新", "type": "extended", "sheet_row": 93, "format": "text" }
+          ]
+        },
+        {
+          "id": "initial_assessment",
+          "title": "初判",
+          "fields": [
+            { "name": "初判备注",     "type": "basic",    "sheet_row": 94, "format": "text_long" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "field_investigation",
+      "title": "现地调查",
+      "min_tier": "viewer_premium",
+      "subsections": [
+        {
+          "id": "media",
+          "title": "媒体库",
+          "fields": [
+            { "name": "照片",         "type": "media",    "sheet_row": null, "format": "image_gallery", "drive_subfolder": true },
+            { "name": "视频",         "type": "media",    "sheet_row": null, "format": "video_gallery", "drive_subfolder": true },
+            { "name": "上传入口",     "type": "media",    "sheet_row": null, "format": "upload_form",   "min_tier": "worker" }
+          ]
+        },
+        {
+          "id": "field_comments",
+          "title": "现状调查备注",
+          "fields": [
+            { "name": "现场考察",     "type": "media",    "sheet_row": 95,  "format": "text_long" },
+            { "name": "周边商业",     "type": "media",    "sheet_row": 96,  "format": "text_long" },
+            { "name": "公共设施",     "type": "media",    "sheet_row": 97,  "format": "text_long" },
+            { "name": "噪音",         "type": "media",    "sheet_row": 98,  "format": "text_long" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "investment_analysis",
+      "title": "投资分析",
+      "min_tier": "viewer_premium",
+      "subsections": [
+        {
+          "id": "valuation",
+          "title": "现状调查数值",
+          "fields": [
+            { "name": "第三方评估价格","type": "input",   "sheet_row": 99,  "format": "currency_jpy" },
+            { "name": "AI评估价格",   "type": "input",    "sheet_row": 100, "format": "currency_jpy" },
+            { "name": "竞争性报价预估","type": "input",   "sheet_row": 101, "format": "currency_jpy" }
+          ]
+        },
+        {
+          "id": "disposal_costs",
+          "title": "处置费用",
+          "fields": [
+            { "name": "室内清理",     "type": "input",    "sheet_row": 102, "format": "currency_jpy" },
+            { "name": "内装想定",     "type": "input",    "sheet_row": 103, "format": "currency_jpy" },
+            { "name": "入居者赔偿",   "type": "input",    "sheet_row": 104, "format": "currency_jpy" },
+            { "name": "驱逐费用",     "type": "input",    "sheet_row": 105, "format": "currency_jpy" },
+            { "name": "其他1",        "type": "input",    "sheet_row": 106, "format": "currency_jpy" }
+          ]
+        },
+        {
+          "id": "returns",
+          "title": "收益",
+          "fields": [
+            { "name": "预期利润",     "type": "input",    "sheet_row": 107, "format": "currency_jpy" },
+            { "name": "收益率（年）", "type": "input",    "sheet_row": 108, "format": "percent" }
+          ]
+        },
+        {
+          "id": "second_assessment",
+          "title": "二判",
+          "fields": [
+            { "name": "二判备注",     "type": "input",    "sheet_row": 109, "format": "text_long" }
+          ]
+        },
+        {
+          "id": "opportunity",
+          "title": "机会分析",
+          "fields": [
+            { "name": "关注级别",     "type": "input",    "sheet_row": 110, "format": "select", "options": ["A", "B", "C", "D"] },
+            { "name": "要点",         "type": "input",    "sheet_row": 111, "format": "text_long" },
+            { "name": "处置方式",     "type": "input",    "sheet_row": 112, "format": "select", "options": ["修缮出租", "修整转售", "其他"] },
+            { "name": "修缮出租",     "type": "input",    "sheet_row": 113, "format": "currency_jpy_monthly" },
+            { "name": "收益预计",     "type": "input",    "sheet_row": 114, "format": "currency_jpy" },
+            { "name": "预计收益率",   "type": "input",    "sheet_row": 115, "format": "percent" },
+            { "name": "修整转售",     "type": "input",    "sheet_row": 116, "format": "currency_jpy" },
+            { "name": "持有时间",     "type": "input",    "sheet_row": 117, "format": "text" },
+            { "name": "转售价格",     "type": "input",    "sheet_row": 118, "format": "currency_jpy" },
+            { "name": "转售收益",     "type": "input",    "sheet_row": 119, "format": "currency_jpy" },
+            { "name": "转售收益年化", "type": "input",    "sheet_row": 120, "format": "percent" },
+            { "name": "可行入扎价格", "type": "input",    "sheet_row": 122, "format": "currency_jpy" },
+            { "name": "按入扎价格收益率","type": "input", "sheet_row": 123, "format": "percent" }
+          ]
+        }
+      ]
+    }
+  ]
+}

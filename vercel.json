@@ -8,6 +8,21 @@
     },
     "api/parse-pdf.py": {
       "maxDuration": 30
+    },
+    "api/monospages-admin.py": {
+      "maxDuration": 30
+    },
+    "api/monospages-config.py": {
+      "maxDuration": 30
+    },
+    "api/monospages-upload.py": {
+      "maxDuration": 30
+    },
+    "api/monospages-field-record.py": {
+      "maxDuration": 30
+    },
+    "api/monospages-analysis-record.py": {
+      "maxDuration": 30
     }
   },
   "env": {

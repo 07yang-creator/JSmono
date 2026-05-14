@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理员页 — 法拍管理系统</title>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+  <!-- ⚠️ TEST MODE — set TEST_MODE=false before production -->
+  <script>
+  (function () {
+    window.TEST_MODE = false;            // test shim disabled
+    if (!window.TEST_MODE) return;
+
+    /* Fake Auth0 user (admin role) */
+    var _fake = { name:'测试管理员', email:'test@example.com', picture:null, sub:'test|000' };
+    var _client = {
+      isAuthenticated:      function(){ return Promise.resolve(true); },
+      getUser:              function(){ return Promise.resolve(_fake); },
+      getTokenSilently:     function(){ return Promise.resolve('test-token-000'); },
+      handleRedirectCallback: function(){ return Promise.resolve({}); },
+      checkSession:         function(){ return Promise.resolve(); },
+      loginWithRedirect:    function(){ /* no-op in test mode */ },
+      logout: function(o){
+        location.href = (o && o.logoutParams && o.logoutParams.returnTo)
+                        || '/monospages/';
+      },
+    };
+
+    /* Override Auth0Client constructor (most pages) */
+    if (window.auth0) window.auth0.Auth0Client = function(){ return _client; };
+    /* Override createAuth0Client helper (batches page) */
+    window.createAuth0Client = function(){ return Promise.resolve(_client); };
+
+    /* Intercept fetch — fake the role API, pass everything else through */
+    var _orig = window.fetch.bind(window);
+    window.fetch = function(url, opts) {
+      var u = typeof url === 'string' ? url : '';
+      if (u.indexOf('/api/monospages-admin') !== -1) {
+        return Promise.resolve(new Response(
+          JSON.stringify({ monospages_role:'admin', email:'test@example.com', name:'测试管理员' }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      if (u.indexOf('/api/monospages-config') !== -1 && opts && opts.method === 'POST') {
+        return Promise.resolve(new Response(
+          JSON.stringify({ ok:true }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      return _orig(url, opts);
+    };
+  })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue:    #2B6CB0; --blue-dk: #215387; --blue-lt: #3a80c9; --blue-bg: #EBF4FF;
+      --orange:  #f76a0c; --orange-lt: #ff8534; --orange-bg: #fff3eb;
+      --red:     #c0392b; --red-bg: #fdf2f1;
+      --green:   #38a169; --green-bg: #e6fffa;
+      --yellow:  #d97706; --yellow-bg: #fef3c7;
+      --bg:      #F7FAFC; --card: #ffffff; --border: #E2E8F0;
+      --text:    #1A202C; --text-body: #2D3748; --muted: #718096;
+      --radius:  8px;
+      --shadow:  0 1px 3px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+                   'Microsoft YaHei', sans-serif;
+      background: var(--bg); color: var(--text-body);
+      font-size: 14px; line-height: 1.6;
+    }
+    a { text-decoration: none; color: inherit; }
+
+    /* ── NAVBAR ── */
+    .navbar {
+      position: sticky; top: 0; z-index: 200;
+      background: var(--blue-dk); border-bottom: 3px solid var(--orange);
+      display: flex; align-items: center; padding: 0 24px; height: 56px;
+      box-shadow: 0 2px 8px rgba(33,83,135,0.25);
+    }
+    .navbar-brand { display: flex; align-items: center; gap: 8px; margin-right: 24px; }
+    .navbar-brand-icon { width: 28px; height: 28px; background: var(--orange); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; }
+    .navbar-brand-main { font-size: 14px; font-weight: 700; color: #fff; }
+    .navbar-brand-sub  { font-size: 10px; color: rgba(255,255,255,0.42); }
+    .navbar-links { display: flex; align-items: center; gap: 2px; flex: 1; }
+    .navbar-links a { color: rgba(255,255,255,0.75); font-size: 13px; padding: 5px 12px; border-radius: 6px; white-space: nowrap; }
+    .navbar-links a:hover  { background: rgba(255,255,255,0.1); color: #fff; }
+    .navbar-links a.active { color: #fff; background: rgba(43,108,176,0.5); }
+    .navbar-right { display: flex; align-items: center; gap: 8px; }
+    .btn-nav-login { background: var(--orange); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-logout { background: transparent; color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2); padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .btn-logout:hover { color: #fff; border-color: rgba(255,255,255,0.5); }
+    .nav-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; overflow: hidden; }
+    .nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .nav-username { font-size: 13px; color: rgba(255,255,255,0.8); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #nav-auth-user { display: none; align-items: center; gap: 7px; }
+
+    /* ── PAGE HEADER ── */
+    .page-hdr {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 14px 28px; display: flex; align-items: center; gap: 12px;
+    }
+    .page-hdr-title { font-size: 18px; font-weight: 700; color: var(--text); flex: 1; }
+    .admin-badge {
+      background: var(--orange-bg); color: var(--orange);
+      font-size: 11px; font-weight: 700;
+      padding: 3px 10px; border-radius: 20px;
+    }
+
+    /* ── TAB BAR ── */
+    .tab-bar {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      display: flex; gap: 0; padding: 0 28px; position: sticky; top: 56px; z-index: 100;
+    }
+    .tab-btn {
+      padding: 13px 20px; font-size: 13px; font-weight: 500;
+      color: var(--muted); border: none; background: none;
+      cursor: pointer; font-family: inherit;
+      border-bottom: 3px solid transparent; margin-bottom: -1px;
+      transition: color 0.12s, border-color 0.12s;
+      display: flex; align-items: center; gap: 7px; white-space: nowrap;
+    }
+    .tab-btn:hover  { color: var(--text); }
+    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+    .tab-btn .tab-icon { font-size: 15px; }
+
+    /* ── MAIN BODY ── */
+    .page-body { max-width: 960px; margin: 0 auto; padding: 28px 20px 60px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── SECTION CARD ── */
+    .section-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      margin-bottom: 20px; overflow: hidden;
+    }
+    .section-card-head {
+      padding: 13px 20px; border-bottom: 1px solid var(--border);
+      font-size: 14px; font-weight: 700; color: var(--text);
+      background: var(--bg); display: flex; align-items: center; gap: 8px;
+    }
+    .section-card-head .hd-spacer { flex: 1; }
+    .section-card-body { padding: 20px; }
+
+    /* ── FORM ELEMENTS ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-grid.single { grid-template-columns: 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--text-body); }
+    .form-group .hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .form-input, .form-select, .form-textarea {
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 11px; font-size: 13px; color: var(--text);
+      font-family: inherit; background: #fff; width: 100%;
+      transition: border-color 0.15s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none; border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(43,108,176,0.1);
+    }
+    .form-textarea { resize: vertical; min-height: 80px; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit; border: none; transition: background 0.15s;
+    }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { background: var(--blue-dk); }
+    .btn-primary:disabled { background: var(--muted); cursor: not-allowed; }
+    .btn-secondary { background: var(--bg); color: var(--blue); border: 1px solid var(--blue); }
+    .btn-secondary:hover { background: var(--blue-bg); }
+    .btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid #fca5a5; }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-success:hover { filter: brightness(0.9); }
+    .btn-orange { background: var(--orange); color: #fff; }
+    .btn-orange:hover { background: var(--orange-lt); }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    /* ── STATUS ── */
+    .status-tag {
+      display: inline-block; font-size: 11px; font-weight: 600;
+      padding: 2px 9px; border-radius: 20px;
+    }
+    .st-ok  { background: var(--green-bg); color: var(--green); }
+    .st-err { background: var(--red-bg); color: var(--red); }
+    .st-info { background: var(--blue-bg); color: var(--blue); }
+    .st-warn { background: var(--yellow-bg); color: var(--yellow); }
+    .form-status { font-size: 12px; margin-top: 8px; }
+    .form-status.ok  { color: var(--green); }
+    .form-status.err { color: var(--red); }
+    .form-status.info { color: var(--blue); }
+
+    /* ── TABLE ── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th {
+      text-align: left; padding: 8px 12px;
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.4px;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+    }
+    .data-table td {
+      padding: 10px 12px; border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: #fafbfc; }
+    .user-avatar-sm {
+      width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
+      background: var(--blue-bg); flex-shrink: 0;
+    }
+    .user-info { display: flex; align-items: center; gap: 8px; }
+    .user-name-em { font-weight: 600; color: var(--text); }
+    .user-email   { font-size: 11px; color: var(--muted); }
+
+    /* role select inline */
+    .role-select {
+      border: 1px solid var(--border); border-radius: 5px;
+      padding: 4px 8px; font-size: 12px; font-family: inherit;
+      background: var(--bg); cursor: pointer;
+    }
+    .role-select:focus { outline: none; border-color: var(--blue); }
+
+    /* ── BATCH LIST ── */
+    .batch-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+    }
+    .batch-row:last-child { border-bottom: none; }
+    .batch-id-tag {
+      font-size: 11px; font-weight: 700;
+      background: var(--blue-bg); color: var(--blue);
+      padding: 3px 10px; border-radius: 20px; white-space: nowrap;
+    }
+    .batch-row-name { flex: 1; font-weight: 600; color: var(--text); }
+    .batch-row-meta { font-size: 12px; color: var(--muted); }
+
+    /* ── FIELD LAYOUT EDITOR ── */
+    .subsection-block {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 10px; overflow: hidden;
+    }
+    .subsection-block-head {
+      background: var(--bg); padding: 10px 14px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px; font-weight: 700; color: var(--text);
+      cursor: pointer;
+    }
+    .subsection-block-head .ss-caret { font-size: 10px; color: var(--muted); transition: transform 0.15s; }
+    .subsection-block-head.open .ss-caret { transform: rotate(90deg); }
+    .field-list { display: none; }
+    .field-list.open { display: block; }
+    .field-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px; border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .field-item:last-child { border-bottom: none; }
+    .field-item-name { flex: 1; font-weight: 500; color: var(--text); }
+    .field-item-row  { color: var(--muted); font-size: 11px; min-width: 50px; }
+    .field-item-fmt  { color: var(--muted); font-size: 11px; min-width: 100px; }
+    .type-toggle {
+      display: flex; gap: 3px;
+    }
+    .type-btn {
+      padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--bg); cursor: pointer;
+      font-family: inherit; color: var(--muted); transition: all 0.12s;
+    }
+    .type-btn.active-basic    { background: var(--red-bg); color: var(--red); border-color: #fca5a5; }
+    .type-btn.active-extended { background: var(--blue-bg); color: var(--blue); border-color: #90cdf4; }
+    .type-btn.active-input    { background: var(--green-bg); color: var(--green); border-color: #9ae6b4; }
+
+    /* ── BANNER PREVIEW ── */
+    .banner-preview {
+      border-radius: var(--radius); overflow: hidden;
+      position: relative; min-height: 160px;
+      display: flex; align-items: center;
+    }
+    .banner-preview-bg {
+      position: absolute; inset: 0;
+      background-size: cover; background-position: center;
+      transition: background-image 0.3s;
+    }
+    .banner-preview-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(105deg, rgba(33,83,135,0.88) 0%, rgba(43,108,176,0.78) 45%, rgba(33,83,135,0.45) 100%);
+    }
+    .banner-preview-inner {
+      position: relative; z-index: 1; padding: 20px 24px; width: 100%;
+      display: flex; align-items: center; gap: 20px;
+    }
+    .banner-preview-content { flex: 1; }
+    .bp-tag   { display: inline-block; background: var(--orange); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 20px; margin-bottom: 7px; }
+    .bp-title { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 5px; }
+    .bp-desc  { font-size: 12px; color: rgba(255,255,255,0.8); margin-bottom: 10px; line-height: 1.6; }
+    .bp-cta   { display: inline-block; background: var(--orange); color: #fff; padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600; }
+    .banner-preview-stats { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+    .bp-stat  { background: rgba(255,255,255,0.15); backdrop-filter: blur(4px); border-radius: 6px; padding: 8px 14px; text-align: center; min-width: 90px; }
+    .bp-stat-num { font-size: 18px; font-weight: 700; color: #fff; }
+    .bp-stat-lbl { font-size: 10px; color: rgba(255,255,255,0.55); }
+
+    /* ── ACCESS GATE ── */
+    #gate {
+      max-width: 400px; margin: 80px auto;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 48px 32px; text-align: center;
+      box-shadow: var(--shadow);
+    }
+    #gate .icon { font-size: 36px; margin-bottom: 12px; }
+    #gate h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    #gate p  { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .btn-gate-login { background: var(--blue); color: #fff; border: none; padding: 11px 32px; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="navbar-brand-icon">拍</div>
+    <div>
+      <div class="navbar-brand-main">法拍管理系统</div>
+      <div class="navbar-brand-sub">JJconnect.online</div>
+    </div>
+  </div>
+  <div class="navbar-links">
+    <a href="/monospages/">首页</a>
+    <a href="/monospages/batches/">批次总览</a>
+    <a href="/monospages/field/">现地调查</a>
+    <a href="/monospages/analysis/">快速分析</a>
+    <a href="/monospages/admin/" class="active">⚙ 管理</a>
+  </div>
+  <div class="navbar-right">
+    <button id="btn-nav-login" class="btn-nav-login" onclick="authLogin()">登录</button>
+    <div id="nav-auth-user">
+      <div class="nav-avatar">
+        <img id="nav-avatar-img" src="" alt="" onerror="this.style.display='none';document.getElementById('nav-avatar-init').style.display='flex';">
+        <span id="nav-avatar-init" style="display:none;"></span>
+      </div>
+      <span class="nav-username" id="nav-username"></span>
+      <button class="btn-logout" onclick="authLogout()">退出</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ACCESS GATE -->
+<div id="gate" style="display:none;">
+  <div class="icon">🔐</div>
+  <h3 id="gate-title">请先登录</h3>
+  <p id="gate-msg">管理员页面需要 admin 权限。</p>
+  <button class="btn-gate-login" onclick="authLogin()">登录 / Login</button>
+</div>
+
+<!-- PAGE CONTENT -->
+<div id="page-wrap" style="display:none;">
+
+  <div class="page-hdr">
+    <div class="page-hdr-title">⚙ 管理员页</div>
+    <span class="admin-badge">仅管理员</span>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('batches')" id="tab-batches">
+      <span class="tab-icon">📦</span>批次管理
+    </button>
+    <button class="tab-btn" onclick="switchTab('fields')" id="tab-fields">
+      <span class="tab-icon">🗂</span>字段布局编辑器
+    </button>
+    <button class="tab-btn" onclick="switchTab('users')" id="tab-users">
+      <span class="tab-icon">👥</span>用户管理
+    </button>
+    <button class="tab-btn" onclick="switchTab('banner')" id="tab-banner">
+      <span class="tab-icon">📢</span>首页横幅
+    </button>
+  </div>
+
+  <div class="page-body">
+
+    <!-- ══════════════════════════════════
+         TAB 1: 批次管理
+    ══════════════════════════════════ -->
+    <div class="tab-panel active" id="panel-batches">
+
+      <!-- Existing batches -->
+      <div class="section-card">
+        <div class="section-card-head">
+          当前批次列表
+          <div class="hd-spacer"></div>
+          <span class="status-tag st-info" id="batch-count">载入中…</span>
+        </div>
+        <div id="batch-list">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- Create new batch -->
+      <div class="section-card">
+        <div class="section-card-head">创建新批次</div>
+        <div class="section-card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>批次ID（URL slug）</label>
+              <input type="text" class="form-input" id="nb-id" placeholder="例：2026-5b">
+              <div class="hint">用于 URL 路径，只含小写字母、数字、连字符</div>
+            </div>
+            <div class="form-group">
+              <label>批次显示名称</label>
+              <input type="text" class="form-input" id="nb-name" placeholder="例：2026年5月B批次">
+            </div>
+            <div class="form-group">
+              <label>Google Sheets ID</label>
+              <input type="text" class="form-input" id="nb-sheet" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
+              <div class="hint">Sheets URL 中 /d/ 后面的字符串</div>
+            </div>
+            <div class="form-group">
+              <label>Google Drive 文件夹 ID（可选）</label>
+              <input type="text" class="form-input" id="nb-drive" placeholder="Drive 文件夹 ID">
+            </div>
+            <div class="form-group">
+              <label>入札开始日</label>
+              <input type="date" class="form-input" id="nb-start">
+            </div>
+            <div class="form-group">
+              <label>入札截止日</label>
+              <input type="date" class="form-input" id="nb-end">
+            </div>
+            <div class="form-group">
+              <label>开扎日</label>
+              <input type="date" class="form-input" id="nb-kaifuda">
+            </div>
+            <div class="form-group">
+              <label>裁判所</label>
+              <input type="text" class="form-input" id="nb-court" value="東京地方裁判所">
+            </div>
+          </div>
+          <div style="margin-top:16px;" class="btn-row">
+            <button class="btn btn-primary" onclick="generateBatchPage()">生成批次页面 HTML</button>
+            <button class="btn btn-secondary" onclick="previewBatch()">预览配置</button>
+          </div>
+          <div class="form-status" id="nb-status"></div>
+
+          <!-- Generated HTML download area -->
+          <div id="nb-download-area" style="display:none;margin-top:16px;background:var(--green-bg);border:1px solid #9ae6b4;border-radius:8px;padding:14px;">
+            <div style="font-size:13px;font-weight:600;color:var(--green);margin-bottom:8px;">✓ 批次页面已生成</div>
+            <div style="font-size:12px;color:var(--text-body);margin-bottom:10px;">
+              1. 点击下载，将 <code>index.html</code> 保存到仓库 <code>/monospages/<span id="dl-batch-id"></span>/</code><br>
+              2. 同时创建 <code>/monospages/<span class="dl-batch-id2"></span>/324/</code> 等物件子目录（复制现有模板）<br>
+              3. Commit → Push → Vercel 自动部署
+            </div>
+            <button class="btn btn-success" onclick="downloadBatchHTML()">⬇ 下载 index.html</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /panel-batches -->
+
+    <!-- ══════════════════════════════════
+         TAB 2: 字段布局编辑器
+    ══════════════════════════════════ -->
+    <div class="tab-panel" id="panel-fields">
+      <div class="section-card">
+        <div class="section-card-head">
+          字段布局编辑器
+          <div class="hd-spacer"></div>
+          <div class="btn-row">
+            <button class="btn btn-secondary btn-sm" onclick="exportFieldLayout()">导出 JSON</button>
+            <button class="btn btn-primary btn-sm" onclick="saveFieldLayout()">保存更改</button>
+          </div>
+        </div>
+        <div class="section-card-body">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.7;">
+            点击各子栏展开字段列表。点击 <strong>基础</strong> / <strong>扩展</strong> / <strong>输入</strong> 切换字段类型。
+            改动后点击 <strong>保存更改</strong> 或 <strong>导出JSON</strong> 提交到 <code>field-layout.json</code>。
+          </div>
+          <div id="field-editor">
+            <div style="color:var(--muted);font-size:13px;">载入中…</div>
+          </div>
+          <div class="form-status" id="field-status" style="margin-top:12px;"></div>
+        </div>
+      </div>
+    </div><!-- /panel-fields -->
+
+    <!-- ══════════════════════════════════
+         TAB 3: 用户管理
+    ══════════════════════════════════ -->
+    <div class="tab-panel" id="panel-users">
+      <div class="section-card">
+        <div class="section-card-head">
+          用户权限管理
+          <div class="hd-spacer"></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadUsers()">刷新</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);padding:10px 20px;border-bottom:1px solid var(--border);">
+          权限存储于 Auth0 <code>app_metadata.monospages_role</code>，用户无法自行修改。
+        </div>
+        <div id="users-table-wrap">
+          <div style="padding:20px;color:var(--muted);font-size:13px;">载入中…</div>
+        </div>
+      </div>
+      <div class="section-card" style="margin-top:0;">
+        <div class="section-card-head">权限级别说明</div>
+        <div class="section-card-body">
+          <table class="data-table">
+            <tr><th>级别</th><th>Key</th><th>可访问内容</th></tr>
+            <tr><td><span class="status-tag" style="background:#7c3aed20;color:#7c3aed;">管理员</span></td><td><code>admin</code></td><td>全部功能 + 用户管理 + 批次创建</td></tr>
+            <tr><td><span class="status-tag" style="background:#0369a120;color:#0369a1;">编辑员</span></td><td><code>worker</code></td><td>查看全部 + 编辑分析 + 上传媒体</td></tr>
+            <tr><td><span class="status-tag" style="background:#15803d20;color:#15803d;">高级查看</span></td><td><code>viewer_premium</code></td><td>全部3个区段（只读）+ 扩展字段</td></tr>
+            <tr><td><span class="status-tag" style="background:#71717a20;color:#71717a;">基础查看</span></td><td><code>viewer_basic</code></td><td>仅🔴基础字段，隐藏现地调查&amp;投资分析</td></tr>
+            <tr><td><span class="status-tag st-err">无权限</span></td><td>（空）</td><td>登录后显示权限受限提示</td></tr>
+          </table>
+        </div>
+      </div>
+    </div><!-- /panel-users -->
+
+    <!-- ══════════════════════════════════
+         TAB 4: 首页横幅
+    ══════════════════════════════════ -->
+    <div class="tab-panel" id="panel-banner">
+      <div class="section-card">
+        <div class="section-card-head">首页横幅预览</div>
+        <div class="section-card-body" style="padding:0 0 14px;">
+          <div class="banner-preview" id="banner-preview">
+            <div class="banner-preview-bg" id="bp-bg" style="background-image:url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&q=70&auto=format&fit=crop');"></div>
+            <div class="banner-preview-overlay"></div>
+            <div class="banner-preview-inner">
+              <div class="banner-preview-content">
+                <div class="bp-tag" id="bp-tag">最新公告</div>
+                <div class="bp-title" id="bp-title">2026年5月A批次开始受理</div>
+                <div class="bp-desc" id="bp-desc">本期共收录21件东京都内法拍物件。<br>入札期间：2026年5月21日 — 5月28日</div>
+                <a class="bp-cta" id="bp-cta">查看本批次物件 →</a>
+              </div>
+              <div class="banner-preview-stats">
+                <div class="bp-stat"><div class="bp-stat-num" id="bp-s1">21</div><div class="bp-stat-lbl">件物件</div></div>
+                <div class="bp-stat"><div class="bp-stat-num" id="bp-s2">5/28</div><div class="bp-stat-lbl">入札截止</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-card-head">
+          编辑横幅内容
+          <div class="hd-spacer"></div>
+        </div>
+        <div class="section-card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>标签文字（左上角徽章）</label>
+              <input type="text" class="form-input" id="bn-tag" placeholder="最新公告" oninput="previewBanner()">
+            </div>
+            <div class="form-group">
+              <label>统计数字1（件数）</label>
+              <input type="text" class="form-input" id="bn-s1" placeholder="21" oninput="previewBanner()">
+            </div>
+            <div class="form-group full">
+              <label>标题</label>
+              <input type="text" class="form-input" id="bn-title" placeholder="2026年5月A批次开始受理" oninput="previewBanner()">
+            </div>
+            <div class="form-group full">
+              <label>说明文字（支持 \n 换行）</label>
+              <textarea class="form-textarea" id="bn-desc" oninput="previewBanner()" style="min-height:60px;"></textarea>
+            </div>
+            <div class="form-group">
+              <label>按钮文字</label>
+              <input type="text" class="form-input" id="bn-cta-text" placeholder="查看本批次物件 →" oninput="previewBanner()">
+            </div>
+            <div class="form-group">
+              <label>按钮链接</label>
+              <input type="text" class="form-input" id="bn-cta-href" placeholder="/monospages/2026-5a/">
+            </div>
+            <div class="form-group">
+              <label>统计数字2（截止日等）</label>
+              <input type="text" class="form-input" id="bn-s2" placeholder="5/28" oninput="previewBanner()">
+            </div>
+            <div class="form-group full">
+              <label>背景图片 URL</label>
+              <input type="text" class="form-input" id="bn-bg" oninput="previewBanner()" placeholder="https://images.unsplash.com/…">
+              <div class="hint">推荐使用 Unsplash 或 Google Drive 直链。宽度建议 1600px 以上。</div>
+            </div>
+          </div>
+          <div style="margin-top:16px;" class="btn-row">
+            <button class="btn btn-primary" onclick="saveBanner()">保存横幅配置</button>
+            <button class="btn btn-secondary" onclick="loadBannerCurrent()">重置为当前值</button>
+          </div>
+          <div class="form-status" id="banner-status"></div>
+        </div>
+      </div>
+    </div><!-- /panel-banner -->
+
+  </div><!-- /page-body -->
+</div><!-- /page-wrap -->
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   AUTH0
+───────────────────────────────────────────────────────────── */
+const AUTH0_DOMAIN    = 'dev-5z54p7b3gul1eb27.jp.auth0.com';
+const AUTH0_CLIENT_ID = 'oGyqJ3R55KbNjZ6hOru7tpCaPgAHe5Ph';
+const REDIRECT_URI    = window.location.origin + '/monospages/admin/';
+
+let _auth0 = null, _token = null;
+let _fieldLayout = null;   // loaded field-layout.json
+let _nbHTML = '';          // generated batch page HTML
+
+async function initAuth() {
+  _auth0 = new window.auth0.Auth0Client({
+    domain: AUTH0_DOMAIN, clientId: AUTH0_CLIENT_ID,
+    authorizationParams: { redirect_uri: REDIRECT_URI, scope: 'openid profile email offline_access' },
+    cacheLocation: 'localstorage', useRefreshTokens: true
+  });
+  if (location.search.includes('code=') && location.search.includes('state=')) {
+    try { await _auth0.handleRedirectCallback(); } catch(e) {}
+    history.replaceState({}, document.title, location.pathname);
+  } else { try { await _auth0.checkSession(); } catch(_) {} }
+  await applyAuth();
+}
+
+async function applyAuth() {
+  let ok = false;
+  try { ok = await _auth0.isAuthenticated(); } catch(_) {}
+  if (!ok) { showGate('请先登录', '管理员页面需要登录。'); return; }
+
+  const user = await _auth0.getUser();
+  _token = await _auth0.getTokenSilently();
+  const name = user.name || user.email || '';
+  document.getElementById('nav-username').textContent = name;
+  const img = document.getElementById('nav-avatar-img');
+  const ini = document.getElementById('nav-avatar-init');
+  if (user.picture) { img.src=user.picture; img.style.display=''; ini.style.display='none'; }
+  else { img.style.display='none'; ini.textContent=name[0]?.toUpperCase()||'?'; ini.style.display='flex'; }
+  document.getElementById('btn-nav-login').style.display = 'none';
+  document.getElementById('nav-auth-user').style.display = 'flex';
+
+  // Check role
+  let role = '';
+  try {
+    const r = await fetch('/api/monospages-admin', { headers: {'Authorization':'Bearer '+_token} });
+    if (r.ok) { const d = await r.json(); role = d.monospages_role || ''; }
+  } catch(_) {}
+
+  if (role !== 'admin') {
+    showGate('访问受限', '此页面仅限 admin 角色。如需权限请联系系统管理员。');
+    return;
+  }
+
+  document.getElementById('gate').style.display      = 'none';
+  document.getElementById('page-wrap').style.display = 'block';
+
+  // Load initial tab data
+  initBatches();
+  loadBannerCurrent();
+}
+
+function showGate(title, msg) {
+  document.getElementById('gate-title').textContent = title;
+  document.getElementById('gate-msg').textContent   = msg;
+  document.getElementById('gate').style.display     = 'block';
+  document.getElementById('page-wrap').style.display = 'none';
+}
+
+function authLogin()  { if(_auth0) _auth0.loginWithRedirect({authorizationParams:{redirect_uri:REDIRECT_URI}}); }
+function authLogout() { if(_auth0) _auth0.logout({logoutParams:{returnTo:window.location.origin+'/monospages/'}}); }
+
+/* ─────────────────────────────────────────────────────────────
+   TAB SWITCHING
+───────────────────────────────────────────────────────────── */
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  document.getElementById('panel-'+id).classList.add('active');
+  if (id === 'users')  loadUsers();
+  if (id === 'fields') loadFieldLayout();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TAB 1: BATCH MANAGEMENT
+───────────────────────────────────────────────────────────── */
+// Hardcoded known batches — admin page will manage this list
+const KNOWN_BATCHES = [
+  { id:'2026-5a', name:'2026年5月A批次', sheet:'13YPzFbgNnrEQSTTuOXLaevapiL3OW_3L', start:'2026-05-21', end:'2026-05-28', kaifuda:'2026-06-03', court:'東京地方裁判所', status:'active' }
+];
+
+function initBatches() {
+  const list = document.getElementById('batch-list');
+  document.getElementById('batch-count').textContent = `${KNOWN_BATCHES.length} 个批次`;
+  if (!KNOWN_BATCHES.length) {
+    list.innerHTML = `<div style="padding:20px;color:var(--muted);font-size:13px;">暂无批次记录</div>`;
+    return;
+  }
+  list.innerHTML = KNOWN_BATCHES.map(b => `
+    <div class="batch-row">
+      <span class="batch-id-tag">${b.id}</span>
+      <div class="flex-1">
+        <div class="batch-row-name">${b.name}</div>
+        <div class="batch-row-meta">入札：${b.start} — ${b.end} &nbsp;·&nbsp; 开札：${b.kaifuda}</div>
+      </div>
+      <span class="status-tag ${b.status==='active'?'st-ok':'st-info'}">${b.status==='active'?'进行中':'已结束'}</span>
+      <a href="/monospages/${b.id}/" class="btn btn-secondary btn-sm" target="_blank">查看</a>
+    </div>`).join('');
+}
+
+function previewBatch() {
+  const id = document.getElementById('nb-id').value.trim();
+  const name = document.getElementById('nb-name').value.trim();
+  if (!id || !name) { setStatus('nb-status', '请填写批次ID和名称', 'err'); return; }
+  setStatus('nb-status', `预览：路径 /monospages/${id}/ ，名称「${name}」`, 'info');
+}
+
+function generateBatchPage() {
+  const id      = document.getElementById('nb-id').value.trim();
+  const name    = document.getElementById('nb-name').value.trim();
+  const sheet   = document.getElementById('nb-sheet').value.trim();
+  const drive   = document.getElementById('nb-drive').value.trim();
+  const start   = document.getElementById('nb-start').value;
+  const end     = document.getElementById('nb-end').value;
+  const kaifuda = document.getElementById('nb-kaifuda').value;
+  const court   = document.getElementById('nb-court').value.trim() || '東京地方裁判所';
+
+  if (!id || !name || !sheet) {
+    setStatus('nb-status', '请填写批次ID、名称和 Sheet ID', 'err'); return;
+  }
+  if (!/^[a-z0-9-]+$/.test(id)) {
+    setStatus('nb-status', '批次ID 只能含小写字母、数字和连字符', 'err'); return;
+  }
+
+  // Generate batch page HTML by replacing constants from 2026-5a template
+  _nbHTML = buildBatchHTML({ id, name, sheet, drive, start, end, kaifuda, court });
+  document.getElementById('dl-batch-id').textContent = id;
+  document.querySelectorAll('.dl-batch-id2').forEach(el => el.textContent = id);
+  document.getElementById('nb-download-area').style.display = '';
+  setStatus('nb-status', `✓ HTML 已生成（${_nbHTML.length.toLocaleString()} 字节）`, 'ok');
+}
+
+function downloadBatchHTML() {
+  if (!_nbHTML) return;
+  const id = document.getElementById('nb-id').value.trim();
+  const blob = new Blob([_nbHTML], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${id}-index.html`;
+  a.click();
+}
+
+function buildBatchHTML({ id, name, sheet, drive, start, end, kaifuda, court }) {
+  // Template — identical to 2026-5a/index.html, just BATCH config replaced
+  return `<!DOCTYPE html>
+<html lang="zh-CN"><!-- Batch: ${name} | Generated by admin page ${new Date().toISOString().slice(0,10)} -->
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${name} — 法拍管理系统</title>
+  <!-- Copy full CSS from /monospages/2026-5a/index.html (identical) -->
+</head>
+<body>
+<script>
+/* ── BATCH CONFIG ─────────────────────────────────────── */
+const BATCH = {
+  id:         '${id}',
+  name:       '${name}',
+  sheet_id:   '${sheet}',
+  sheet_name: '入例表【土地+建物】',
+  drive_id:   '${drive}',
+  status:     'active',
+  bid_start:  '${start}',
+  bid_end:    '${end}',
+  kaifuda:    '${kaifuda}',
+  court:      '${court}'
+};
+/* ── Copy all remaining JS from /monospages/2026-5a/index.html ── */
+<\/script>
+</body>
+</html>`;
+  // Note: In production, the full HTML is generated by copying 2026-5a/index.html
+  // and replacing only the BATCH constant block. The admin downloads this file
+  // and commits it to /monospages/{id}/index.html in the repo.
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TAB 2: FIELD LAYOUT EDITOR
+───────────────────────────────────────────────────────────── */
+async function loadFieldLayout() {
+  if (_fieldLayout) { renderFieldEditor(_fieldLayout); return; }
+  const editor = document.getElementById('field-editor');
+  editor.innerHTML = '<div style="color:var(--muted);font-size:13px;">载入 field-layout.json…</div>';
+  try {
+    const r = await fetch('/monospages/field-layout.json?_=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    _fieldLayout = await r.json();
+    renderFieldEditor(_fieldLayout);
+  } catch(e) {
+    editor.innerHTML = `<div style="color:var(--red);font-size:13px;">载入失败：${e.message}<br>请确认 field-layout.json 可访问。</div>`;
+  }
+}
+
+function renderFieldEditor(layout) {
+  const editor = document.getElementById('field-editor');
+  let html = '';
+  for (const sec of layout.page_sections) {
+    html += `<div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">${sec.title}</div>`;
+    for (const ss of sec.subsections) {
+      const ssId = `ss_${sec.id}_${ss.id}`;
+      html += `<div class="subsection-block">
+        <div class="subsection-block-head" onclick="toggleSS('${ssId}')">
+          <span class="ss-caret">›</span> ${ss.title}
+          <span style="flex:1"></span>
+          <span style="font-size:11px;color:var(--muted);">${ss.fields.length} 个字段</span>
+        </div>
+        <div class="field-list" id="${ssId}">`;
+      for (let fi = 0; fi < ss.fields.length; fi++) {
+        const f = ss.fields[fi];
+        const bid = `${ssId}_${fi}`;
+        html += `<div class="field-item" data-sec="${sec.id}" data-ss="${ss.id}" data-fi="${fi}">
+          <div class="field-item-name">${f.name}</div>
+          <div class="field-item-row">行 ${f.sheet_row||'—'}</div>
+          <div class="field-item-fmt">${f.format||'text'}</div>
+          <div class="type-toggle">
+            <button class="type-btn ${f.type==='basic'?'active-basic':''}" onclick="setFieldType(this,'${bid}','basic')">基础</button>
+            <button class="type-btn ${f.type==='extended'?'active-extended':''}" onclick="setFieldType(this,'${bid}','extended')">扩展</button>
+            <button class="type-btn ${f.type==='input'?'active-input':''}" onclick="setFieldType(this,'${bid}','input')">输入</button>
+          </div>
+        </div>`;
+      }
+      html += `</div></div>`;
+    }
+    html += `</div>`;
+  }
+  editor.innerHTML = html;
+}
+
+function toggleSS(id) {
+  const el = document.getElementById(id);
+  const hd = el.previousElementSibling;
+  const open = el.classList.toggle('open');
+  hd.classList.toggle('open', open);
+}
+
+function setFieldType(btn, bid, type) {
+  // Update UI
+  const row = btn.closest('.field-item');
+  row.querySelectorAll('.type-btn').forEach(b => b.className = 'type-btn');
+  btn.classList.add(`active-${type}`);
+
+  // Update in-memory layout
+  const sec = row.dataset.sec;
+  const ss  = row.dataset.ss;
+  const fi  = parseInt(row.dataset.fi);
+  const secObj = _fieldLayout.page_sections.find(s => s.id === sec);
+  const ssObj  = secObj?.subsections.find(s => s.id === ss);
+  if (ssObj) ssObj.fields[fi].type = type;
+}
+
+function exportFieldLayout() {
+  if (!_fieldLayout) { setStatus('field-status', '请先载入字段布局', 'err'); return; }
+  const blob = new Blob([JSON.stringify(_fieldLayout, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'field-layout.json';
+  a.click();
+  setStatus('field-status', '✓ 已导出 field-layout.json，替换仓库中的文件后 commit', 'ok');
+}
+
+async function saveFieldLayout() {
+  if (!_fieldLayout) { setStatus('field-status', '未载入字段布局', 'err'); return; }
+  // For now: trigger download (same as export) — direct write requires a PUT API
+  exportFieldLayout();
+  setStatus('field-status', '字段布局已导出，请将文件提交至仓库以生效。', 'info');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TAB 3: USER MANAGEMENT
+───────────────────────────────────────────────────────────── */
+async function loadUsers() {
+  const wrap = document.getElementById('users-table-wrap');
+  wrap.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;">⏳ 载入用户列表…</div>';
+  try {
+    const r = await fetch('/api/monospages-admin?action=list_users', {
+      headers: { 'Authorization': 'Bearer ' + _token }
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.json()).error}`);
+    const { users } = await r.json();
+    renderUsersTable(users);
+  } catch(e) {
+    wrap.innerHTML = `<div style="padding:20px;color:var(--red);font-size:13px;">
+      载入失败：${e.message}<br>
+      <small>请确认 AUTH0_MGMT_CLIENT_ID / AUTH0_MGMT_CLIENT_SECRET 已配置于 Vercel 环境变量。</small>
+    </div>`;
+  }
+}
+
+function renderUsersTable(users) {
+  const wrap = document.getElementById('users-table-wrap');
+  if (!users.length) {
+    wrap.innerHTML = '<div style="padding:20px;color:var(--muted);">暂无用户</div>'; return;
+  }
+  const ROLE_LABELS = {
+    'admin': '管理员', 'worker': '编辑员',
+    'viewer_premium': '高级查看', 'viewer_basic': '基础查看', '': '无权限'
+  };
+  wrap.innerHTML = `<table class="data-table">
+    <thead><tr>
+      <th>用户</th>
+      <th>最近登录</th>
+      <th>权限级别</th>
+      <th style="width:80px;">操作</th>
+    </tr></thead>
+    <tbody>
+    ${users.map((u,i) => `
+    <tr id="urow_${i}">
+      <td>
+        <div class="user-info">
+          <img class="user-avatar-sm" src="${u.picture||''}" alt="" onerror="this.style.display='none'">
+          <div>
+            <div class="user-name-em">${u.name||'—'}</div>
+            <div class="user-email">${u.email}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px;color:var(--muted);">${u.last_login ? new Date(u.last_login).toLocaleDateString('zh-CN') : '—'}</td>
+      <td>
+        <select class="role-select" id="role_${i}" data-uid="${u.user_id}">
+          <option value="" ${!u.monospages_role?'selected':''}>无权限</option>
+          <option value="viewer_basic"   ${u.monospages_role==='viewer_basic'  ?'selected':''}>基础查看</option>
+          <option value="viewer_premium" ${u.monospages_role==='viewer_premium'?'selected':''}>高级查看</option>
+          <option value="worker"         ${u.monospages_role==='worker'        ?'selected':''}>编辑员</option>
+          <option value="admin"          ${u.monospages_role==='admin'         ?'selected':''}>管理员</option>
+        </select>
+      </td>
+      <td>
+        <button class="btn btn-primary btn-sm" onclick="saveUserRole(${i})">保存</button>
+        <span class="form-status" id="ustat_${i}" style="font-size:11px;"></span>
+      </td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+async function saveUserRole(i) {
+  const sel  = document.getElementById(`role_${i}`);
+  const stat = document.getElementById(`ustat_${i}`);
+  const uid  = sel.dataset.uid;
+  const role = sel.value;
+  stat.textContent = '…'; stat.className = 'form-status info';
+  try {
+    const r = await fetch('/api/monospages-admin', {
+      method: 'POST',
+      headers: { 'Authorization':'Bearer '+_token, 'Content-Type':'application/json' },
+      body: JSON.stringify({ target_user_id: uid, role })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Error');
+    stat.textContent = '✓ 已保存'; stat.className = 'form-status ok';
+  } catch(e) {
+    stat.textContent = '✗ ' + e.message; stat.className = 'form-status err';
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TAB 4: BANNER CONFIG
+───────────────────────────────────────────────────────────── */
+async function loadBannerCurrent() {
+  try {
+    const r = await fetch('/api/monospages-config?section=banner');
+    if (r.ok) {
+      const cfg = await r.json();
+      document.getElementById('bn-tag').value      = cfg.tag      || '';
+      document.getElementById('bn-title').value    = cfg.title    || '';
+      document.getElementById('bn-desc').value     = cfg.desc     || '';
+      document.getElementById('bn-cta-text').value = cfg.cta_text || '';
+      document.getElementById('bn-cta-href').value = cfg.cta_href || '';
+      document.getElementById('bn-s1').value       = cfg.stat1_num|| '';
+      document.getElementById('bn-s2').value       = cfg.stat2_num|| '';
+      document.getElementById('bn-bg').value       = cfg.bg_image || '';
+      previewBanner();
+    }
+  } catch(_) {}
+}
+
+function previewBanner() {
+  document.getElementById('bp-tag').textContent   = document.getElementById('bn-tag').value   || '最新公告';
+  document.getElementById('bp-title').textContent = document.getElementById('bn-title').value || '（标题）';
+  document.getElementById('bp-desc').innerHTML    = (document.getElementById('bn-desc').value || '').replace(/\n/g,'<br>');
+  document.getElementById('bp-cta').textContent   = document.getElementById('bn-cta-text').value || '查看 →';
+  document.getElementById('bp-s1').textContent    = document.getElementById('bn-s1').value || '—';
+  document.getElementById('bp-s2').textContent    = document.getElementById('bn-s2').value || '—';
+  const bg = document.getElementById('bn-bg').value.trim();
+  if (bg) document.getElementById('bp-bg').style.backgroundImage = `url('${bg}')`;
+}
+
+async function saveBanner() {
+  const data = {
+    tag:       document.getElementById('bn-tag').value,
+    title:     document.getElementById('bn-title').value,
+    desc:      document.getElementById('bn-desc').value,
+    cta_text:  document.getElementById('bn-cta-text').value,
+    cta_href:  document.getElementById('bn-cta-href').value,
+    stat1_num: document.getElementById('bn-s1').value,
+    stat2_num: document.getElementById('bn-s2').value,
+    bg_image:  document.getElementById('bn-bg').value,
+  };
+  setStatus('banner-status', '保存中…', 'info');
+  try {
+    const r = await fetch('/api/monospages-config', {
+      method: 'POST',
+      headers: { 'Authorization':'Bearer '+_token, 'Content-Type':'application/json' },
+      body: JSON.stringify({ section: 'banner', data })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Error');
+    setStatus('banner-status', '✓ 横幅配置已保存', 'ok');
+  } catch(e) {
+    setStatus('banner-status', '✗ 保存失败：' + e.message, 'err');
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   UTILS
+───────────────────────────────────────────────────────────── */
+function setStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'form-status ' + (type||'info');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BOOT
+───────────────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', initAuth);
+</script>
+</body>
+</html>

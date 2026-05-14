@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2026年5月A批次 — 法拍管理系统</title>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+  <!-- ⚠️ TEST MODE — set TEST_MODE=false before production -->
+  <script>
+  (function () {
+    window.TEST_MODE = false;            // test shim disabled
+    if (!window.TEST_MODE) return;
+
+    /* Fake Auth0 user (admin role) */
+    var _fake = { name:'测试管理员', email:'test@example.com', picture:null, sub:'test|000' };
+    var _client = {
+      isAuthenticated:      function(){ return Promise.resolve(true); },
+      getUser:              function(){ return Promise.resolve(_fake); },
+      getTokenSilently:     function(){ return Promise.resolve('test-token-000'); },
+      handleRedirectCallback: function(){ return Promise.resolve({}); },
+      checkSession:         function(){ return Promise.resolve(); },
+      loginWithRedirect:    function(){ /* no-op in test mode */ },
+      logout: function(o){
+        location.href = (o && o.logoutParams && o.logoutParams.returnTo)
+                        || '/monospages/';
+      },
+    };
+
+    /* Override Auth0Client constructor (most pages) */
+    if (window.auth0) window.auth0.Auth0Client = function(){ return _client; };
+    /* Override createAuth0Client helper (batches page) */
+    window.createAuth0Client = function(){ return Promise.resolve(_client); };
+
+    /* Intercept fetch — fake the role API, pass everything else through */
+    var _orig = window.fetch.bind(window);
+    window.fetch = function(url, opts) {
+      var u = typeof url === 'string' ? url : '';
+      if (u.indexOf('/api/monospages-admin') !== -1) {
+        return Promise.resolve(new Response(
+          JSON.stringify({ monospages_role:'admin', email:'test@example.com', name:'测试管理员' }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      if (u.indexOf('/api/monospages-config') !== -1 && opts && opts.method === 'POST') {
+        return Promise.resolve(new Response(
+          JSON.stringify({ ok:true }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      return _orig(url, opts);
+    };
+  })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue:      #2B6CB0;
+      --blue-dk:   #215387;
+      --blue-lt:   #3a80c9;
+      --blue-bg:   #EBF4FF;
+      --orange:    #f76a0c;
+      --orange-lt: #ff8534;
+      --red:       #c0392b;
+      --red-lt:    #e74c3c;
+      --red-bg:    #fdf2f1;
+      --bg:        #F7FAFC;
+      --card:      #ffffff;
+      --border:    #E2E8F0;
+      --text:      #1A202C;
+      --text-body: #2D3748;
+      --muted:     #718096;
+      --success:   #38a169;
+      --radius:    10px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+                   'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: var(--bg); color: var(--text-body);
+      font-size: 14px; line-height: 1.6;
+    }
+    a { text-decoration: none; color: inherit; }
+
+    /* ── NAVBAR ── */
+    .navbar {
+      position: sticky; top: 0; z-index: 200;
+      background: var(--blue-dk);
+      border-bottom: 3px solid var(--orange);
+      display: flex; align-items: center;
+      padding: 0 28px; height: 56px;
+      box-shadow: 0 2px 8px rgba(33,83,135,0.25);
+    }
+    .navbar-brand { display: flex; align-items: center; gap: 10px; margin-right: 36px; flex-shrink: 0; }
+    .navbar-brand-icon {
+      width: 30px; height: 30px; background: var(--orange); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; color: #fff;
+    }
+    .navbar-brand-main { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.2; }
+    .navbar-brand-sub  { font-size: 10px; color: rgba(255,255,255,0.42); line-height: 1; }
+    .navbar-links { display: flex; align-items: center; gap: 4px; flex: 1; }
+    .navbar-links a {
+      color: rgba(255,255,255,0.75); font-size: 13px; font-weight: 500;
+      padding: 6px 14px; border-radius: 6px;
+      transition: background 0.15s, color 0.15s; white-space: nowrap;
+    }
+    .navbar-links a:hover  { background: rgba(255,255,255,0.1); color: #fff; }
+    .navbar-links a.active { color: #fff; background: rgba(43,108,176,0.5); }
+    .navbar-links a.admin-link { color: rgba(247,106,12,0.9); margin-left: 8px; }
+    .navbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .btn-nav-action {
+      background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 5px 13px; border-radius: 6px; font-size: 12px; cursor: pointer;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .btn-nav-action:hover { background: rgba(255,255,255,0.18); color: #fff; }
+    .btn-nav-login {
+      background: var(--orange); color: #fff; border: none;
+      padding: 7px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .btn-nav-login:hover { background: var(--orange-lt); }
+    .btn-logout {
+      background: transparent; color: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    }
+    .btn-logout:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
+    .nav-avatar {
+      width: 30px; height: 30px; border-radius: 50%; background: var(--blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #fff; overflow: hidden;
+    }
+    .nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .nav-username { font-size: 13px; color: rgba(255,255,255,0.8); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #nav-auth-user { display: none; align-items: center; gap: 8px; }
+
+    /* ── PAGE HEADER ── */
+    .page-header {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 16px 28px; display: flex; align-items: center; gap: 16px;
+    }
+    .page-header-back {
+      color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 4px;
+      transition: color 0.15s;
+    }
+    .page-header-back:hover { color: var(--blue); }
+    .page-header-title {
+      font-size: 18px; font-weight: 700; color: var(--text); flex: 1;
+    }
+    .page-header-meta { font-size: 12px; color: var(--muted); }
+    .badge-active {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #e6fffa; color: #2c7a7b;
+      font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px; white-space: nowrap;
+    }
+    .dot-green { width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
+
+    /* ── FILTER BAR ── */
+    .filter-bar {
+      position: sticky; top: 56px; z-index: 100;
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 10px 28px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .filter-label { font-size: 12px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    .filter-select {
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 10px; font-size: 12px; color: var(--text-body);
+      background: var(--bg); cursor: pointer;
+      font-family: inherit;
+    }
+    .filter-select:focus { outline: none; border-color: var(--blue); }
+    .filter-btn-group { display: flex; gap: 4px; }
+    .filter-btn {
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 12px; font-size: 12px; background: var(--bg);
+      cursor: pointer; font-weight: 500; color: var(--muted);
+      transition: all 0.12s; font-family: inherit;
+    }
+    .filter-btn:hover  { border-color: var(--blue); color: var(--blue); }
+    .filter-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .filter-btn.attn-a.active { background: #c0392b; border-color: #c0392b; }
+    .filter-btn.attn-b.active { background: #e67e22; border-color: #e67e22; }
+    .filter-btn.attn-c.active { background: #27ae60; border-color: #27ae60; }
+    .filter-btn.attn-d.active { background: var(--muted); border-color: var(--muted); }
+    .filter-spacer { flex: 1; }
+    .filter-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+    /* ── MAIN BODY ── */
+    .page-body { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    /* ── CARD GRID ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    @media (max-width: 980px)  { .card-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px)  { .card-grid { grid-template-columns: 1fr; } }
+
+    .prop-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.15s, border-color 0.15s, transform 0.12s;
+    }
+    .prop-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: #bee3f8;
+      transform: translateY(-3px);
+    }
+
+    /* Card image */
+    .card-img {
+      height: 150px; background: #e8edf4;
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .card-img img { width: 100%; height: 100%; object-fit: cover; }
+    .card-img-placeholder {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      color: #a0aec0; font-size: 11px; text-align: center;
+    }
+    .card-img-placeholder span { font-size: 28px; }
+    .card-deadline {
+      position: absolute; top: 10px; right: 10px;
+      background: var(--red); color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 3px 8px; border-radius: 4px;
+      white-space: nowrap;
+    }
+    .card-deadline.urgent { background: #7b0000; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.75} }
+
+    /* Card body */
+    .card-body { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+
+    .card-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .attn-badge {
+      font-size: 11px; font-weight: 700;
+      width: 22px; height: 22px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; flex-shrink: 0;
+    }
+    .attn-A { background: #c0392b; }
+    .attn-B { background: #e67e22; }
+    .attn-C { background: #27ae60; }
+    .attn-D { background: var(--muted); }
+    .attn-none { background: #e2e8f0; color: #718096; }
+    .district-tag {
+      font-size: 11px; color: var(--blue);
+      background: var(--blue-bg);
+      padding: 2px 8px; border-radius: 10px;
+    }
+    .type-tag {
+      font-size: 11px; color: var(--muted);
+      background: var(--bg); border: 1px solid var(--border);
+      padding: 2px 8px; border-radius: 10px;
+    }
+
+    .card-id { font-size: 11px; color: var(--muted); }
+    .card-name { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.3; }
+
+    .card-price-row { display: flex; flex-direction: column; gap: 2px; }
+    .card-price-main { font-size: 18px; font-weight: 700; color: var(--red); }
+    .card-price-label { font-size: 10px; color: var(--muted); }
+    .card-price-deposit { font-size: 11px; color: var(--muted); }
+
+    .card-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px; background: var(--bg);
+      border-radius: 6px; padding: 8px;
+    }
+    .card-stat { text-align: center; }
+    .card-stat-val { font-size: 13px; font-weight: 600; color: var(--text); }
+    .card-stat-lbl { font-size: 10px; color: var(--muted); }
+
+    .card-address { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+    .card-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-footer-meta { font-size: 11px; color: var(--muted); }
+    .card-cta {
+      font-size: 12px; font-weight: 600; color: var(--blue);
+      display: flex; align-items: center; gap: 4px;
+      transition: gap 0.1s;
+    }
+    .card-cta:hover { gap: 7px; }
+
+    /* ── EMPTY / LOADING ── */
+    .grid-message {
+      grid-column: 1 / -1;
+      text-align: center; padding: 60px 20px;
+      color: var(--muted); font-size: 14px;
+    }
+    .grid-message .icon { font-size: 36px; margin-bottom: 12px; }
+
+    /* ── LOGIN GATE ── */
+    #login-gate {
+      max-width: 400px; margin: 80px auto;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 48px 32px; text-align: center;
+      box-shadow: var(--shadow-sm);
+    }
+    #login-gate h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    #login-gate p  { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .btn-login-lg {
+      display: inline-block; background: var(--blue); color: #fff;
+      padding: 11px 32px; border-radius: 7px;
+      font-size: 14px; font-weight: 600; cursor: pointer; border: none;
+    }
+    .btn-login-lg:hover { background: var(--blue-dk); }
+
+    /* ── PRINT ── */
+    @media print {
+      .navbar, .filter-bar, .page-header { display: none !important; }
+      .prop-card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
+      .card-cta, .card-footer { display: none; }
+      .page-body { padding: 0; max-width: 100%; }
+      .card-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="navbar-brand-icon">拍</div>
+    <div>
+      <div class="navbar-brand-main">法拍管理系统</div>
+      <div class="navbar-brand-sub">JJconnect.online</div>
+    </div>
+  </div>
+  <div class="navbar-links">
+    <a href="/monospages/">首页</a>
+    <a href="/monospages/batches/" class="active">批次总览</a>
+    <a href="/monospages/field/">现地调查</a>
+    <a href="/monospages/analysis/">快速分析</a>
+    <a href="/monospages/admin/" class="admin-link" id="nav-admin-link" style="display:none;">⚙ 管理</a>
+  </div>
+  <div class="navbar-right">
+    <button class="btn-nav-action" onclick="doPrint()">🖨 打印</button>
+    <button class="btn-nav-action" id="btn-save" onclick="saveFilters()">💾 保存筛选</button>
+    <button id="btn-nav-login" class="btn-nav-login" onclick="authLogin()">登录</button>
+    <div id="nav-auth-user">
+      <div class="nav-avatar">
+        <img id="nav-avatar-img" src="" alt="" onerror="this.style.display='none';document.getElementById('nav-avatar-init').style.display='flex';">
+        <span id="nav-avatar-init" style="display:none;"></span>
+      </div>
+      <span class="nav-username" id="nav-username"></span>
+      <button class="btn-logout" onclick="authLogout()">退出</button>
+    </div>
+  </div>
+</nav>
+
+<!-- PAGE HEADER -->
+<div class="page-header" id="page-header" style="display:none;">
+  <a href="/monospages/" class="page-header-back">← 首页</a>
+  <div class="page-header-title" id="batch-title">2026年5月A批次</div>
+  <div class="page-header-meta" id="batch-meta">入札：5月21日—5月28日 &nbsp;|&nbsp; 开札：6月3日 &nbsp;|&nbsp; 東京地方裁判所</div>
+  <span class="badge-active"><span class="dot-green"></span>进行中</span>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar" id="filter-bar" style="display:none;">
+  <span class="filter-label">区域</span>
+  <select class="filter-select" id="f-district" onchange="applyFilters()">
+    <option value="">全部区域</option>
+  </select>
+
+  <span class="filter-label">物件类型</span>
+  <select class="filter-select" id="f-type" onchange="applyFilters()">
+    <option value="">全部类型</option>
+    <option value="区分所有権">区分所有権</option>
+    <option value="所有権">所有権</option>
+    <option value="底地">底地</option>
+  </select>
+
+  <span class="filter-label">关注级别</span>
+  <div class="filter-btn-group">
+    <button class="filter-btn active" data-attn="" onclick="setAttn(this)">全部</button>
+    <button class="filter-btn attn-a" data-attn="A" onclick="setAttn(this)">A</button>
+    <button class="filter-btn attn-b" data-attn="B" onclick="setAttn(this)">B</button>
+    <button class="filter-btn attn-c" data-attn="C" onclick="setAttn(this)">C</button>
+    <button class="filter-btn attn-d" data-attn="D" onclick="setAttn(this)">D</button>
+  </div>
+
+  <span class="filter-label">排序</span>
+  <select class="filter-select" id="f-sort" onchange="applyFilters()">
+    <option value="deadline">入札截止日</option>
+    <option value="price_asc">价格 ↑</option>
+    <option value="price_desc">价格 ↓</option>
+    <option value="attn">关注级别</option>
+  </select>
+
+  <div class="filter-spacer"></div>
+  <span class="filter-count" id="result-count"></span>
+</div>
+
+<!-- LOGIN GATE -->
+<div id="login-gate" style="display:none;">
+  <div style="font-size:32px;margin-bottom:12px;">🔒</div>
+  <h3>请先登录</h3>
+  <p>需要授权账号才能查看物件数据。</p>
+  <button class="btn-login-lg" onclick="authLogin()">登录 / Login</button>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="page-body" id="main-content" style="display:none;">
+  <div class="card-grid" id="card-grid">
+    <div class="grid-message">
+      <div class="icon">⏳</div>
+      <div>正在加载物件数据…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   BATCH CONFIG  (generated per batch by admin page)
+───────────────────────────────────────────────────────────── */
+const BATCH = {
+  id:         '2026-5a',
+  name:       '2026年5月A批次',
+  sheet_id:   '13YPzFbgNnrEQSTTuOXLaevapiL3OW_3L',
+  sheet_name: '入例表【土地+建物】',
+  status:     'active',
+  bid_start:  '2026-05-21',
+  bid_end:    '2026-05-28',
+  kaifuda:    '2026-06-03',
+  court:      '東京地方裁判所'
+};
+
+/* ─────────────────────────────────────────────────────────────
+   MOCK DATA  (fallback when sheet not yet published)
+───────────────────────────────────────────────────────────── */
+const MOCK_PROPS = [
+  { '物件命名':'TYO-001','法拍文件编号':'R07K-00001','入扎日期终':'2026-05-28','标的':'区分所有権',
+    '买受可能价额':15600000,'保证金':1560000,'所在地区域':'新宿区',
+    '住居表示':'東京都新宿区西新宿2-3-1','面积（专有）':45.5,'建物年限':25,'楼层':12,'总户数':80,'关注级别':'A' },
+  { '物件命名':'TYO-002','法拍文件编号':'R07K-00002','入扎日期终':'2026-05-28','标的':'区分所有権',
+    '买受可能价额':8900000,'保证金':890000,'所在地区域':'港区',
+    '住居表示':'東京都港区芝浦4-15-1','面积（专有）':32.0,'建物年限':18,'楼层':8,'总户数':60,'关注级别':'B' },
+  { '物件命名':'TYO-003','法拍文件编号':'R07K-00003','入扎日期终':'2026-05-28','标的':'所有権',
+    '买受可能价额':34500000,'保证金':3450000,'所在地区域':'文京区',
+    '住居表示':'東京都文京区本郷5-26-3','面积（专有）':78.2,'建物年限':8,'楼层':3,'总户数':12,'关注级别':'A' },
+  { '物件命名':'TYO-004','法拍文件编号':'R07K-00004','入扎日期终':'2026-05-28','标的':'区分所有権',
+    '买受可能价额':6200000,'保证金':620000,'所在地区域':'台東区',
+    '住居表示':'東京都台東区上野6-1-1','面积（专有）':28.5,'建物年限':35,'楼层':5,'总户数':24,'关注级别':'C' },
+  { '物件命名':'TYO-005','法拍文件编号':'R07K-00005','入扎日期终':'2026-05-28','标的':'区分所有権',
+    '买受可能价额':12300000,'保证金':1230000,'所在地区域':'渋谷区',
+    '住居表示':'東京都渋谷区道玄坂1-12-1','面积（专有）':38.0,'建物年限':20,'楼层':15,'总户数':120,'关注级别':'B' },
+  { '物件命名':'TYO-006','法拍文件编号':'R07K-00006','入扎日期终':'2026-05-28','标的':'底地',
+    '买受可能价额':22000000,'保证金':2200000,'所在地区域':'江東区',
+    '住居表示':'東京都江東区豊洲3-1-1','面积（专有）':55.0,'建物年限':12,'楼层':20,'总户数':200,'关注级别':'C' }
+];
+
+/* ─────────────────────────────────────────────────────────────
+   AUTH0
+───────────────────────────────────────────────────────────── */
+const AUTH0_DOMAIN   = 'dev-5z54p7b3gul1eb27.jp.auth0.com';
+const AUTH0_CLIENT_ID = 'oGyqJ3R55KbNjZ6hOru7tpCaPgAHe5Ph';
+const REDIRECT_URI   = window.location.origin + '/monospages/2026-5a/';
+
+let _auth0 = null, _token = null, _role = null;
+
+async function initAuth() {
+  _auth0 = new window.auth0.Auth0Client({
+    domain: AUTH0_DOMAIN, clientId: AUTH0_CLIENT_ID,
+    authorizationParams: { redirect_uri: REDIRECT_URI, scope: 'openid profile email offline_access' },
+    cacheLocation: 'localstorage', useRefreshTokens: true
+  });
+  if (location.search.includes('code=') && location.search.includes('state=')) {
+    try { await _auth0.handleRedirectCallback(); } catch(e) {}
+    history.replaceState({}, document.title, location.pathname);
+  } else { try { await _auth0.checkSession(); } catch(_) {} }
+  await applyAuth();
+}
+
+async function applyAuth() {
+  let ok = false;
+  try { ok = await _auth0.isAuthenticated(); } catch(_) {}
+  if (!ok) { document.getElementById('login-gate').style.display = 'block'; return; }
+
+  const user = await _auth0.getUser();
+  _token = await _auth0.getTokenSilently();
+  const name = user.name || user.email || '';
+  document.getElementById('nav-username').textContent = name;
+  const img = document.getElementById('nav-avatar-img');
+  const ini = document.getElementById('nav-avatar-init');
+  if (user.picture) { img.src = user.picture; img.style.display=''; ini.style.display='none'; }
+  else { img.style.display='none'; ini.textContent=name[0]?.toUpperCase()||'?'; ini.style.display='flex'; }
+  document.getElementById('btn-nav-login').style.display = 'none';
+  document.getElementById('nav-auth-user').style.display = 'flex';
+
+  try {
+    const r = await fetch('/api/monospages-admin', { headers:{'Authorization':'Bearer '+_token} });
+    if (r.ok) { const d = await r.json(); _role = d.monospages_role || 'viewer_basic'; }
+  } catch(_) {}
+  if (!_role) _role = 'viewer_basic';
+
+  const isAdmin = _role==='admin';
+  document.getElementById('nav-admin-link').style.display = isAdmin ? '' : 'none';
+
+  document.getElementById('page-header').style.display = '';
+  document.getElementById('filter-bar').style.display  = '';
+  document.getElementById('main-content').style.display = '';
+
+  await loadData();
+  restoreFilters();
+}
+
+function authLogin()  { if(_auth0) _auth0.loginWithRedirect({authorizationParams:{redirect_uri:REDIRECT_URI}}); }
+function authLogout() { if(_auth0) _auth0.logout({logoutParams:{returnTo:window.location.origin+'/monospages/'}}); }
+
+/* ─────────────────────────────────────────────────────────────
+   GOOGLE SHEETS LOADER
+───────────────────────────────────────────────────────────── */
+let _allProps = [];
+let _filtered = [];
+
+async function loadData() {
+  const url = `https://docs.google.com/spreadsheets/d/${BATCH.sheet_id}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(BATCH.sheet_name)}`;
+  try {
+    const res  = await fetch(url);
+    const text = await res.text();
+    const s = text.indexOf('{'), e = text.lastIndexOf('}');
+    if (s < 0 || e < 0) throw new Error('bad response');
+    const table = JSON.parse(text.slice(s, e+1)).table;
+    _allProps = parseProperties(table);
+    if (!_allProps.length) throw new Error('empty');
+  } catch(err) {
+    console.warn('Sheet load failed, using mock data:', err.message);
+    _allProps = MOCK_PROPS;
+  }
+  populateDistricts();
+  applyFilters();
+}
+
+function parseProperties(table) {
+  if (!table?.rows?.length) return [];
+  const rows = table.rows;
+  const numProps = table.cols.length - 2;
+  const props = [];
+  for (let p = 0; p < numProps; p++) {
+    const obj = {};
+    for (let r = 0; r < rows.length; r++) {
+      const fname = rows[r]?.c?.[1]?.v;
+      const val   = rows[r]?.c?.[p+2]?.v;
+      if (fname != null) obj[fname] = val ?? '';
+    }
+    props.push(obj);
+  }
+  return props.filter(p => p['物件命名']);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FILTERS
+───────────────────────────────────────────────────────────── */
+let _attnFilter = '';
+
+function populateDistricts() {
+  const sel = document.getElementById('f-district');
+  const districts = [...new Set(_allProps.map(p => p['所在地区域']).filter(Boolean))].sort();
+  districts.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d; opt.textContent = d;
+    sel.appendChild(opt);
+  });
+}
+
+function setAttn(btn) {
+  document.querySelectorAll('.filter-btn[data-attn]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _attnFilter = btn.dataset.attn;
+  applyFilters();
+}
+
+function applyFilters() {
+  const district = document.getElementById('f-district').value;
+  const type     = document.getElementById('f-type').value;
+  const sort     = document.getElementById('f-sort').value;
+
+  _filtered = _allProps.filter(p => {
+    if (district && p['所在地区域'] !== district) return false;
+    if (type     && p['标的']       !== type)     return false;
+    if (_attnFilter && p['关注级别'] !== _attnFilter) return false;
+    return true;
+  });
+
+  const ATTN_ORDER = {A:0, B:1, C:2, D:3, '':4, undefined:4};
+  if (sort === 'price_asc')  _filtered.sort((a,b) => (a['买受可能价额']||0) - (b['买受可能价额']||0));
+  if (sort === 'price_desc') _filtered.sort((a,b) => (b['买受可能价额']||0) - (a['买受可能价额']||0));
+  if (sort === 'attn')       _filtered.sort((a,b) => (ATTN_ORDER[a['关注级别']]||4) - (ATTN_ORDER[b['关注级别']]||4));
+  if (sort === 'deadline')   _filtered.sort((a,b) => new Date(a['入扎日期终']||'9999') - new Date(b['入扎日期终']||'9999'));
+
+  document.getElementById('result-count').textContent = `共 ${_filtered.length} 件`;
+  renderCards(_filtered);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RENDER CARDS
+───────────────────────────────────────────────────────────── */
+function fmtJpy(v) {
+  if (!v && v !== 0) return '—';
+  const n = Number(v);
+  if (n >= 1e8) return (n/1e8).toFixed(1).replace(/\.0$/,'') + '億円';
+  if (n >= 1e4) return Math.round(n/1e4) + '万円';
+  return n.toLocaleString() + '円';
+}
+function fmtArea(v) { return v ? Number(v).toFixed(1) + ' m²' : '—'; }
+function daysLeft(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  return Math.ceil((d - Date.now()) / 86400000);
+}
+function deadlineBadge(p) {
+  const days = daysLeft(p['入扎日期终']);
+  if (days === null) return `<span class="card-deadline">截止：${p['入扎日期终']||'—'}</span>`;
+  if (days < 0)  return `<span class="card-deadline" style="background:#555">已截止</span>`;
+  if (days <= 3) return `<span class="card-deadline urgent">⚠ 还剩${days}天</span>`;
+  return `<span class="card-deadline">截止 ${days}天后</span>`;
+}
+function attnBadge(level) {
+  const cls = level ? `attn-${level}` : 'attn-none';
+  return `<span class="attn-badge ${cls}">${level||'—'}</span>`;
+}
+
+function renderCards(props) {
+  const grid = document.getElementById('card-grid');
+  if (!props.length) {
+    grid.innerHTML = `<div class="grid-message"><div class="icon">🔍</div><div>没有符合条件的物件</div></div>`;
+    return;
+  }
+  grid.innerHTML = props.map(p => {
+    const id   = encodeURIComponent(p['物件命名'] || '');
+    const area = fmtArea(p['面积（专有）']);
+    const age  = p['建物年限'] ? `${p['建物年限']}年` : '—';
+    const fl   = p['楼层']    ? `${p['楼层']}F` : '—';
+    return `
+    <a href="/monospages/${BATCH.id}/${encodeURIComponent(p['物件命名']||'')}/" class="prop-card">
+      <div class="card-img">
+        <div class="card-img-placeholder"><span>🏠</span><div>暂无图片</div></div>
+        ${deadlineBadge(p)}
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          ${attnBadge(p['关注级别'])}
+          ${p['所在地区域'] ? `<span class="district-tag">${p['所在地区域']}</span>` : ''}
+          ${p['标的'] ? `<span class="type-tag">${p['标的']}</span>` : ''}
+        </div>
+        <div>
+          <div class="card-id">${p['法拍文件编号']||''}</div>
+          <div class="card-name">${p['物件命名']||'—'}</div>
+        </div>
+        <div class="card-price-row">
+          <div class="card-price-label">买受可能价额</div>
+          <div class="card-price-main">${fmtJpy(p['买受可能价额'])}</div>
+          <div class="card-price-deposit">保证金：${fmtJpy(p['保证金'])}</div>
+        </div>
+        <div class="card-stats">
+          <div class="card-stat"><div class="card-stat-val">${area}</div><div class="card-stat-lbl">专有面积</div></div>
+          <div class="card-stat"><div class="card-stat-val">${age}</div><div class="card-stat-lbl">建物年限</div></div>
+          <div class="card-stat"><div class="card-stat-val">${fl}</div><div class="card-stat-lbl">楼层</div></div>
+        </div>
+        <div class="card-address">${p['住居表示']||'—'}</div>
+      </div>
+      <div class="card-footer">
+        <span class="card-footer-meta">入札截止：${p['入扎日期终']||'—'}</span>
+        <span class="card-cta">查看详情 →</span>
+      </div>
+    </a>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PRINT & SAVE
+───────────────────────────────────────────────────────────── */
+function doPrint() { window.print(); }
+
+async function saveFilters() {
+  const state = {
+    district: document.getElementById('f-district').value,
+    type:     document.getElementById('f-type').value,
+    attn:     _attnFilter,
+    sort:     document.getElementById('f-sort').value
+  };
+  localStorage.setItem('filters_' + BATCH.id, JSON.stringify(state));
+  if (_token) {
+    try {
+      await fetch('/api/user-profile', {
+        method: 'POST',
+        headers: { 'Authorization':'Bearer '+_token, 'Content-Type':'application/json' },
+        body: JSON.stringify({ key: 'filters_'+BATCH.id, value: state })
+      });
+    } catch(_) {}
+  }
+  const btn = document.getElementById('btn-save');
+  btn.textContent = '✓ 已保存';
+  setTimeout(() => btn.textContent = '💾 保存筛选', 2000);
+}
+
+function restoreFilters() {
+  const saved = localStorage.getItem('filters_' + BATCH.id);
+  if (!saved) return;
+  try {
+    const s = JSON.parse(saved);
+    if (s.district) document.getElementById('f-district').value = s.district;
+    if (s.type)     document.getElementById('f-type').value     = s.type;
+    if (s.sort)     document.getElementById('f-sort').value     = s.sort;
+    if (s.attn !== undefined) {
+      _attnFilter = s.attn;
+      document.querySelectorAll('.filter-btn[data-attn]').forEach(b => {
+        b.classList.toggle('active', b.dataset.attn === s.attn);
+      });
+    }
+  } catch(_) {}
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BOOT
+───────────────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', initAuth);
+</script>
+</body>
+</html>

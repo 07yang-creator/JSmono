@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>法拍管理系统 — JJconnect.online</title>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+  <!-- ⚠️ TEST MODE — set TEST_MODE=false before production -->
+  <script>
+  (function () {
+    window.TEST_MODE = false;            // test shim disabled
+    if (!window.TEST_MODE) return;
+
+    /* Fake Auth0 user (admin role) */
+    var _fake = { name:'测试管理员', email:'test@example.com', picture:null, sub:'test|000' };
+    var _client = {
+      isAuthenticated:      function(){ return Promise.resolve(true); },
+      getUser:              function(){ return Promise.resolve(_fake); },
+      getTokenSilently:     function(){ return Promise.resolve('test-token-000'); },
+      handleRedirectCallback: function(){ return Promise.resolve({}); },
+      checkSession:         function(){ return Promise.resolve(); },
+      loginWithRedirect:    function(){ /* no-op in test mode */ },
+      logout: function(o){
+        location.href = (o && o.logoutParams && o.logoutParams.returnTo)
+                        || '/monospages/';
+      },
+    };
+
+    /* Override Auth0Client constructor (most pages) */
+    if (window.auth0) window.auth0.Auth0Client = function(){ return _client; };
+    /* Override createAuth0Client helper (batches page) */
+    window.createAuth0Client = function(){ return Promise.resolve(_client); };
+
+    /* Intercept fetch — fake the role API, pass everything else through */
+    var _orig = window.fetch.bind(window);
+    window.fetch = function(url, opts) {
+      var u = typeof url === 'string' ? url : '';
+      if (u.indexOf('/api/monospages-admin') !== -1) {
+        return Promise.resolve(new Response(
+          JSON.stringify({ monospages_role:'admin', email:'test@example.com', name:'测试管理员' }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      if (u.indexOf('/api/monospages-config') !== -1 && opts && opts.method === 'POST') {
+        return Promise.resolve(new Response(
+          JSON.stringify({ ok:true }),
+          { status:200, headers:{'Content-Type':'application/json'} }
+        ));
+      }
+      return _orig(url, opts);
+    };
+  })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Variables — matches jjconnect.jp palette ── */
+    :root {
+      --blue:       #2B6CB0;
+      --blue-dk:    #215387;
+      --blue-lt:    #3a80c9;
+      --blue-bg:    #EBF4FF;
+      --orange:     #f76a0c;
+      --orange-lt:  #ff8534;
+      --orange-bg:  #fff3eb;
+      --red:        #c0392b;   /* kept for auction/alert semantics */
+      --bg:         #F7FAFC;
+      --bg2:        #EDF2F7;
+      --card:       #ffffff;
+      --border:     #E2E8F0;
+      --text:       #1A202C;
+      --text-body:  #2D3748;
+      --muted:      #718096;
+      --success:    #38a169;
+      --radius:     10px;
+      --shadow-sm:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md:  0 4px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+                   'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      color: var(--text-body);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    a { text-decoration: none; color: inherit; }
+
+    /* ══════════════════════════════════════════════
+       NAVBAR
+    ══════════════════════════════════════════════ */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--blue-dk);
+      border-bottom: 3px solid var(--orange);
+      display: flex;
+      align-items: center;
+      padding: 0 28px;
+      height: 56px;
+      gap: 0;
+      box-shadow: 0 2px 8px rgba(33,83,135,0.25);
+    }
+    .navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-right: 36px;
+      flex-shrink: 0;
+    }
+    .navbar-brand-icon {
+      width: 30px; height: 30px;
+      background: var(--orange);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; color: #fff;
+    }
+    .navbar-brand-text { display: flex; flex-direction: column; }
+    .navbar-brand-main { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.2; }
+    .navbar-brand-sub  { font-size: 10px; color: rgba(255,255,255,0.42); line-height: 1; }
+
+    .navbar-links { display: flex; align-items: center; gap: 4px; flex: 1; }
+    .navbar-links a {
+      color: rgba(255,255,255,0.75);
+      font-size: 13px; font-weight: 500;
+      padding: 6px 14px; border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .navbar-links a:hover  { background: rgba(255,255,255,0.1); color: #fff; }
+    .navbar-links a.active { color: #fff; background: rgba(43,108,176,0.5); }
+    .navbar-links a.admin-link { color: rgba(247,106,12,0.9); margin-left: 8px; }
+    .navbar-links a.admin-link:hover { background: rgba(247,106,12,0.15); color: var(--orange-lt); }
+
+    .navbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .btn-login {
+      background: var(--orange); color: #fff; border: none;
+      padding: 7px 18px; border-radius: 6px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-login:hover { background: var(--orange-lt); }
+    .btn-logout {
+      background: transparent; color: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 5px 12px; border-radius: 6px;
+      font-size: 12px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-logout:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
+    .nav-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--blue); display: flex; align-items: center;
+      justify-content: center; font-size: 13px; font-weight: 700;
+      color: #fff; overflow: hidden; flex-shrink: 0;
+    }
+    .nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .nav-username {
+      font-size: 13px; color: rgba(255,255,255,0.8);
+      max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #nav-auth-user { display: none; align-items: center; gap: 8px; }
+
+    /* ══════════════════════════════════════════════
+       HERO BANNER  (landscape photo background)
+    ══════════════════════════════════════════════ */
+    .hero {
+      position: relative;
+      border-radius: var(--radius);
+      overflow: hidden;
+      min-height: 240px;
+      display: flex;
+      align-items: center;
+    }
+    /* Tokyo cityscape background via Unsplash */
+    .hero-bg {
+      position: absolute; inset: 0;
+      background-image: url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1600&q=80&auto=format&fit=crop');
+      background-size: cover;
+      background-position: center 60%;
+    }
+    /* Gradient overlay for legibility */
+    .hero-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        105deg,
+        rgba(33,83,135,0.88) 0%,
+        rgba(43,108,176,0.78) 45%,
+        rgba(33,83,135,0.45) 100%
+      );
+    }
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      padding: 32px 36px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .hero-content { flex: 1; }
+    .hero-tag {
+      display: inline-block;
+      background: var(--orange);
+      color: #fff; font-size: 11px; font-weight: 700;
+      padding: 3px 12px; border-radius: 20px;
+      margin-bottom: 12px; letter-spacing: 0.5px;
+    }
+    .hero-title {
+      font-size: 22px; font-weight: 700;
+      color: #fff; line-height: 1.3; margin-bottom: 8px;
+    }
+    .hero-desc {
+      font-size: 13px; color: rgba(255,255,255,0.80);
+      line-height: 1.75; margin-bottom: 18px;
+    }
+    .hero-cta {
+      display: inline-block;
+      background: var(--orange); color: #fff;
+      padding: 9px 24px; border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 2px 8px rgba(247,106,12,0.35);
+    }
+    .hero-cta:hover { background: var(--orange-lt); transform: translateY(-1px); }
+    .hero-stats {
+      display: flex; flex-direction: column;
+      gap: 10px; flex-shrink: 0; text-align: right;
+    }
+    .hero-stat {
+      background: rgba(255,255,255,0.12);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 8px;
+      padding: 10px 18px;
+      min-width: 112px;
+    }
+    .hero-stat-num { font-size: 22px; font-weight: 700; color: #fff; }
+    .hero-stat-lbl { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+
+    /* ══════════════════════════════════════════════
+       MAIN LAYOUT
+    ══════════════════════════════════════════════ */
+    .page-body {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ══════════════════════════════════════════════
+       SECTION HEADERS
+    ══════════════════════════════════════════════ */
+    .section-hd {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .section-hd h2 {
+      font-size: 14px; font-weight: 700; color: var(--text);
+      white-space: nowrap;
+    }
+    .section-hd-line { flex: 1; height: 1px; background: var(--border); }
+    .section-hd-badge {
+      font-size: 11px; color: var(--muted);
+      background: var(--card); border: 1px solid var(--border);
+      padding: 2px 10px; border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    /* ══════════════════════════════════════════════
+       LATEST BATCH CARD
+    ══════════════════════════════════════════════ */
+    .batch-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    .batch-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: #bee3f8;
+    }
+    .batch-icon {
+      width: 50px; height: 50px;
+      background: var(--blue-bg);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .batch-info { flex: 1; }
+    .batch-name {
+      font-size: 16px; font-weight: 700; color: var(--text);
+      margin-bottom: 5px;
+    }
+    .batch-row {
+      display: flex; flex-wrap: wrap; gap: 14px;
+      font-size: 12px; color: var(--muted);
+    }
+    .batch-row span { display: flex; align-items: center; gap: 4px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .dot-green { background: var(--success); }
+    .dot-red   { background: var(--red); }
+    .batch-btn {
+      display: inline-block;
+      background: var(--blue); color: #fff;
+      padding: 9px 20px; border-radius: 6px;
+      font-size: 13px; font-weight: 600; flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .batch-btn:hover { background: var(--blue-dk); }
+
+    /* ══════════════════════════════════════════════
+       PAGE CARDS GRID
+    ══════════════════════════════════════════════ */
+    .pages-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .page-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 22px 18px;
+      display: flex; flex-direction: column; gap: 8px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+      cursor: pointer;
+    }
+    .page-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: #bee3f8;
+      transform: translateY(-2px);
+    }
+    .page-card-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; margin-bottom: 2px;
+    }
+    .icon-blue   { background: var(--blue-bg); }
+    .icon-green  { background: #e6fffa; }
+    .icon-purple { background: #f3eeff; }
+    .icon-orange { background: var(--orange-bg); }
+    .page-card-title { font-size: 15px; font-weight: 700; color: var(--text); }
+    .page-card-desc {
+      font-size: 13px; color: var(--muted); line-height: 1.65; flex: 1;
+    }
+    .page-card-link {
+      font-size: 12px; font-weight: 600; color: var(--blue);
+      display: flex; align-items: center; gap: 4px; margin-top: 4px;
+    }
+    .page-card-tier {
+      font-size: 11px;
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--muted); padding: 2px 8px; border-radius: 10px;
+      align-self: flex-start;
+    }
+
+    /* ══════════════════════════════════════════════
+       LOGIN GATE
+    ══════════════════════════════════════════════ */
+    #login-gate {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 52px 32px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      display: none;
+    }
+    .login-gate-icon {
+      font-size: 36px; margin-bottom: 14px;
+    }
+    #login-gate h3 {
+      font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px;
+    }
+    #login-gate p  { font-size: 13px; color: var(--muted); margin-bottom: 22px; line-height: 1.7; }
+    .btn-login-lg {
+      display: inline-block;
+      background: var(--blue); color: #fff;
+      padding: 11px 32px; border-radius: 7px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      border: none; transition: background 0.15s, box-shadow 0.15s;
+      box-shadow: 0 2px 8px rgba(43,108,176,0.3);
+    }
+    .btn-login-lg:hover {
+      background: var(--blue-dk);
+      box-shadow: 0 4px 16px rgba(43,108,176,0.4);
+    }
+
+    /* ══════════════════════════════════════════════
+       FOOTER
+    ══════════════════════════════════════════════ */
+    .site-footer {
+      text-align: center;
+      font-size: 11px; color: var(--muted);
+      padding: 20px; border-top: 1px solid var(--border);
+      margin-top: 8px;
+    }
+
+    /* ══════════════════════════════════════════════
+       RESPONSIVE
+    ══════════════════════════════════════════════ */
+    @media (max-width: 640px) {
+      .hero-inner  { flex-direction: column; gap: 20px; padding: 24px 20px; }
+      .hero-stats  { flex-direction: row; text-align: left; }
+      .hero-title  { font-size: 18px; }
+      .batch-card  { flex-direction: column; align-items: flex-start; }
+      .navbar-links a span.link-label { display: none; }
+      .page-body   { padding: 20px 14px 48px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     NAVBAR
+══════════════════════════════════════════════ -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="navbar-brand-icon">拍</div>
+    <div class="navbar-brand-text">
+      <div class="navbar-brand-main">法拍管理系统</div>
+      <div class="navbar-brand-sub">JJconnect.online</div>
+    </div>
+  </div>
+
+  <div class="navbar-links">
+    <a href="/monospages/" class="active"><span class="link-label">首页</span></a>
+    <a href="/monospages/batches/"><span class="link-label">批次总览</span></a>
+    <a href="/monospages/field/"><span class="link-label">现地调查</span></a>
+    <a href="/monospages/analysis/"><span class="link-label">快速分析</span></a>
+    <a href="/monospages/admin/" class="admin-link" id="nav-admin-link" style="display:none;">
+      ⚙ 管理
+    </a>
+  </div>
+
+  <div class="navbar-right">
+    <button id="btn-nav-login" class="btn-login" onclick="authLogin()">登录</button>
+    <div id="nav-auth-user">
+      <div class="nav-avatar">
+        <img id="nav-avatar-img" src="" alt=""
+             onerror="this.style.display='none';document.getElementById('nav-avatar-init').style.display='flex';">
+        <span id="nav-avatar-init" style="display:none;"></span>
+      </div>
+      <span class="nav-username" id="nav-username"></span>
+      <button class="btn-logout" onclick="authLogout()">退出</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════
+     PAGE BODY
+══════════════════════════════════════════════ -->
+<div class="page-body">
+
+  <!-- ── Login gate (shown when not logged in) ── -->
+  <div id="login-gate">
+    <div class="login-gate-icon">🔒</div>
+    <h3>请先登录</h3>
+    <p>法拍管理系统需要授权账号才能访问。<br>请使用您的 JJconnect 账号登录。</p>
+    <button class="btn-login-lg" onclick="authLogin()">登录 / Login</button>
+  </div>
+
+  <!-- ── Main content (shown when logged in) ── -->
+  <div id="main-content" style="display:none;">
+
+    <!-- TOOL INTRO -->
+    <div style="font-size:13px; color:var(--muted); line-height:1.8; padding: 4px 2px 0;">
+      本系统用于管理东京都内法拍（競売）不动产物件。每批次物件数据来自 Google Sheets，支持物件筛选、现地调查记录、投资分析输入与多媒体上传。如需访问权限，请联系管理员。
+    </div>
+
+    <!-- HERO BANNER (landscape photo + admin-editable text) -->
+    <div class="hero" id="promo-banner">
+      <div class="hero-bg"></div>
+      <div class="hero-overlay"></div>
+      <div class="hero-inner">
+        <div class="hero-content">
+          <div class="hero-tag" id="banner-tag">最新公告</div>
+          <div class="hero-title" id="banner-title">2026年5月A批次开始受理</div>
+          <div class="hero-desc" id="banner-desc">
+            本期共收录21件东京都内法拍物件，涵盖新宿、港区、文京等核心区域。<br>
+            入札期间：2026年5月21日 — 5月28日，开札日：6月3日。
+          </div>
+          <a class="hero-cta" id="banner-cta" href="/monospages/2026-5a/">查看本批次物件 →</a>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-num" id="banner-stat1-num">21</div>
+            <div class="hero-stat-lbl">件物件</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-num" id="banner-stat2-num">5/28</div>
+            <div class="hero-stat-lbl">入札截止</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LATEST BATCH -->
+    <div>
+      <div class="section-hd">
+        <h2>最新批次</h2>
+        <div class="section-hd-line"></div>
+        <div class="section-hd-badge">进行中</div>
+      </div>
+      <a href="/monospages/2026-5a/" class="batch-card" style="display:flex;">
+        <div class="batch-icon">🏠</div>
+        <div class="batch-info">
+          <div class="batch-name">2026年5月 A批次</div>
+          <div class="batch-row">
+            <span><span class="dot dot-green"></span>进行中</span>
+            <span>21件物件</span>
+            <span>入札：5月21日 — 5月28日</span>
+            <span>开札：6月3日</span>
+            <span>裁判所：東京地方裁判所</span>
+          </div>
+        </div>
+        <div class="batch-btn">查看物件</div>
+      </a>
+    </div>
+
+    <!-- PAGES -->
+    <div>
+      <div class="section-hd">
+        <h2>功能页面</h2>
+        <div class="section-hd-line"></div>
+      </div>
+      <div class="pages-grid">
+
+        <!-- 批次总览 -->
+        <a href="/monospages/batches/" class="page-card">
+          <div class="page-card-icon icon-blue">📋</div>
+          <div class="page-card-title">批次总览</div>
+          <div class="page-card-tier">全部用户</div>
+          <div class="page-card-desc">
+            查看所有历史及当前批次，筛选物件区域、价格区间、截标日期与关注级别。支持导出PDF与保存筛选偏好。
+          </div>
+          <div class="page-card-link">进入总览 →</div>
+        </a>
+
+        <!-- 现地调查 -->
+        <a href="/monospages/field/" class="page-card">
+          <div class="page-card-icon icon-green">📍</div>
+          <div class="page-card-title">快速现地调查</div>
+          <div class="page-card-tier">编辑员 / 管理员</div>
+          <div class="page-card-desc">
+            现场工作专用页面。输入物件编号快速调取基础信息与地图，上传现场照片/视频，填写考察备注并提交。
+          </div>
+          <div class="page-card-link">进入调查 →</div>
+        </a>
+
+        <!-- 快速分析 -->
+        <a href="/monospages/analysis/" class="page-card">
+          <div class="page-card-icon icon-purple">📊</div>
+          <div class="page-card-title">快速分析</div>
+          <div class="page-card-tier">编辑员 / 管理员</div>
+          <div class="page-card-desc">
+            双栏布局：左侧滚动浏览物件全部数据，右侧独立填写投资分析、处置方案与结论，支持预览与提交。
+          </div>
+          <div class="page-card-link">进入分析 →</div>
+        </a>
+
+        <!-- 管理 (admin only) -->
+        <a href="/monospages/admin/" class="page-card" id="card-admin" style="display:none;">
+          <div class="page-card-icon icon-orange">⚙️</div>
+          <div class="page-card-title">管理员页</div>
+          <div class="page-card-tier">仅管理员</div>
+          <div class="page-card-desc">
+            创建新批次、编辑字段布局（基础/扩展设置）、管理用户权限等级，以及编辑首页公告横幅内容。
+          </div>
+          <div class="page-card-link">进入管理 →</div>
+        </a>
+
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /page-body -->
+
+<footer class="site-footer">
+  法拍管理系统 &nbsp;|&nbsp; JJconnect.online &nbsp;|&nbsp; 数据来源：Google Sheets &nbsp;|&nbsp; 存储：Google Drive
+</footer>
+
+<!-- ══════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════ -->
+<script>
+
+// ── Auth0 config ─────────────────────────────────────────────────────────────
+const AUTH0_DOMAIN       = 'dev-5z54p7b3gul1eb27.jp.auth0.com';
+const AUTH0_CLIENT_ID    = 'oGyqJ3R55KbNjZ6hOru7tpCaPgAHe5Ph';
+const AUTH0_REDIRECT_URI = window.location.origin + '/monospages/';
+
+let _auth0 = null;
+let _token = null;
+let _role  = null;   // monospages_role from app_metadata
+
+// ── Banner config ─────────────────────────────────────────────────────────────
+const DEFAULT_BANNER = {
+  tag:       '最新公告',
+  title:     '2026年5月A批次开始受理',
+  desc:      '本期共收录21件东京都内法拍物件，涵盖新宿、港区、文京等核心区域。\n入札期间：2026年5月21日 — 5月28日，开札日：6月3日。',
+  cta_text:  '查看本批次物件 →',
+  cta_href:  '/monospages/2026-5a/',
+  stat1_num: '21',
+  stat2_num: '5/28',
+  bg_image:  'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1600&q=80&auto=format&fit=crop'
+};
+
+function applyBanner(cfg) {
+  document.getElementById('banner-tag').textContent   = cfg.tag      || DEFAULT_BANNER.tag;
+  document.getElementById('banner-title').textContent = cfg.title    || DEFAULT_BANNER.title;
+  document.getElementById('banner-desc').innerHTML    = (cfg.desc    || DEFAULT_BANNER.desc).replace(/\n/g, '<br>');
+  const cta = document.getElementById('banner-cta');
+  cta.textContent = cfg.cta_text || DEFAULT_BANNER.cta_text;
+  cta.href        = cfg.cta_href || DEFAULT_BANNER.cta_href;
+  document.getElementById('banner-stat1-num').textContent = cfg.stat1_num || DEFAULT_BANNER.stat1_num;
+  document.getElementById('banner-stat2-num').textContent = cfg.stat2_num || DEFAULT_BANNER.stat2_num;
+  // Allow admin to set a different background photo
+  if (cfg.bg_image) {
+    document.querySelector('.hero-bg').style.backgroundImage = `url('${cfg.bg_image}')`;
+  }
+}
+
+async function loadBannerConfig() {
+  try {
+    const res = await fetch('/api/monospages-config?section=banner');
+    if (res.ok) { applyBanner(await res.json()); }
+    else         { applyBanner(DEFAULT_BANNER); }
+  } catch (_) {
+    applyBanner(DEFAULT_BANNER);
+  }
+}
+
+// ── Auth0 init ────────────────────────────────────────────────────────────────
+async function initAuth() {
+  try {
+    _auth0 = new window.auth0.Auth0Client({
+      domain: AUTH0_DOMAIN,
+      clientId: AUTH0_CLIENT_ID,
+      authorizationParams: {
+        redirect_uri: AUTH0_REDIRECT_URI,
+        scope: 'openid profile email offline_access'
+      },
+      cacheLocation: 'localstorage',
+      useRefreshTokens: true
+    });
+
+    if (window.location.search.includes('code=') && window.location.search.includes('state=')) {
+      try { await _auth0.handleRedirectCallback(); } catch (e) { console.warn('[Auth0] callback:', e.message); }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      try { await _auth0.checkSession(); } catch (_) {}
+    }
+
+    await applyAuthState();
+  } catch (e) {
+    console.error('[Auth0] init error:', e);
+    showLoginGate();
+  }
+}
+
+async function applyAuthState() {
+  let isAuth = false;
+  try { isAuth = await _auth0.isAuthenticated(); } catch (_) {}
+
+  if (!isAuth) { showLoginGate(); return; }
+
+  try {
+    const user = await _auth0.getUser();
+    _token = await _auth0.getTokenSilently();
+
+    // Navbar avatar + name
+    const name = user.name || user.email || '';
+    document.getElementById('nav-username').textContent = name;
+    const avatarImg  = document.getElementById('nav-avatar-img');
+    const avatarInit = document.getElementById('nav-avatar-init');
+    if (user.picture) {
+      avatarImg.src = user.picture; avatarImg.style.display = '';
+      avatarInit.style.display = 'none';
+    } else {
+      avatarImg.style.display = 'none';
+      avatarInit.textContent  = name.slice(0,1).toUpperCase();
+      avatarInit.style.display = 'flex';
+    }
+    document.getElementById('btn-nav-login').style.display = 'none';
+    document.getElementById('nav-auth-user').style.display = 'flex';
+
+    // Fetch role from app_metadata
+    try {
+      const profileRes = await fetch('/api/monospages-admin', {
+        headers: { 'Authorization': 'Bearer ' + _token }
+      });
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        _role = profile.monospages_role || 'viewer_basic';
+      }
+    } catch (_) { _role = 'viewer_basic'; }
+    if (!_role) _role = 'viewer_basic';   // guard: non-ok response without throw
+
+    applyRoleUI(_role);
+    showMainContent();
+    loadBannerConfig();
+
+  } catch (e) {
+    console.error('[Auth0] user fetch error:', e);
+    showLoginGate();
+  }
+}
+
+function applyRoleUI(role) {
+  const isAdmin  = role === 'admin';
+  const isWorker = role === 'worker' || isAdmin;
+  document.getElementById('nav-admin-link').style.display = isAdmin ? '' : 'none';
+  document.getElementById('card-admin').style.display     = isAdmin ? '' : 'none';
+  if (!isWorker) {
+    // dim BOTH the navbar link and the page card for each worker-only page
+    document.querySelectorAll('a[href="/monospages/field/"], a[href="/monospages/analysis/"]')
+      .forEach(el => { el.style.opacity = '0.45'; el.style.pointerEvents = 'none'; });
+  }
+}
+
+function showLoginGate() {
+  document.getElementById('login-gate').style.display   = 'block';
+  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('btn-nav-login').style.display = '';
+  document.getElementById('nav-auth-user').style.display = 'none';
+}
+
+function showMainContent() {
+  document.getElementById('login-gate').style.display   = 'none';
+  document.getElementById('main-content').style.display = 'flex';
+  document.getElementById('main-content').style.flexDirection = 'column';
+  document.getElementById('main-content').style.gap = '28px';
+}
+
+function authLogin() {
+  if (_auth0) _auth0.loginWithRedirect({ authorizationParams: { redirect_uri: AUTH0_REDIRECT_URI } });
+}
+function authLogout() {
+  if (_auth0) _auth0.logout({ logoutParams: { returnTo: window.location.origin + '/monospages/' } });
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', initAuth);
+
+</script>
+</body>
+</html>
